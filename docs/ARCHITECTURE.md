@@ -95,7 +95,20 @@ That is all. Game understanding lives in software, never in schema.
 
 ### Connecting Rust rules to a TypeScript site
 
-The site is TypeScript; the rules are Rust. Two ways to bridge them:
+The site is TypeScript; the rules are Rust. They have to meet somewhere.
+
+First, a distinction. Two things in the Rust are usually spoken of together but
+behave nothing alike:
+
+| | Move legality (`gyges`) | Bot move (`gyges_engine`) |
+|---|---|---|
+| Question answered | "what is legal here?" | "what is *best* here?" |
+| Time | microseconds | seconds |
+| CPU | trivial | a full core, and it wants threads (`YbwcPool`) |
+| Called | on every human move, and while dragging | only in bot games |
+| Fits in a web request? | yes | no — needs a job with a time budget |
+
+That difference, not language, is what drives the design below.
 
 **A. Compile `gyges` to WebAssembly.** The crate becomes a module the TypeScript
 imports and calls directly — no extra service, no network hop, and the *same*
@@ -109,15 +122,50 @@ instruction, WASM builds use the fallback. Roughly 15 lines, with no effect on
 native engine speed. **This has not yet been attempted and should be verified
 before committing to it.**
 
-**B. Run the Rust as a small separate service.** The site sends a board over
-HTTP and gets legal moves back. Requires no changes to the Rust, but adds a
-second deployable, a second thing to pay for, and a network round-trip per
-validation.
+**B. Run the Rust as a small service.** A long-lived Rust program exposing
+endpoints the site calls over HTTP:
 
-**Leaning: A for validation, B later for the bot.** Validation is a fast yes/no
-that belongs inline with the request. Engine search is slow and CPU-hungry, wants
-more time than a web request should take, and therefore belongs in its own
-process where it can be given a queue and a time budget.
+```
+POST /legal-moves   { board, player }        -> the legal move list
+POST /validate      { board, player, move }  -> accepted / rejected
+POST /bot-move      { board, player, depth } -> the engine's chosen move
+```
+
+The site never knows the rules; it asks. Notes on building it:
+
+- Link `gyges` and `gyges_engine` **as crates**, rather than spawning
+  `gyges_engine.exe` and piping UGI text. They are libraries; `Searcher::new(...)`
+  plus `go()` with an `AtomicBool` stop signal is the entry point. This avoids
+  subprocess management and text parsing entirely.
+- Caveat: `gyges_engine`'s own docs say it is "not intended to be used as a
+  dependency," so expect small changes to link it cleanly.
+- It cannot be serverless. The engine wants real threads and seconds of CPU,
+  which rules out Vercel functions. This needs an ordinary always-on host
+  (Railway or Fly, roughly $2-5/mo).
+- Bot moves should be a **queued job**, not a blocking HTTP call: accept the
+  request, search, then write the move and notify. Correspondence play makes this
+  natural — nobody is watching a spinner.
+
+### Which to choose
+
+**These are not exclusive, and B is needed eventually regardless** — a bot cannot
+run inside a serverless function, so the moment bot play arrives, a service like
+B has to exist. Choosing B first is therefore not wasted work; it is work brought
+forward.
+
+The argument for A alongside it is latency on one specific interaction: if
+legality lives only in a service, then highlighting legal moves while a player
+drags a piece means a network round-trip per hover, for something that takes
+microseconds to compute. A WASM build puts a copy of the rules in the browser for
+instant feedback, while the server still enforces them independently from the
+same source, so the two cannot disagree.
+
+**Recommended: start with B.** One service, one deployment, one mental model, and
+it covers both jobs. Add A later purely as a client-side responsiveness
+improvement, if dragging feels laggy.
+
+The reverse order also works if the bot is far off and the site should stay on a
+single free host for now.
 
 ### Sequencing
 
