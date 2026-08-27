@@ -159,30 +159,56 @@ and unsafe for many simultaneous players:
 None of this is a defect in the engine. It just means the bridge has to provide
 what the protocol does not.
 
-### Two fixes, both preserving the design
+### The fix: split by workload, not a general pool
 
-1. **Serialize access.** One process behind a lock; requests queue and run one at
-   a time. Simple and correct. Cost: a multi-second bot search blocks every other
-   player's legality check behind it.
-2. **A small process pool.** The bridge holds several engine processes; each
-   request takes a free one. Standard answer, and the one to prefer once bot play
-   exists.
-
-### Make commands self-contained
-
-Strongly recommended regardless of pool or lock: have verification commands carry
-their input rather than relying on remembered state.
+The requests are **bimodal** — microseconds or seconds, with nothing in between.
+So rather than a general process pool, run one engine instance per *kind* of work:
 
 ```
-legalmoves <boardstring> <player>     -> the legal move list
-validate   <boardstring> <player> <move>  -> accepted / rejected
+Backend (bridge)
+   |
+   +--> engine instance "fast"   legalmoves, validate     (microseconds)
+   |
+   +--> engine instance "bot"    go / search              (seconds)
 ```
 
-One request, one line, no dependence on a prior `setpos`. This removes most of
-the concurrency hazard, makes retries safe, and means a crashed process loses
-nothing. Bot search stays as it is — stateful and long-running — but is treated
-as a **queued job** rather than a blocking call, which correspondence play makes
-natural since nobody is watching a spinner.
+Same executable, two instances, different jobs. A long bot search cannot block a
+legality check, because they do not share a process. This is simpler than a pool
+and matches the actual shape of the work, while adding:
+
+- **Independent tuning.** The bot instance gets threads and the large
+  transposition table (`init()` allocates 400 MB). The fast instance needs
+  neither — it only calls `MoveGen`.
+- **Independent failure.** A hung or OOM-killed bot search does not take legality
+  checking down with it.
+- **Independent scaling.** More players means more fast instances; more bot games
+  means more bot instances.
+
+**Sequencing:** the second instance is only needed once bot play exists. Until
+then one instance serves everything. The split is a configuration change, not a
+redesign.
+
+### Make the fast commands stateless — from the start
+
+This part should **not** wait. Verification commands must carry their input
+rather than depending on remembered state:
+
+```
+legalmoves <boardstring> <player>            -> the legal move list
+validate   <boardstring> <player> <move>     -> accepted / rejected
+```
+
+Not `setpos` followed by `legalmoves`. The reason is a silent correctness bug:
+with any concurrency at all — two instances, or one instance serving two players
+whose requests interleave — player A's `setpos`, then player B's `setpos`, then
+A's `legalmoves` returns A the wrong answer. No crash, no error message, just a
+wrong legal-move list.
+
+Self-contained commands make that impossible by construction, make retries safe,
+and mean a crashed process loses nothing. The cost today is nothing.
+
+`go` may stay stateful; it runs one search at a time on a dedicated process by
+design.
 
 ### Hosting consequence
 
