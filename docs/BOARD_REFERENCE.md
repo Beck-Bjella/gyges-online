@@ -98,8 +98,16 @@ bear-off:  flipped[36] = board[37]
 36 -> 37,   37 -> 36,   x -> 35 - x
 ```
 
-**Terminal condition:** a player has won when either bear-off is occupied,
+**Terminal condition:** the game ends when either bear-off is occupied,
 i.e. `board[36] != 0 || board[37] != 0`.
+
+**Who won:** a player wins by reaching the space beyond their *opponent's* home
+row, so the ownership is inverted relative to the naming:
+
+```
+board[36] occupied (below P1's home row)  ->  Player 2 won
+board[37] occupied (above P2's home row)  ->  Player 1 won
+```
 
 ---
 

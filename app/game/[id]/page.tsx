@@ -1,0 +1,55 @@
+import { notFound } from "next/navigation";
+import { currentUser } from "@/lib/auth";
+import {
+  getGame,
+  getMoves,
+  settleExpiredGames,
+  sideOf,
+  decodeBoard,
+} from "@/lib/db/queries";
+import { moveFromString } from "@/lib/game/board";
+import GameView from "@/components/GameView";
+
+export const dynamic = "force-dynamic";
+
+export default async function GamePage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  settleExpiredGames();
+
+  const game = getGame(id);
+  if (!game) notFound();
+
+  const user = await currentUser();
+  const moves = getMoves(id);
+
+  return (
+    <GameView
+      game={{
+        id: game.id,
+        status: game.status,
+        turn: game.turn,
+        result: game.result,
+        resultReason: game.result_reason,
+        ply: game.ply,
+        moveSeconds: game.move_seconds,
+        deadlineAt: game.deadline_at,
+        player1Name: game.player1_name,
+        player2Name: game.player2_name,
+        hasPlayer2: game.player2_id !== null,
+      }}
+      board={decodeBoard(game.board)}
+      history={moves.map((m) => ({
+        ply: m.ply,
+        player: m.player,
+        move: moveFromString(m.move),
+        boardAfter: decodeBoard(m.board_after),
+      }))}
+      viewerSide={sideOf(game, user?.id ?? null)}
+      signedIn={Boolean(user)}
+    />
+  );
+}

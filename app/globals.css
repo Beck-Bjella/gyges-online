@@ -1,0 +1,340 @@
+/*
+ * Design tokens carried over from the desktop UIs.
+ * See docs/BOARD_REFERENCE.md section 5.
+ */
+
+:root {
+  --bg-deepest: #0a0807;
+  --bg-darkest: #110d0a;
+  --bg-dark: #18120e;
+  --bg-panel: #1f1812;
+  --bg-panel-hover: #2a2118;
+  --bg-panel-active: #1a3329;
+
+  --border-subtle: #322619;
+  --border-strong: #4a3a26;
+
+  --text-primary: #ede4cb;
+  --text-secondary: #a09373;
+  --text-dim: #6b5e4a;
+
+  --board-light: #6e5a40;
+  --board-dark: #423526;
+  --board-edge: #2c2218;
+  --gridspot-light: #3e3122;
+  --gridspot-dark: #2c2218;
+  --bear-off-light: #2c2218;
+  --bear-off-dark: #1a1410;
+
+  --piece-light: #f4ead0;
+  --piece-mid: #d4c498;
+  --piece-dark: #8a7550;
+  --piece-ring: #1a1108;
+
+  --accent-mint: #6ee7b7;
+  --accent-amber: #f0a875;
+  --accent-blue: #88a9ff;
+  --accent-red: #e88;
+
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    Helvetica, Arial, sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", Consolas, Monaco, monospace;
+
+  --radius: 8px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+  background: var(--bg-deepest);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  color: var(--accent-mint);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+input {
+  font: inherit;
+}
+
+/* --- layout ------------------------------------------------------------- */
+
+.site {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 14px 24px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-darkest);
+  flex-wrap: wrap;
+}
+
+.brand {
+  font-weight: 600;
+  font-size: 18px;
+  letter-spacing: 0.02em;
+  color: var(--text-primary);
+}
+.brand:hover {
+  text-decoration: none;
+  color: var(--accent-mint);
+}
+
+.topbar nav {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.topbar nav a {
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+.topbar nav a:hover {
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.who {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+.who strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+main {
+  flex: 1;
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 28px 24px 60px;
+}
+
+h1 {
+  font-size: 24px;
+  font-weight: 600;
+  margin: 0 0 6px;
+}
+
+h2 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 12px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.lede {
+  color: var(--text-secondary);
+  margin: 0 0 28px;
+  line-height: 1.6;
+  max-width: 60ch;
+}
+
+/* --- panels and controls ------------------------------------------------ */
+
+.panel {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  padding: 18px;
+}
+
+.btn {
+  display: inline-block;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  padding: 9px 16px;
+  font-size: 14px;
+  color: var(--text-primary);
+  transition: background 120ms ease, border-color 120ms ease;
+}
+.btn:hover:not(:disabled) {
+  background: var(--bg-panel-hover);
+  border-color: var(--accent-mint);
+  text-decoration: none;
+}
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.btn-primary {
+  background: var(--bg-panel-active);
+  border-color: var(--accent-mint);
+  color: var(--accent-mint);
+}
+.btn-danger:hover:not(:disabled) {
+  border-color: var(--accent-red);
+  color: var(--accent-red);
+}
+
+input[type="text"] {
+  background: var(--bg-darkest);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  color: var(--text-primary);
+  padding: 9px 12px;
+  font-size: 14px;
+  outline: none;
+}
+input[type="text"]:focus {
+  border-color: var(--accent-mint);
+}
+
+select {
+  background: var(--bg-darkest);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  color: var(--text-primary);
+  padding: 9px 12px;
+  font-size: 14px;
+}
+
+.row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.error {
+  color: var(--accent-red);
+  font-size: 14px;
+  margin: 10px 0 0;
+}
+
+.muted {
+  color: var(--text-dim);
+  font-size: 14px;
+}
+
+/* --- lists -------------------------------------------------------------- */
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.list-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  transition: border-color 120ms ease;
+}
+.list-item:hover {
+  border-color: var(--border-strong);
+}
+
+.tag {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+.tag-turn {
+  border-color: var(--accent-mint);
+  color: var(--accent-mint);
+}
+.tag-waiting {
+  border-color: var(--accent-amber);
+  color: var(--accent-amber);
+}
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .grid-2 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+th {
+  text-align: left;
+  color: var(--text-dim);
+  font-weight: 500;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0 12px 10px;
+}
+td {
+  padding: 10px 12px;
+  border-top: 1px solid var(--border-subtle);
+}
+td.num {
+  font-family: var(--font-mono);
+  text-align: right;
+}
+
+/* --- board -------------------------------------------------------------- */
+
+.board {
+  width: 100%;
+  max-width: 640px;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+  background: radial-gradient(
+    ellipse at center,
+    #14100c 0%,
+    var(--bg-deepest) 100%
+  );
+  border-radius: var(--radius);
+  user-select: none;
+}
