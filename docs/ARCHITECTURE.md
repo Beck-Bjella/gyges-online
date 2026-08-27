@@ -5,6 +5,23 @@ things get built and assumptions get tested.
 
 ---
 
+## Status
+
+**Built and working locally** (see the README to run it): accounts and sessions,
+creating and joining games, an interactive SVG board with displacement moves,
+per-move history with review, resignation, forfeit on time, and a leaderboard.
+The server enforces participation and turn order. 47 unit tests and 31
+end-to-end checks pass.
+
+**Local stack differs from the target in one place:** development uses SQLite
+rather than Postgres, on a schema deliberately restricted to the portable
+subset. Everything else below describes the intended production shape.
+
+**Not built yet:** move legality (waiting on the engine service), passwords,
+email notifications, and bot play.
+
+---
+
 ## Product shape
 
 **Correspondence-style asynchronous play**, in the model of Board Game Arena.
