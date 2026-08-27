@@ -210,11 +210,43 @@ and mean a crashed process loses nothing. The cost today is nothing.
 `go` may stay stateful; it runs one search at a time on a dedicated process by
 design.
 
-### Hosting consequence
+### Hosting consequence and cost
 
-This service cannot be serverless: the engine wants real threads
-(`YbwcPool`) and seconds of CPU, which Vercel functions do not provide. It needs
-an ordinary always-on host — Railway or Fly, roughly $2-5/mo.
+This service cannot be serverless: the engine wants real threads (`YbwcPool`) and
+seconds of CPU, which Vercel functions do not provide. It needs an ordinary
+always-on host — Railway or Fly, roughly **$2-5/mo**.
+
+That is the entire cost, and it stays small because **correspondence play is the
+cheapest possible workload**:
+
+- Moves arrive hours or days apart, so the server is idle almost all the time. A
+  *live* game site is what makes engine hosting expensive — every game holding an
+  open connection and a running clock. This is not that.
+- Legality checks are microseconds of CPU. Thousands a day would not register.
+- Only bot searches consume real CPU, only in bot games, and only for the few
+  seconds allowed by `maxTime`.
+
+**The binding constraint is RAM, not CPU.** `Ugi::init()` allocates a 400 MB
+transposition table (`init_tt(2usize.pow(22))`), which does not fit the cheapest
+instances. Two constants make it fit:
+
+- Transposition table: `2usize.pow(20)` is roughly 100 MB and fits a small box.
+  The lost search strength is not meaningful at correspondence time controls.
+- `threads` already defaults to 1, which is correct for a small instance.
+
+Both are configuration for the server build, not code changes.
+
+Ways to reduce the cost further:
+
+1. **Do not run it yet.** v1 has no bot and no validation, so there is no engine
+   service and no bill — $0 beyond the domain. Add it when rules or bots arrive.
+2. **Scale-to-zero hosting.** Fly stops an idle machine and restarts on request; a
+   stopped machine costs about $0.15/GB/month. A quiet correspondence site pays
+   for the minutes it actually uses. The tradeoff is a cold start on the first
+   request after a lull — acceptable for submitting a move or queueing a bot job.
+3. **Self-host during development.** For friends-and-testing, the engine can run
+   on a personal machine behind a tunnel at $0. Not appropriate for a public
+   site, but fine while proving the design.
 
 ### Which to choose
 
