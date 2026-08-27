@@ -125,15 +125,12 @@ e.g. `12|18` or `12|18|24`.
 
 ---
 
-## 4. Rules summary (informal — NOT an implementation)
+## 4. Rules summary (prose only — the implementation is in Rust)
 
-**No move validator exists yet, in this repo or in the Gyges engine project.**
-The rules below are a prose description from the `gyges` library documentation,
-recorded so the eventual validator has a starting point. They are incomplete and
-must not be treated as a specification.
-
-The website's v1 is deliberately **rule-free**: any move is accepted. See
-`ARCHITECTURE.md`.
+An informal description, for orientation. The real implementation is the move
+generator in the `gyges` Rust crate (`gyges/src/moves/movegen.rs`), which the
+website reaches rather than reimplements. Do not treat the prose below as a
+specification.
 
 - The object is to move a piece to your opponent's last row (their bear-off).
 - **No one owns the pieces.** You may only move a piece in **the row nearest you**
@@ -145,12 +142,14 @@ The website's v1 is deliberately **rule-free**: any move is accepted. See
 - If a piece lands on another piece at the end of its movement, it may instead
   **displace** that piece to any open square on the board.
 
-The `gyges` Rust crate contains move *generation* scaffolding
-(`gyges/src/moves/movegen.rs`) used by the engine's search, but it is not a
-finished validator and should not be treated as the authority on legality.
+`MoveGen::gen::<GenMoves, _>()` in the `gyges` crate is the authority: it
+produces the legal move list for a player from a board state. The website calls
+into it (see `ARCHITECTURE.md`) rather than reimplementing the rules, so that
+move validation and the future bot always agree.
 
-Whenever validation is written, the server must be the one enforcing it. Client
--side checks are a UX affordance only — a player can edit their own JavaScript.
+Whichever way it is reached, the **server** must be the side enforcing it.
+Client-side checks are a UX affordance only — a player can edit their own
+JavaScript.
 
 ---
 

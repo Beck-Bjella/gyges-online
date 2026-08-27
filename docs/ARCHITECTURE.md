@@ -28,8 +28,9 @@ What the server decides, starting in v1:
 - **when they may act** — that it is their turn
 - **the record** — the ordered move list, and the fact that a game has ended
 
-What the server does **not** decide yet: whether a move is *legal*. See the
-validation section below — v1 is deliberately rule-free.
+What the server does **not** decide in the first version: whether a move is
+*legal*. Validation comes from the Rust move generator and is wired in later —
+see "Where the game rules live" below.
 
 The distinction matters. "Server-authoritative" is about **who owns the truth**,
 not about how much of it is rule-checked. Even with no rules, the server must be
@@ -60,42 +61,76 @@ but it is a derived value, not the source of truth.
 
 ---
 
-## Move validation: deliberately absent in v1
+## Where the game rules live
 
-**There is no move validator yet, anywhere — including in the Rust engine
-project.** It has not been written. It is genuinely intricate (chained landings,
-displacement to any open square, the "nearest row" restriction), and writing it
-is not a prerequisite for having a website.
+**In code — specifically, in the existing Rust.** Not in the database, and not
+duplicated in TypeScript.
 
-**Decision: v1 is rule-free.** Players may make any move, exactly as the old
-desktop UIs allowed. The server still owns everything *else* about a game:
+The `gyges` Rust crate already contains a real legal-move generator
+(`gyges/src/moves/movegen.rs`). `MoveGen::gen::<GenMoves, _>()` walks the active
+line, handles piece-chaining traversal with backtracking and banned positions,
+and produces a `RawMoveList` that decodes to a `Vec<Move>`.
 
-- whose turn it is
-- the ordered move list
-- when a game is over
-- who is allowed to act (only a participant, only on their own turn)
+### Why the rules must not be reimplemented in TypeScript
 
-It simply does not judge whether a move obeys the rules of Gygès.
+The engine needs legal move generation in order to search. So the same code that
+will one day choose the bot's move is the code that can validate a human's move.
+Writing a second implementation in TypeScript would guarantee the two eventually
+disagree — and a bot playing by different rules than the validator enforces is a
+serious defect.
 
-### Why this is safe to defer
+**One rules implementation. Two uses: validation now, bot search later.**
 
-Because games are stored as an **ordered move list** rather than as board
-snapshots, validation is a later addition, not a later rewrite. The stored shape
-of a move does not change. Adding rules means adding one check before a move is
-accepted — no schema migration, no restructuring, and existing games remain
-readable.
+### What the database does NOT do
 
-### What it costs
+The database stores rows. It has no knowledge of Gygès — not what a ring is, not
+what the active line is, not what a legal move is. Its constraints are ordinary
+bookkeeping:
 
-Until validation exists, the site cannot support **ranked play against
-strangers**, because nothing prevents an illegal move. That is acceptable: v1
-targets friends and testing, where players know the rules and there is no
-incentive to cheat. Ratings and public matchmaking should wait for the
-validator.
+- a game cannot reference a user that does not exist
+- two rows cannot both claim to be ply 7 of the same game
+- a username cannot be registered twice
 
-When the validator is written, it belongs in `src/lib/game/` as a pure,
-dependency-free module, so the same code can run in the browser (to highlight
-legal moves) and on the server (to enforce them).
+That is all. Game understanding lives in software, never in schema.
+
+### Connecting Rust rules to a TypeScript site
+
+The site is TypeScript; the rules are Rust. Two ways to bridge them:
+
+**A. Compile `gyges` to WebAssembly.** The crate becomes a module the TypeScript
+imports and calls directly — no extra service, no network hop, and the *same*
+build can run in the browser to highlight legal moves.
+
+The crate's docs claim x86_64-only, but the actual dependency is **a single
+line**: `core::arch::x86_64::_pext_u64` at `movegen.rs:870` (the BMI2
+parallel-bit-extract instruction). The standard fix is a portable software
+fallback selected by `cfg(target_arch)` — native builds keep the fast
+instruction, WASM builds use the fallback. Roughly 15 lines, with no effect on
+native engine speed. **This has not yet been attempted and should be verified
+before committing to it.**
+
+**B. Run the Rust as a small separate service.** The site sends a board over
+HTTP and gets legal moves back. Requires no changes to the Rust, but adds a
+second deployable, a second thing to pay for, and a network round-trip per
+validation.
+
+**Leaning: A for validation, B later for the bot.** Validation is a fast yes/no
+that belongs inline with the request. Engine search is slow and CPU-hungry, wants
+more time than a web request should take, and therefore belongs in its own
+process where it can be given a queue and a time budget.
+
+### Sequencing
+
+Validation is **not** required for the first version to be useful. A v1 that
+accepts any move is playable among people who know the rules, and it lets the
+accounts / games / board / notifications work be finished and tested first.
+
+Because games are stored as an **ordered move list** rather than board
+snapshots, wiring in the validator later is a drop-in: the stored shape of a move
+does not change, no migration is needed, and existing games stay readable.
+
+Ranked play and public matchmaking should wait for validation, since ratings are
+meaningless while illegal moves are accepted.
 
 ---
 
@@ -110,8 +145,10 @@ Rationale:
   and the pages together, with types shared across the boundary.
 - **PostgreSQL over MySQL** for real constraints, transactions, and JSON columns.
   Move lists and game state benefit from both.
-- **TypeScript throughout**, so the board encoding and move format are literally
-  the same code on client and server — and so the eventual validator can be too.
+- **TypeScript throughout** for the site, so the board encoding and move format
+  are literally the same code on client and server.
+- **Game rules stay in Rust**, reached from TypeScript. They are never rewritten
+  in another language and never encoded in the schema.
 
 Deliberately deferred: WebSockets, a job queue, a separate API service, and
 microservices of any kind. None are needed for turn-based correspondence play, and
@@ -130,7 +167,8 @@ GygesUI/
 │   ├── app/                 Next.js routes — pages and API endpoints
 │   ├── components/          board SVG, game list, profile, layout
 │   ├── lib/
-│   │   ├── game/            board encoding, move format (validation later)
+│   │   ├── game/            board encoding, move format
+│   │   ├── rules/           WASM bindings to the gyges Rust move generator
 │   │   ├── db/              schema and queries
 │   │   └── auth/            sessions and accounts
 │   └── styles/
@@ -207,11 +245,11 @@ a board or a move is written once and used by both sides.
 38 numbers and a page expects something else, that is caught while writing the
 code rather than by a player hitting a broken screen.
 
-**PostgreSQL** over MySQL because it is stricter about data integrity. The
-database itself can refuse impossible states — two moves both claiming to be
-move 7 of one game, or a game referencing a player who does not exist. Since v1
-does not validate moves, having the *storage* layer be strict matters more, not
-less: application bugs cannot corrupt the game record.
+**PostgreSQL** over MySQL because it is stricter about *bookkeeping* integrity.
+It can refuse impossible rows — two moves both claiming to be ply 7 of one game,
+or a game referencing a player who does not exist. This is ordinary record
+keeping and involves no knowledge of Gygès; the rules live in Rust, never in the
+schema.
 
 **Vercel** is made by the same people as Next.js. Connect the GitHub repo and
 every push deploys automatically; HTTPS, CDN, and scaling are handled. Crucially
