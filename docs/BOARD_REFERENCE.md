@@ -125,9 +125,15 @@ e.g. `12|18` or `12|18|24`.
 
 ---
 
-## 4. Rules summary (for the future server-side validator)
+## 4. Rules summary (informal — NOT an implementation)
 
-From the `gyges` library documentation:
+**No move validator exists yet, in this repo or in the Gyges engine project.**
+The rules below are a prose description from the `gyges` library documentation,
+recorded so the eventual validator has a starting point. They are incomplete and
+must not be treated as a specification.
+
+The website's v1 is deliberately **rule-free**: any move is accepted. See
+`ARCHITECTURE.md`.
 
 - The object is to move a piece to your opponent's last row (their bear-off).
 - **No one owns the pieces.** You may only move a piece in **the row nearest you**
@@ -139,10 +145,12 @@ From the `gyges` library documentation:
 - If a piece lands on another piece at the end of its movement, it may instead
   **displace** that piece to any open square on the board.
 
-The authoritative implementation lives in the separate `gyges` Rust crate
-(`gyges/src/moves/movegen.rs`, in the Gyges/GygesRust project). This spec is a
-description, **not** a substitute — the server must validate against a real move
-generator and must never trust the client.
+The `gyges` Rust crate contains move *generation* scaffolding
+(`gyges/src/moves/movegen.rs`) used by the engine's search, but it is not a
+finished validator and should not be treated as the authority on legality.
+
+Whenever validation is written, the server must be the one enforcing it. Client
+-side checks are a UX affordance only — a player can edit their own JavaScript.
 
 ---
 

@@ -20,21 +20,25 @@ and no persistent socket connections. A move is one ordinary HTTP request.
 ## Non-negotiable: the server is the authority
 
 The browser renders the board and submits *move intents*. It is never trusted.
+The server holds the game state; the client holds a copy for display.
 
-Every move is validated server-side against the authoritative game state before it
-is persisted. Anything else is trivially cheatable — a player can edit client-side
-JavaScript, so client-side validation is a UX affordance only.
+What the server decides, starting in v1:
 
-This is a deliberate reversal of how the old desktop UIs worked. Those performed
-no validation at all, on purpose, so the engine could be tested from arbitrary
-positions. That affordance does not survive into competitive online play.
+- **who may act** — that the requester is a participant in this game
+- **when they may act** — that it is their turn
+- **the record** — the ordered move list, and the fact that a game has ended
 
-Concretely:
+What the server does **not** decide yet: whether a move is *legal*. See the
+validation section below — v1 is deliberately rule-free.
 
-- The client may compute legal moves to highlight them and to reject obvious
-  mistakes instantly. This is for feel, not for correctness.
-- The server recomputes legality from its own state on every submission.
-- The server also owns turn order, game termination, and rating changes.
+The distinction matters. "Server-authoritative" is about **who owns the truth**,
+not about how much of it is rule-checked. Even with no rules, the server must be
+the one that says whose turn it is and what the move history contains, because a
+player can edit their own JavaScript. Any check written on the client is a
+convenience for the player, never a guarantee against them.
+
+When validation is added, it slots into this same structure as one more thing
+the server decides.
 
 ---
 
@@ -56,32 +60,42 @@ but it is a derived value, not the source of truth.
 
 ---
 
-## Where the rules live
+## Move validation: deliberately absent in v1
 
-The authoritative rules exist today in the `gyges` Rust crate, in the separate
-Gyges engine project. That crate documents itself as **x86_64 only**, so it does
-not drop unchanged into a web server or a WASM build.
+**There is no move validator yet, anywhere — including in the Rust engine
+project.** It has not been written. It is genuinely intricate (chained landings,
+displacement to any open square, the "nearest row" restriction), and writing it
+is not a prerequisite for having a website.
 
-Three options for the server-side validator:
+**Decision: v1 is rule-free.** Players may make any move, exactly as the old
+desktop UIs allowed. The server still owns everything *else* about a game:
 
-| Option | Cost | Benefit |
-|--------|------|---------|
-| 1. Port move generation to TypeScript | ~500 lines, plus a test suite | Runs anywhere; no cross-language build; simplest deploy |
-| 2. Compile `gyges` to WebAssembly | Must fix x86_64 assumptions first | One source of truth for the rules |
-| 3. Separate Rust validation service | Two deployables, network hop per move | Maximum fidelity to the engine |
+- whose turn it is
+- the ordered move list
+- when a game is over
+- who is allowed to act (only a participant, only on their own turn)
 
-**Decision for v1: option 1.** Shipping matters more than sharing one
-implementation, and a TypeScript validator can run in *both* the browser and the
-server — giving instant client-side move highlighting from the same code that
-enforces legality. The risk is drift between two rule implementations; the
-mitigation is a test suite of positions cross-checked against the Rust move
-generator offline.
+It simply does not judge whether a move obeys the rules of Gygès.
 
-Option 2 becomes attractive later, when the engine is integrated as an opponent
-and a WASM build is needed anyway.
+### Why this is safe to defer
 
-The validator lives in an isolated, dependency-free module so it can be swapped
-for a WASM implementation without touching anything that calls it.
+Because games are stored as an **ordered move list** rather than as board
+snapshots, validation is a later addition, not a later rewrite. The stored shape
+of a move does not change. Adding rules means adding one check before a move is
+accepted — no schema migration, no restructuring, and existing games remain
+readable.
+
+### What it costs
+
+Until validation exists, the site cannot support **ranked play against
+strangers**, because nothing prevents an illegal move. That is acceptable: v1
+targets friends and testing, where players know the rules and there is no
+incentive to cheat. Ratings and public matchmaking should wait for the
+validator.
+
+When the validator is written, it belongs in `src/lib/game/` as a pure,
+dependency-free module, so the same code can run in the browser (to highlight
+legal moves) and on the server (to enforce them).
 
 ---
 
@@ -96,8 +110,8 @@ Rationale:
   and the pages together, with types shared across the boundary.
 - **PostgreSQL over MySQL** for real constraints, transactions, and JSON columns.
   Move lists and game state benefit from both.
-- **TypeScript throughout**, so the board encoding, move format, and validation
-  logic are literally the same code on client and server.
+- **TypeScript throughout**, so the board encoding and move format are literally
+  the same code on client and server — and so the eventual validator can be too.
 
 Deliberately deferred: WebSockets, a job queue, a separate API service, and
 microservices of any kind. None are needed for turn-based correspondence play, and
@@ -116,18 +130,19 @@ GygesUI/
 │   ├── app/                 Next.js routes — pages and API endpoints
 │   ├── components/          board SVG, game list, profile, layout
 │   ├── lib/
-│   │   ├── game/            board encoding, move generation, validation
+│   │   ├── game/            board encoding, move format (validation later)
 │   │   ├── db/              schema and queries
 │   │   └── auth/            sessions and accounts
 │   └── styles/
-├── tests/                   rules tests against known positions
+├── tests/                   tests
 └── package.json
 ```
 
 `src/lib/game/` is the important boundary: **no framework imports, no database
 imports, no I/O**. Pure functions over a board state. That is what lets the same
-module run in the browser for responsiveness and on the server for authority, and
-what makes it swappable for WASM later.
+module run in the browser for responsiveness and on the server for authority.
+Keeping this boundary clean now is what makes adding validation later a drop-in
+rather than a rewrite.
 
 ---
 
@@ -141,7 +156,9 @@ Not final; recorded so the shape is agreed before implementation.
   (for correspondence, this is a per-move deadline such as 72 hours).
 - **moves** — game reference, ply number, the move itself, the player who made
   it, and when. Unique on (game, ply). This table is the source of truth.
-- **ratings** — rating per user, updated on game completion.
+- **ratings** — rating per user, updated on game completion. Deferred until
+  move validation exists; ranked play is meaningless while illegal moves are
+  accepted.
 
 Correspondence play needs one background concern: **timeouts**. If a player does
 not move within the deadline, the game is forfeited. That is a scheduled job, not
@@ -160,6 +177,56 @@ order:
    site to be installed to the home screen as a PWA.
 
 ---
+
+## The three pieces of a website
+
+Plain-language version, because "hosting" bundles three separate jobs that are
+often three separate companies.
+
+1. **The domain** — the name, e.g. `gyges.com`. It is *rented*, holds no code,
+   and stores nothing. Every domain has DNS settings: a control panel that says
+   "when someone types this name, send them to that server." Change two records
+   and the name points anywhere.
+2. **The application** — the program that builds pages and receives moves. It
+   must be running constantly, waiting for requests.
+3. **The database** — permanent storage for accounts, games, and moves. Survives
+   restarts, crashes, and deploys.
+
+A single provider *can* do all three. NameHero cannot do all three for this
+particular app, for the reasons in the Hosting section below.
+
+## Why each tool
+
+**Next.js** puts the pages people see and the server code behind them in one
+project, in one language. The alternative — a separate frontend app and backend
+API — means two things to deploy, two to debug, and hand-written glue between
+them. At this scale that is pure overhead. One codebase means the definition of
+a board or a move is written once and used by both sides.
+
+**TypeScript** is JavaScript with type checking. When the server sends a board of
+38 numbers and a page expects something else, that is caught while writing the
+code rather than by a player hitting a broken screen.
+
+**PostgreSQL** over MySQL because it is stricter about data integrity. The
+database itself can refuse impossible states — two moves both claiming to be
+move 7 of one game, or a game referencing a player who does not exist. Since v1
+does not validate moves, having the *storage* layer be strict matters more, not
+less: application bugs cannot corrupt the game record.
+
+**Vercel** is made by the same people as Next.js. Connect the GitHub repo and
+every push deploys automatically; HTTPS, CDN, and scaling are handled. Crucially
+it does not sleep — some free hosts shut down after minutes of inactivity and
+take about a minute to wake, which makes a site look broken to anyone arriving
+during a quiet period.
+
+**Neon** runs the Postgres server so it does not have to be installed, patched,
+or backed up by hand.
+
+**Resend** sends the "it's your turn" emails. Correspondence play is unusable
+without them.
+
+Three services rather than one, but each does a single job, each is free at this
+scale, and any one can be replaced without disturbing the others.
 
 ## Hosting
 
