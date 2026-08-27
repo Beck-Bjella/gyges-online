@@ -122,50 +122,90 @@ instruction, WASM builds use the fallback. Roughly 15 lines, with no effect on
 native engine speed. **This has not yet been attempted and should be verified
 before committing to it.**
 
-**B. Run the Rust as a small service.** A long-lived Rust program exposing
-endpoints the site calls over HTTP:
+**B. Keep the engine as one executable; the backend is a bridge to it.**
+
+This is the preferred approach. The engine stays exactly what it already is — a
+self-contained `.exe` with a text command interface (UGI) — and gains the
+verification commands it lacks. The web backend spawns it and feeds it commands.
+
+Adding legality to the engine is small: `MoveGen` is already imported in
+`gyges_engine/src/ugi.rs`, and the existing `eval` command shows the pattern
+(build a `MoveGen`, run it against the board, print the result). Roughly 20
+lines.
+
+Advantages that matter:
+
+- **The engine stays independent.** It does not learn that a website exists, and
+  the website does not depend on crate internals.
+- **Debuggable by hand.** Run the exe in a terminal, type commands, read replies.
+  Reproducing a reported bug needs no web stack at all.
+- **Already proven.** The desktop UIs drove the engine this way for years.
+
+### The one structural catch: UGI is single-user
+
+The UGI loop is one `stdin` reader over **one board** (`search_options.board`)
+running **one search at a time**. That is correct for one human at one desktop,
+and unsafe for many simultaneous players:
+
+- `setpos` overwrites the single board, so two players' requests corrupt each
+  other's position.
+- Commands are **stateful and paired** — every request is really `setpos` then a
+  query. Interleave two users and the pairing breaks.
+- `go` sets `searching = true`; a second `go` mid-search is a conflict, not a
+  queued job.
+- Replies are `println!` text with no request identifier, so with several callers
+  there is no way to tell whose `bestmove` just arrived.
+
+None of this is a defect in the engine. It just means the bridge has to provide
+what the protocol does not.
+
+### Two fixes, both preserving the design
+
+1. **Serialize access.** One process behind a lock; requests queue and run one at
+   a time. Simple and correct. Cost: a multi-second bot search blocks every other
+   player's legality check behind it.
+2. **A small process pool.** The bridge holds several engine processes; each
+   request takes a free one. Standard answer, and the one to prefer once bot play
+   exists.
+
+### Make commands self-contained
+
+Strongly recommended regardless of pool or lock: have verification commands carry
+their input rather than relying on remembered state.
 
 ```
-POST /legal-moves   { board, player }        -> the legal move list
-POST /validate      { board, player, move }  -> accepted / rejected
-POST /bot-move      { board, player, depth } -> the engine's chosen move
+legalmoves <boardstring> <player>     -> the legal move list
+validate   <boardstring> <player> <move>  -> accepted / rejected
 ```
 
-The site never knows the rules; it asks. Notes on building it:
+One request, one line, no dependence on a prior `setpos`. This removes most of
+the concurrency hazard, makes retries safe, and means a crashed process loses
+nothing. Bot search stays as it is — stateful and long-running — but is treated
+as a **queued job** rather than a blocking call, which correspondence play makes
+natural since nobody is watching a spinner.
 
-- Link `gyges` and `gyges_engine` **as crates**, rather than spawning
-  `gyges_engine.exe` and piping UGI text. They are libraries; `Searcher::new(...)`
-  plus `go()` with an `AtomicBool` stop signal is the entry point. This avoids
-  subprocess management and text parsing entirely.
-- Caveat: `gyges_engine`'s own docs say it is "not intended to be used as a
-  dependency," so expect small changes to link it cleanly.
-- It cannot be serverless. The engine wants real threads and seconds of CPU,
-  which rules out Vercel functions. This needs an ordinary always-on host
-  (Railway or Fly, roughly $2-5/mo).
-- Bot moves should be a **queued job**, not a blocking HTTP call: accept the
-  request, search, then write the move and notify. Correspondence play makes this
-  natural — nobody is watching a spinner.
+### Hosting consequence
+
+This service cannot be serverless: the engine wants real threads
+(`YbwcPool`) and seconds of CPU, which Vercel functions do not provide. It needs
+an ordinary always-on host — Railway or Fly, roughly $2-5/mo.
 
 ### Which to choose
 
-**These are not exclusive, and B is needed eventually regardless** — a bot cannot
-run inside a serverless function, so the moment bot play arrives, a service like
-B has to exist. Choosing B first is therefore not wasted work; it is work brought
-forward.
+**Decision: B.** The engine stays one executable with a text interface, and the
+web backend is a thin bridge that feeds it commands — with the bridge owning a
+lock or a process pool, and verification commands made self-contained.
 
-The argument for A alongside it is latency on one specific interaction: if
-legality lives only in a service, then highlighting legal moves while a player
-drags a piece means a network round-trip per hover, for something that takes
-microseconds to compute. A WASM build puts a copy of the rules in the browser for
-instant feedback, while the server still enforces them independently from the
-same source, so the two cannot disagree.
+B is also needed eventually regardless: a bot cannot run inside a serverless
+function, so the moment bot play arrives this service has to exist. Building it
+now brings that work forward rather than duplicating it.
 
-**Recommended: start with B.** One service, one deployment, one mental model, and
-it covers both jobs. Add A later purely as a client-side responsiveness
-improvement, if dragging feels laggy.
-
-The reverse order also works if the bot is far off and the site should stay on a
-single free host for now.
+**A stays available as a later refinement, for one interaction only:**
+highlighting legal moves *while a player drags a piece*. Through a service, every
+hover is a network round-trip for something computable in microseconds. A WASM
+build would put a copy of the rules in the browser for instant feedback while the
+server still enforces them independently from the same source. That is polish, not
+architecture — revisit it only if dragging feels laggy.
 
 ### Sequencing
 
@@ -311,8 +351,27 @@ or backed up by hand.
 **Resend** sends the "it's your turn" emails. Correspondence play is unusable
 without them.
 
-Three services rather than one, but each does a single job, each is free at this
-scale, and any one can be replaced without disturbing the others.
+**Engine service** — the existing Gygès engine executable, plus a thin bridge
+that feeds it commands. Answers "is this move legal?" now and "what move should
+the bot play?" later. Needs an always-on host rather than a serverless one.
+
+Each piece does a single job and any one can be replaced without disturbing the
+others:
+
+```
+Browser
+   |
+   v
+Vercel (Next.js)  --->  Neon Postgres     accounts, games, move lists
+   |
+   +-------------->  Engine service       legality now, bot moves later
+   |                   (Rust exe + bridge)
+   |
+   +-------------->  Resend               "it's your turn" email
+```
+
+The site holds no game knowledge; it asks the engine service. The database holds
+no game knowledge; it stores rows.
 
 ## Hosting
 
