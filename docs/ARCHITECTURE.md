@@ -141,6 +141,65 @@ Advantages that matter:
   Reproducing a reported bug needs no web stack at all.
 - **Already proven.** The desktop UIs drove the engine this way for years.
 
+### How chess platforms do this
+
+This design is the standard one, and Lichess (open source) is the citable case.
+Its `lila` README lists the two as separate concerns:
+
+- *"Chess logic: scalachess submodule"* — a rules library with **no search and no
+  evaluation**. Legal move generation, variants, FEN/PGN, game state.
+- *"Chess engine: Stockfish, via fishnet AI cluster"* — a different system
+  entirely.
+
+**For a normal human-vs-human game, Stockfish is not in the path at all.** The
+move is validated by scalachess and broadcast. The engine appears only for
+analysis and for "play the computer," and even then it runs off-box: lila talks
+to Redis, which talks to a `lila-fishnet` coordinator service, which hands work
+over HTTP to volunteers running Stockfish on their own machines.
+
+The detail worth copying: **the bot's own move is re-validated.** fishnet returns
+a plain UCI move string, and lila puts it through scalachess like any other move.
+The engine is a consultant with no authority over game state — which is why
+Lichess can safely run it on strangers' desktops.
+
+Lichess also ships a WebAssembly Stockfish (`stockfish-web`) for in-browser
+analysis. So there are three independent engine deployments, and **none of them
+decides whether a move is legal.**
+
+### Why the split is universal
+
+The two computations are categorically different:
+
+| | Move validation | Engine search |
+|---|---|---|
+| Nature | exact, total, deterministic | heuristic, approximate, anytime |
+| Correct answer | exists and is unique | none — only better or worse |
+| Cost | ~1 microsecond, bounded | seconds, unbounded |
+| Trust | must be authoritative, server-side | advisory; safe on untrusted machines |
+| A bug means | corrupt game state | a worse suggestion |
+| Scales with | number of players | analysis demand — independently |
+
+Concrete numbers: the `shakmaty` Rust chess library reports perft 5 (4.87M
+positions) in 24 ms, roughly 200M move-generations/second. fishnet's minimum
+hardware bar for a volunteer is "~2 meganodes in 6 seconds" of real search. That
+is a **six-to-seven order of magnitude** gap. Anything with that cost ratio
+belongs on the other side of a process boundary.
+
+Rules-only libraries are a well-established category — `chess.js` describes
+itself as *"everything but the AI"*; `shakmaty`, `cozy-chess`, `python-chess`,
+and `scalachess` are all rules without search. Engines (Stockfish, Fairy-
+Stockfish, Leela) are separate programs reached over **UCI** — a text protocol
+whose entire purpose is to keep the rules authority separate from the thinking
+process.
+
+**The Gygès equivalent already exists.** `gyges` is the rules library,
+`gyges_engine` is the engine, and UGI is the boundary protocol. The structure
+chess arrived at is the structure this project already has.
+
+*(Chess.com is closed source and publishes nothing on its move-validation
+architecture. It certainly does not validate moves with Stockfish, but that is
+inference, not a citable fact.)*
+
 ### The one structural catch: UGI is single-user
 
 The UGI loop is one `stdin` reader over **one board** (`search_options.board`)
@@ -187,6 +246,34 @@ and matches the actual shape of the work, while adding:
 **Sequencing:** the second instance is only needed once bot play exists. Until
 then one instance serves everything. The split is a configuration change, not a
 redesign.
+
+### A rules-only mode is what makes the fast instance cheap
+
+`Ugi::init()` currently allocates the 400 MB transposition table and loads the
+neural network **unconditionally** — including for a process that will only ever
+answer `legalmoves`. Neither is used by `MoveGen`; both are search machinery.
+
+So the engine should take a flag — a `--rules-only` startup mode, or a
+`setoption` honoured before init — that skips `init_tt` and `load_network`
+entirely. A fast instance then costs a few megabytes instead of 400, which is the
+difference between fitting the cheapest host and not.
+
+This is what lets one executable serve both roles honestly:
+
+| | fast instance | bot instance |
+|---|---|---|
+| Transposition table | skipped | `2^22` (400 MB) or tuned down |
+| Neural network | not loaded | loaded |
+| `threads` | 1 | many |
+| Answers | `legalmoves`, `validate` | `go` |
+| Memory | a few MB | hundreds of MB |
+
+One binary, two configurations. Day one runs a single instance doing both; the
+split later changes configuration, not code.
+
+This is also the closest analogue to what chess platforms get by using a separate
+rules *library* — the difference being that here it is the same binary in a
+different mode, which keeps a single implementation of the rules.
 
 ### Make the fast commands stateless — from the start
 
