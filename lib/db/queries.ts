@@ -300,6 +300,22 @@ export function submitMove(gameId: string, userId: string, mv: Move): GameWithPl
     const structure = checkMoveStructure(board, mv);
     if (!structure.ok) throw new GameError(structure.reason ?? "Malformed move.");
 
+    // THE RULES CHECK GOES HERE.
+    //
+    // Everything above establishes authority: the game exists, it is running,
+    // you are a player, it is your turn, and the move is structurally coherent.
+    // What is missing is whether the move is *legal* under the rules of Gygès.
+    //
+    // When the engine service exists this becomes roughly:
+    //
+    //     const verdict = await validateMove(board, side, mv);
+    //     if (!verdict.legal) throw new GameError(verdict.reason ?? "Illegal move.");
+    //
+    // using lib/engine/client.ts. Note that submitMove would have to become
+    // async, since the engine is reached over the network. Nothing else about
+    // the flow changes, and stored games stay readable — see
+    // docs/ARCHITECTURE.md.
+
     const nextBoard = applyMove(board, mv);
     const encoded = encodeBoard(nextBoard);
     const ply = game.ply + 1;
