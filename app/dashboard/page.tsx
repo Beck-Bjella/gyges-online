@@ -30,16 +30,21 @@ export default async function DashboardPage() {
   const timing = timingStats(user.id);
   const games = listGamesForUser(user.id);
 
-  const yourMove = games.filter(
-    (g) =>
-      (g.status === "active" || g.status === "setup") &&
-      sideOf(g, user.id) === g.turn,
-  );
-  const theirMove = games.filter(
-    (g) =>
-      (g.status === "active" || g.status === "setup") &&
-      sideOf(g, user.id) !== g.turn,
-  );
+  // One list of games in play, ordered so the ones needing you come first.
+  // Whose turn it is is shown by colour rather than by splitting the list in
+  // two — a game does not change category when your opponent moves.
+  const active = games
+    .filter((g) => g.status === "active" || g.status === "setup")
+    .sort((a, b) => {
+      const aYours = sideOf(a, user.id) === a.turn ? 0 : 1;
+      const bYours = sideOf(b, user.id) === b.turn ? 0 : 1;
+      return aYours - bYours || b.updated_at - a.updated_at;
+    });
+
+  const yourMoveCount = active.filter(
+    (g) => sideOf(g, user.id) === g.turn,
+  ).length;
+
   const waiting = games.filter((g) => g.status === "open");
   const finished = games.filter((g) => g.status === "finished");
 
@@ -49,8 +54,8 @@ export default async function DashboardPage() {
         <div>
           <h1>{user.username}</h1>
           <p className="lede" style={{ marginBottom: 0 }}>
-            {yourMove.length > 0
-              ? `You have ${yourMove.length} game${yourMove.length === 1 ? "" : "s"} waiting on you.`
+            {yourMoveCount > 0
+              ? `It is your move in ${yourMoveCount} game${yourMoveCount === 1 ? "" : "s"}.`
               : "Nothing is waiting on you right now."}
           </p>
         </div>
@@ -72,70 +77,47 @@ export default async function DashboardPage() {
 
       <div className="grid-2" style={{ marginTop: 32 }}>
         <section>
-          {yourMove.length > 0 && (
-            <>
-              <div className="section-head">
-                <h2>Your move</h2>
-                <span className="count count-mint">{yourMove.length}</span>
-              </div>
-              <ul className="list">
-                {yourMove.map((g) => (
-                  <MyGame key={g.id} game={g} userId={user.id} urgent />
-                ))}
-              </ul>
-            </>
-          )}
+          {/*
+            Every section is always shown, empty or not. A page whose headings
+            appear and disappear depending on state is hard to read: you cannot
+            learn where anything lives, and an absent section is
+            indistinguishable from a section you have scrolled past.
+          */}
+          <GameSection
+            title="Active games"
+            games={active}
+            userId={user.id}
+            accent={yourMoveCount > 0 ? "mint" : undefined}
+            empty={
+              <>
+                No games in play. <Link href="/games">Find an opponent.</Link>
+              </>
+            }
+          />
 
-          {theirMove.length > 0 && (
-            <>
-              <div className="section-head" style={{ marginTop: 30 }}>
-                <h2>Waiting on your opponent</h2>
-                <span className="count">{theirMove.length}</span>
-              </div>
-              <ul className="list">
-                {theirMove.map((g) => (
-                  <MyGame key={g.id} game={g} userId={user.id} />
-                ))}
-              </ul>
-            </>
-          )}
+          <GameSection
+            title="Waiting for a challenger"
+            games={waiting}
+            userId={user.id}
+            accent="amber"
+            empty={
+              <>
+                None open. <Link href="/games">Host a game</Link> and see who
+                turns up.
+              </>
+            }
+          />
 
-          {waiting.length > 0 && (
-            <>
-              <div className="section-head" style={{ marginTop: 30 }}>
-                <h2>Waiting for a challenger</h2>
-                <span className="count count-amber">{waiting.length}</span>
-              </div>
-              <ul className="list">
-                {waiting.map((g) => (
-                  <MyGame key={g.id} game={g} userId={user.id} />
-                ))}
-              </ul>
-            </>
-          )}
-
-          <div className="section-head" style={{ marginTop: 30 }}>
-            <h2>Finished</h2>
-            {finished.length > 0 && <span className="count">{finished.length}</span>}
-          </div>
-          {finished.length === 0 ? (
-            <p className="empty">
-              No finished games yet. <Link href="/games">Find an opponent.</Link>
-            </p>
-          ) : (
-            <ul className="list">
-              {finished.map((g) => (
-                <MyGame key={g.id} game={g} userId={user.id} />
-              ))}
-            </ul>
-          )}
-
-          {games.length === 0 && (
-            <p className="empty" style={{ marginTop: 20 }}>
-              You have not played a game yet.{" "}
-              <Link href="/games">Host or join one</Link> to get started.
-            </p>
-          )}
+          <GameSection
+            title="Finished"
+            games={finished}
+            userId={user.id}
+            empty={
+              <>
+                No finished games yet. <Link href="/games">Find an opponent.</Link>
+              </>
+            }
+          />
         </section>
 
         <aside className="rail">
@@ -171,6 +153,49 @@ export default async function DashboardPage() {
   );
 }
 
+/**
+ * One dashboard section: a heading, a count, and either rows or a reason there
+ * are none. Always rendered, so the page keeps the same shape as games come
+ * and go.
+ */
+function GameSection({
+  title,
+  games,
+  userId,
+  accent,
+  empty,
+}: {
+  title: string;
+  games: GameWithPlayers[];
+  userId: string;
+  accent?: "mint" | "amber";
+  empty: React.ReactNode;
+}) {
+  return (
+    <>
+      <div className="section-head" style={{ marginTop: 30 }}>
+        <h2>{title}</h2>
+        <span
+          className={
+            games.length > 0 && accent ? `count count-${accent}` : "count"
+          }
+        >
+          {games.length}
+        </span>
+      </div>
+      {games.length === 0 ? (
+        <p className="empty">{empty}</p>
+      ) : (
+        <ul className="list">
+          {games.map((g) => (
+            <MyGame key={g.id} game={g} userId={userId} />
+          ))}
+        </ul>
+      )}
+    </>
+  );
+}
+
 function StatCard({
   label,
   value,
@@ -193,36 +218,50 @@ function StatCard({
   );
 }
 
+/**
+ * One of your games.
+ *
+ * The row colours itself by state rather than being told: mint and a "play"
+ * tag when it is your move, amber while waiting for a challenger, plain
+ * otherwise. That keeps whose-turn-it-is legible without splitting the list.
+ */
 function MyGame({
   game,
   userId,
-  urgent = false,
 }: {
   game: GameWithPlayers;
   userId: string;
-  urgent?: boolean;
 }) {
   const side = sideOf(game, userId);
   const opponent = side === 1 ? game.player2_name : game.player1_name;
 
+  const inPlay = game.status === "active" || game.status === "setup";
+  const yourTurn = inPlay && side === game.turn;
+  const open = game.status === "open";
+
   let label: string;
-  if (game.status === "open") label = "waiting for a challenger";
-  else if (game.status === "setup") label = "placing pieces";
-  else if (game.status === "finished") {
+  if (open) label = "waiting for a challenger";
+  else if (game.status === "setup") {
+    label = yourTurn ? "place your pieces" : "opponent is placing";
+  } else if (game.status === "finished") {
     label =
-      game.result === 0
-        ? "drawn"
-        : game.result === side
-          ? "you won"
-          : "you lost";
+      game.result === 0 ? "drawn" : game.result === side ? "you won" : "you lost";
     if (game.result_reason && game.result_reason !== "goal") {
       label += ` by ${game.result_reason}`;
     }
-  } else label = `ply ${game.ply}`;
+  } else {
+    label = yourTurn ? "your move" : "their move";
+  }
+
+  const avatarClass = yourTurn
+    ? "avatar avatar-mint"
+    : open
+      ? "avatar avatar-amber"
+      : "avatar";
 
   return (
-    <li className={urgent ? "list-item urgent" : "list-item"}>
-      <span className={urgent ? "avatar avatar-mint" : "avatar"}>
+    <li className={yourTurn ? "list-item urgent" : "list-item"}>
+      <span className={avatarClass}>
         {(opponent ?? "?").charAt(0).toUpperCase()}
       </span>
       <span style={{ flex: 1, minWidth: 0 }}>
@@ -230,11 +269,20 @@ function MyGame({
           {opponent ? `vs ${opponent}` : "Open game"}
         </Link>
         <br />
-        <span className="muted">
+        <span
+          className="muted"
+          style={
+            yourTurn
+              ? { color: "var(--accent-mint)" }
+              : open
+                ? { color: "var(--accent-amber)" }
+                : undefined
+          }
+        >
           {label} · {relativeTime(game.updated_at)}
         </span>
       </span>
-      {urgent && <span className="tag tag-turn">play</span>}
+      {yourTurn && <span className="tag tag-turn">play</span>}
     </li>
   );
 }

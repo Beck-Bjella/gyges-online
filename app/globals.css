@@ -1,29 +1,30 @@
 /*
  * Gygès Online — visual system.
  *
- * A warm, light interface: chalky paper and soft pastels, so the brown wooden
- * board sits on it the way a real board sits on a table. The board keeps its
- * own palette (docs/BOARD_REFERENCE.md §5) unchanged.
+ * A dark, warm interface: the feeling of a lamp over a table at night, rather
+ * than a code editor. The greys carry a little of the board's own brown, so
+ * the wooden board belongs on the page instead of floating on a cold slab.
  *
  * Accents mean something consistently: green for "your turn / good", amber for
  * "waiting", rose for "danger".
  */
 
 :root {
-  /* Paper. Warm rather than blue-white, to agree with the board. */
-  --bg-deepest: #f6f1e8;
-  --bg-darkest: #fffdf9;
-  --bg-dark: #f1ebe0;
-  --bg-panel: #fffdf9;
-  --bg-panel-hover: #f8f3e9;
-  --bg-panel-active: #e8f5ef;
+  /* Near-black with a brown cast, so it agrees with the board's wood. */
+  --bg-deepest: #12100e;
+  --bg-darkest: #171411;
+  --bg-dark: #1b1815;
+  --bg-panel: #1e1a17;
+  --bg-panel-hover: #262119;
+  --bg-panel-active: #1a2f27;
 
-  --border-subtle: #e5dccd;
-  --border-strong: #d3c7b3;
+  --border-subtle: #2f2a24;
+  --border-strong: #453d33;
 
-  --text-primary: #2e2a24;
-  --text-secondary: #6b6357;
-  --text-dim: #9a9184;
+  --text-primary: #f0e9df;
+  --text-secondary: #b0a596;
+  /* 5.1:1 against a panel — dim, but still comfortably readable. */
+  --text-dim: #948a7c;
 
   /* Board colours — unchanged from the reference. */
   --board-light: #6e5a40;
@@ -39,13 +40,13 @@
   --piece-dark: #8a7550;
   --piece-ring: #1a1108;
 
-  /* Pastels, dark enough to read as text on paper. */
-  --accent-mint: #2f9c7c;
-  --accent-mint-soft: #d6f0e6;
-  --accent-amber: #c67f2b;
-  --accent-amber-soft: #fbebd4;
-  --accent-blue: #4d76c4;
-  --accent-red: #c2545f;
+  /* Bright enough to read on a dark ground, warm enough not to look neon. */
+  --accent-mint: #6fd8b4;
+  --accent-mint-soft: rgba(111, 216, 180, 0.12);
+  --accent-amber: #e8a75c;
+  --accent-amber-soft: rgba(232, 167, 92, 0.13);
+  --accent-blue: #8fa8e8;
+  --accent-red: #e88594;
 
   --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
     Helvetica, Arial, sans-serif;
@@ -53,8 +54,7 @@
 
   --radius: 10px;
   --radius-sm: 6px;
-  --shadow: 0 1px 2px rgba(70, 58, 40, 0.06),
-    0 6px 18px rgba(70, 58, 40, 0.07);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 26px rgba(0, 0, 0, 0.3);
 }
 
 * {
@@ -81,11 +81,19 @@ body::before {
   position: fixed;
   inset: 0 0 auto 0;
   height: 420px;
-  background: radial-gradient(
-    ellipse 900px 340px at 50% 0%,
-    rgba(214, 240, 230, 0.55),
-    transparent 72%
-  );
+  /* A pool of warm light from above, as if a lamp hangs over the table. */
+  background:
+    radial-gradient(
+      ellipse 1100px 480px at 50% -10%,
+      rgba(232, 167, 92, 0.09),
+      transparent 68%
+    ),
+    radial-gradient(
+      ellipse 700px 400px at 82% 2%,
+      rgba(111, 216, 180, 0.05),
+      transparent 66%
+    );
+  height: 620px;
   pointer-events: none;
   z-index: 0;
 }
@@ -125,7 +133,7 @@ input {
   padding: 0 24px;
   height: 58px;
   border-bottom: 1px solid var(--border-subtle);
-  background: rgba(255, 253, 249, 0.82);
+  background: rgba(23, 20, 17, 0.82);
   backdrop-filter: blur(12px);
   position: sticky;
   top: 0;
@@ -260,12 +268,12 @@ h2 {
 }
 .count-mint {
   color: var(--accent-mint);
-  border-color: rgba(47, 156, 124, 0.28);
+  border-color: rgba(111, 216, 180, 0.3);
   background: var(--accent-mint-soft);
 }
 .count-amber {
   color: var(--accent-amber);
-  border-color: rgba(198, 127, 43, 0.28);
+  border-color: rgba(232, 167, 92, 0.3);
   background: var(--accent-amber-soft);
 }
 
@@ -335,15 +343,15 @@ h2 {
 }
 
 .btn-primary {
-  background: linear-gradient(180deg, #3aab8a, #2f9c7c);
-  border-color: #2a8b6f;
-  color: #fffdf9;
-  font-weight: 620;
-  box-shadow: 0 1px 2px rgba(47, 156, 124, 0.25);
+  background: linear-gradient(180deg, #6fd8b4, #4dbf99);
+  border-color: transparent;
+  color: #0e2b23;
+  font-weight: 630;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 .btn-primary:hover:not(:disabled) {
-  background: linear-gradient(180deg, #42bd99, #35a888);
-  color: #fffdf9;
+  background: linear-gradient(180deg, #86e5c4, #5fd0aa);
+  color: #0e2b23;
 }
 
 .btn-danger:hover:not(:disabled) {
@@ -365,7 +373,7 @@ select {
 input[type="text"]:focus,
 select:focus {
   border-color: var(--accent-mint);
-  box-shadow: 0 0 0 3px rgba(47, 156, 124, 0.15);
+  box-shadow: 0 0 0 3px rgba(111, 216, 180, 0.16);
 }
 input::placeholder {
   color: var(--text-dim);
@@ -415,7 +423,7 @@ input::placeholder {
   background: var(--bg-panel-hover);
 }
 .list-item.urgent {
-  border-color: rgba(47, 156, 124, 0.35);
+  border-color: rgba(111, 216, 180, 0.35);
   background: linear-gradient(90deg, var(--accent-mint-soft), var(--bg-panel) 45%);
 }
 
@@ -436,12 +444,12 @@ input::placeholder {
   font-weight: 600;
 }
 .avatar-mint {
-  border-color: rgba(47, 156, 124, 0.3);
+  border-color: rgba(111, 216, 180, 0.32);
   color: var(--accent-mint);
   background: var(--accent-mint-soft);
 }
 .avatar-amber {
-  border-color: rgba(198, 127, 43, 0.3);
+  border-color: rgba(232, 167, 92, 0.32);
   color: var(--accent-amber);
   background: var(--accent-amber-soft);
 }
@@ -458,12 +466,12 @@ input::placeholder {
   white-space: nowrap;
 }
 .tag-turn {
-  border-color: rgba(47, 156, 124, 0.35);
+  border-color: rgba(111, 216, 180, 0.38);
   color: var(--accent-mint);
   background: var(--accent-mint-soft);
 }
 .tag-waiting {
-  border-color: rgba(198, 127, 43, 0.35);
+  border-color: rgba(232, 167, 92, 0.38);
   color: var(--accent-amber);
   background: var(--accent-amber-soft);
 }
@@ -475,7 +483,7 @@ input::placeholder {
   padding: 0 6px;
   border-radius: 999px;
   background: var(--accent-mint);
-  color: #fffdf9;
+  color: #0e2b23;
   font-size: 11px;
   font-weight: 700;
   line-height: 17px;
@@ -596,7 +604,7 @@ td.num {
   font-weight: 700;
   letter-spacing: -0.035em;
   margin: 0 0 14px;
-  background: linear-gradient(135deg, #6e5a40 10%, #4a3b28 55%, #2e2a24);
+  background: linear-gradient(135deg, #f4ead0 15%, #d4c498 55%, #9a8259);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -646,7 +654,7 @@ td.num {
   height: auto;
   display: block;
   margin: 0 auto;
-  background: radial-gradient(ellipse at center, #4a3b28 0%, #33291c 100%);
+  background: radial-gradient(ellipse at center, #241d15 0%, #12100e 100%);
   box-shadow: var(--shadow);
   border-radius: var(--radius);
   user-select: none;
@@ -699,7 +707,7 @@ td.num {
    and blocking pointer events makes that unmistakable — a player should never
    drag a piece and wonder why nothing happened. */
 .board-wrap.reviewing .board {
-  filter: saturate(0.35) brightness(0.78);
+  filter: saturate(0.4) brightness(0.66);
   cursor: default;
   pointer-events: none;
 }
@@ -715,11 +723,11 @@ td.num {
   white-space: nowrap;
   padding: 9px 13px;
   border-radius: var(--radius);
-  background: rgba(255, 253, 249, 0.97);
-  border: 1px solid rgba(198, 127, 43, 0.5);
+  background: rgba(18, 16, 14, 0.95);
+  border: 1px solid rgba(232, 167, 92, 0.5);
   color: var(--accent-amber);
   font-size: 13px;
-  box-shadow: 0 8px 28px rgba(70, 58, 40, 0.25);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.6);
 }
 .review-banner .btn {
   padding: 5px 11px;
