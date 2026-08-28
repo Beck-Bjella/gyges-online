@@ -55,14 +55,12 @@ export default async function PlayerPage({
         </div>
       )}
 
-      <div className="panel" style={{ marginBottom: 24 }}>
-        <div className="statrow">
-          <Stat label="Played" value={stats.played} />
-          <Stat label="Won" value={stats.wins} accent="var(--accent-mint)" />
-          <Stat label="Lost" value={stats.losses} />
-          <Stat label="Drawn" value={stats.draws} />
-          <Stat label="In progress" value={stats.active} accent="var(--accent-amber)" />
-        </div>
+      <div className="statcards" style={{ marginBottom: 26 }}>
+        <Stat label="Played" value={stats.played} />
+        <Stat label="Won" value={stats.wins} accent="var(--accent-mint)" />
+        <Stat label="Lost" value={stats.losses} />
+        <Stat label="Drawn" value={stats.draws} />
+        <Stat label="In progress" value={stats.active} accent="var(--accent-amber)" />
       </div>
 
       {active.length > 0 && (
@@ -138,7 +136,7 @@ function Stat({
   accent?: string;
 }) {
   return (
-    <div>
+    <div className="statcard">
       <div className="statvalue" style={accent ? { color: accent } : undefined}>
         {value}
       </div>

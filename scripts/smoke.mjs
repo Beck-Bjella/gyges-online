@@ -85,7 +85,7 @@ check("both players can sign in", Boolean(aliceCookie && bobCookie));
 
 // The session must survive an ordinary page navigation.
 {
-  const page = await fetch(`${BASE}/`, { headers: { Cookie: aliceCookie } });
+  const page = await fetch(`${BASE}/dashboard`, { headers: { Cookie: aliceCookie } });
   const html = await page.text();
   check(
     "the session persists across pages",
@@ -310,6 +310,8 @@ check(
 
 for (const [name, path] of [
   ["home", "/"],
+  ["games", "/games"],
+  ["dashboard", "/dashboard"],
   ["leaderboard", "/leaderboard"],
   ["rules", "/rules"],
   ["game", `/game/${gameId}`],
@@ -332,6 +334,37 @@ check(
   noPlayer.status === 404,
   `status ${noPlayer.status}`,
 );
+
+// Signed out, the front page is the pitch; signed in, it redirects to the
+// dashboard rather than showing a second, worse version of it.
+{
+  const anon = await fetch(`${BASE}/`, { redirect: "manual" });
+  check("the landing page renders for a visitor", anon.status === 200);
+
+  const signedIn = await fetch(`${BASE}/`, {
+    headers: { Cookie: aliceCookie },
+    redirect: "manual",
+  });
+  check(
+    "a signed-in visitor is sent to the dashboard",
+    signedIn.status === 307 || signedIn.status === 302,
+    `status ${signedIn.status}`,
+  );
+
+  const noDash = await fetch(`${BASE}/dashboard`, { redirect: "manual" });
+  check(
+    "the dashboard is not reachable signed out",
+    noDash.status === 307 || noDash.status === 302,
+    `status ${noDash.status}`,
+  );
+
+  const anonGames = await fetch(`${BASE}/games`);
+  check(
+    "the games lobby is public",
+    anonGames.status === 200,
+    `status ${anonGames.status}`,
+  );
+}
 
 // A finished game must be readable by someone who was not in it.
 const outsider = await signIn(`nosy${suffix}`);

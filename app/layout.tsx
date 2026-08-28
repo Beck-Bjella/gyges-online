@@ -23,14 +23,18 @@ export default async function RootLayout({
       <body>
         <div className="site">
           <header className="topbar">
-            <Link href="/" className="brand">
+            <Link href={user ? "/dashboard" : "/"} className="brand">
+              <span className="brand-mark" aria-hidden />
               Gygès
             </Link>
             <nav>
-              <Link href="/">
-                Games
-                {waiting > 0 && <span className="badge">{waiting}</span>}
-              </Link>
+              {user && (
+                <Link href="/dashboard">
+                  Dashboard
+                  {waiting > 0 && <span className="badge">{waiting}</span>}
+                </Link>
+              )}
+              <Link href="/games">Games</Link>
               <Link href="/leaderboard">Leaderboard</Link>
               <Link href="/rules">Rules</Link>
             </nav>
@@ -50,6 +54,13 @@ export default async function RootLayout({
             )}
           </header>
           <main>{children}</main>
+          <footer className="site-foot">
+            <span>
+              Gygès was designed by Claude Leroy and is published by Blue
+              Orange. This is an unofficial, non-commercial implementation and
+              is not affiliated with or endorsed by them.
+            </span>
+          </footer>
         </div>
       </body>
     </html>
