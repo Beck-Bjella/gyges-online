@@ -21,6 +21,23 @@ import {
 
 export const SESSION_COOKIE = "gyges_session";
 
+/**
+ * Whether to mark the session cookie Secure.
+ *
+ * A Secure cookie is only ever sent back over HTTPS. That is correct for a
+ * deployed site, and silently breaks sign-in when the production build is
+ * served over plain http — which is exactly how the site is tested on a local
+ * network. The browser accepts the cookie and then never returns it, so every
+ * request looks signed out.
+ *
+ * So: on by default in production, but switched off when GYGES_INSECURE_COOKIES
+ * is set, which the LAN scripts do. Never set that in a real deployment.
+ */
+function useSecureCookies(): boolean {
+  if (process.env.GYGES_INSECURE_COOKIES === "1") return false;
+  return process.env.NODE_ENV === "production";
+}
+
 export async function currentUser(): Promise<User | null> {
   const store = await cookies();
   return userForSession(store.get(SESSION_COOKIE)?.value);
@@ -38,7 +55,7 @@ export async function signIn(username: string): Promise<User> {
     sameSite: "lax",
     path: "/",
     maxAge: 30 * 86400,
-    secure: process.env.NODE_ENV === "production",
+    secure: useSecureCookies(),
   });
   return user;
 }

@@ -108,6 +108,16 @@ real play-testing.
 The trade-off is that `npm run build` must be re-run after every code change —
 there is no hot reload in production mode.
 
+`start:lan` also turns **off** the `Secure` flag on the session cookie, via
+`GYGES_INSECURE_COOKIES=1`. This is necessary and worth understanding: a Secure
+cookie is only ever sent back over HTTPS, so serving a production build over a
+plain `http://` LAN address means the browser accepts the session and then never
+returns it. Sign-in appears to work and every page afterwards looks signed out.
+
+A real deployment serves HTTPS and keeps the flag on. **Never set
+`GYGES_INSECURE_COOKIES` in production** — it would let a session cookie travel
+unencrypted.
+
 ### Phones and tablets
 
 The site works on a phone on the same wifi: open `http://192.168.1.11:3000`

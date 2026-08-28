@@ -21,7 +21,7 @@ import {
   type Move,
   type Player,
 } from "@/lib/game/board";
-import { describeTimeControl, relativeTime } from "@/lib/format";
+import { describeThinkTime, describeTimeControl, relativeTime } from "@/lib/format";
 
 interface GameSummary {
   id: string;
@@ -42,6 +42,8 @@ interface HistoryEntry {
   player: Player;
   move: Move;
   boardAfter: BoardState;
+  /** How long the player took, in milliseconds. */
+  thinkMs: number | null;
 }
 
 interface Props {
@@ -254,7 +256,10 @@ export default function GameView({
                       <span style={{ minWidth: 22 }}>
                         {h.player === 1 ? "P1" : "P2"}
                       </span>
-                      <span>{moveToNotation(h.move)}</span>
+                      <span style={{ flex: 1 }}>{moveToNotation(h.move)}</span>
+                      <span style={{ color: "var(--text-dim)" }}>
+                        {describeThinkTime(h.thinkMs)}
+                      </span>
                     </button>
                   </li>
                 );

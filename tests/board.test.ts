@@ -276,3 +276,14 @@ test("a move into the goal is structurally fine", () => {
   // question the engine will answer later.
   assert.equal(checkMoveStructure(b, [30, P2_GOAL]).ok, true);
 });
+
+// --- formatting -------------------------------------------------------------
+
+test("think times display in the unit that suits their size", async () => {
+  const { describeThinkTime } = await import("../lib/format.ts");
+  assert.equal(describeThinkTime(30_000), "30s");
+  assert.equal(describeThinkTime(300_000), "5m");
+  assert.equal(describeThinkTime(7_200_000), "2.0h");
+  assert.equal(describeThinkTime(259_200_000), "3.0d");
+  assert.equal(describeThinkTime(null), "—");
+});

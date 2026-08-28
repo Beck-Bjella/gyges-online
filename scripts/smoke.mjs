@@ -64,6 +64,44 @@ const aliceCookie = await signIn(alice);
 const bobCookie = await signIn(bob);
 check("both players can sign in", Boolean(aliceCookie && bobCookie));
 
+// A Secure cookie is only returned over HTTPS. Setting it while serving plain
+// http means the browser accepts the session and never sends it back, so every
+// page looks signed out. This caught exactly that bug.
+{
+  const res = await fetch(`${BASE}/api/auth/signin`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username: `cookie${suffix}` }),
+  });
+  const header = res.headers.get("set-cookie") ?? "";
+  const isHttps = BASE.startsWith("https://");
+  check(
+    "the session cookie is usable over this protocol",
+    isHttps || !/;\s*Secure/i.test(header),
+    "cookie is marked Secure but the site is served over http",
+  );
+  check("the session cookie is httpOnly", /;\s*HttpOnly/i.test(header));
+}
+
+// The session must survive an ordinary page navigation.
+{
+  const page = await fetch(`${BASE}/`, { headers: { Cookie: aliceCookie } });
+  const html = await page.text();
+  check(
+    "the session persists across pages",
+    html.includes(alice),
+    "the home page does not show the signed-in user",
+  );
+  const board = await fetch(`${BASE}/leaderboard`, {
+    headers: { Cookie: aliceCookie },
+  });
+  check(
+    "the session persists on another page",
+    (await board.text()).includes(alice),
+    "the leaderboard does not show the signed-in user",
+  );
+}
+
 // --- creating and joining --------------------------------------------------
 
 const created = await api("/api/games", {

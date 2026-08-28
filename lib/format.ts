@@ -25,3 +25,19 @@ export function describeTimeControl(seconds: number): string {
   if (seconds % 60 === 0) return plural(seconds / 60, "minute") + " per move";
   return plural(seconds, "second") + " per move";
 }
+
+/**
+ * A think time, in the unit that suits its size.
+ *
+ * Stored in milliseconds, but correspondence moves take hours or days, so
+ * that is what gets shown. Milliseconds is only the storage unit: keeping
+ * precision costs nothing, and adding it later would be impossible.
+ */
+export function describeThinkTime(ms: number | null): string {
+  if (ms === null) return "—";
+  const seconds = Math.round(ms / 1000);
+  if (seconds < 60) return `${seconds}s`;
+  if (seconds < 3600) return `${Math.round(seconds / 60)}m`;
+  if (seconds < 86400) return `${(seconds / 3600).toFixed(1)}h`;
+  return `${(seconds / 86400).toFixed(1)}d`;
+}

@@ -47,6 +47,7 @@ export default async function GamePage({
         player: m.player,
         move: moveFromString(m.move),
         boardAfter: decodeBoard(m.board_after),
+        thinkMs: m.think_ms,
       }))}
       viewerSide={sideOf(game, user?.id ?? null)}
       signedIn={Boolean(user)}

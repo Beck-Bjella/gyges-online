@@ -11,7 +11,7 @@
     "db:reset": "node scripts/reset-db.mjs",
     "test": "node --experimental-strip-types --test \"tests/**/*.test.ts\"",
     "smoke": "node scripts/smoke.mjs",
-    "start:lan": "next start --hostname 0.0.0.0"
+    "start:lan": "node scripts/start-lan.mjs"
   },
   "dependencies": {
     "better-sqlite3": "^11.7.0",
