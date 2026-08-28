@@ -146,6 +146,12 @@ CREATE INDEX IF NOT EXISTS games_deadline_idx ON games(deadline_at)
 CREATE TABLE IF NOT EXISTS moves (
   game_id     TEXT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
   -- 1-based index of this move within the game.
+  --
+  -- "Ply" is the precise term: one player's turn. It is kept here and
+  -- throughout the code because it is unambiguous (chess uses "move" for a
+  -- pair of turns) and because the Gyges engine's UGI protocol already speaks
+  -- it - maxPly, startPly, "info ply". The user interface says "move", which
+  -- is what players understand.
   ply         INTEGER NOT NULL,
   -- Which side made it: 1 or -1.
   player      INTEGER NOT NULL,
