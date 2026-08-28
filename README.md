@@ -19,11 +19,30 @@ Then open <http://localhost:3000>. The database is created automatically at
 Sign in with any username to claim it. To play a full game against yourself,
 open a second browser profile (or a private window) and sign in as someone else.
 
+### Playing with someone else on your wifi
+
+```sh
+npm run dev:lan
+```
+
+Then find your address with `ipconfig` (look for **IPv4 Address**, e.g.
+`192.168.1.11`) and, once, allow the port through the firewall from an
+**Administrator** PowerShell:
+
+```powershell
+New-NetFirewallRule -DisplayName "Gyges Dev Server" -Direction Inbound -LocalPort 3000 -Protocol TCP -Action Allow -Profile Private
+```
+
+The other person opens `http://192.168.1.11:3000`. Your computer is the server;
+your machine must stay awake. Full details, plus how this maps to real hosting,
+are in [docs/RUNNING.md](docs/RUNNING.md).
+
 ### Scripts
 
 | Command | What it does |
 |---------|--------------|
 | `npm run dev` | Development server with hot reload |
+| `npm run dev:lan` | Same, but reachable by other machines on your network |
 | `npm run build` | Production build |
 | `npm start` | Serve the production build |
 | `npm test` | Unit tests (board module and game flow) |
@@ -88,6 +107,8 @@ PostgreSQL for production.
 
 ## Documentation
 
+- [docs/RUNNING.md](docs/RUNNING.md) — running it locally, over your network,
+  and on a real server; and where the engine process fits in.
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — the design and its reasoning:
   server authority, where the rules live, hosting, and costs.
 - [docs/BOARD_REFERENCE.md](docs/BOARD_REFERENCE.md) — board topology, piece
