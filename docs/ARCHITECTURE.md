@@ -60,6 +60,35 @@ the server decides.
 
 ---
 
+## Schema decisions, checked against other servers
+
+The data model was reviewed against seven open-source turn-based game servers
+(lila/lidraughts, pychess-variants, boardgame.io, govsgo, two Rails chess apps,
+and Board Game Arena's published conventions). Three conclusions worth keeping:
+
+**Two player columns, not a junction table.** Lichess embeds both players
+directly in the game (`p0`/`p1`); pychess-variants uses an ordered two-element
+array. The one surveyed project using a junction table has to infer colour from
+row order and carries a TODO admitting it. A junction table buys flexibility
+that an asymmetric two-player game never spends.
+
+**Tombstone deleted users; never cascade.** Lichess replaces a closed account
+with a "ghost" sentinel so every historical game survives, and unsets personal
+fields rather than deleting the row. One surveyed project cascades deletes into
+its game archive, which destroys game records when a user leaves. Hence
+`users.deleted_at` and `ON DELETE RESTRICT` here.
+
+**The cached position earns its keep by guarding writes, not by speeding reads.**
+pychess-variants includes the stored position in its update filter so a stale
+move cannot land; govsgo re-reads the current player inside the write path for
+the same reason. Meanwhile govsgo *removed* a pure read-optimisation cache and
+lichess moved off its cached piece map toward replaying a compressed log. Our
+`submitMove` follows the pattern that survived: the final UPDATE is conditional
+on the ply and turn we read, so a move that lost a race changes zero rows and
+reports a conflict.
+
+---
+
 ## Store moves, not positions
 
 A game is its **ordered list of moves**. The current board position is derived by
