@@ -402,3 +402,89 @@ td.num {
   text-align: center;
   vertical-align: middle;
 }
+
+/* --- player bars around the board --------------------------------------- */
+
+.playerbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 10px 14px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  font-size: 14px;
+}
+.playerbar.to-move {
+  border-color: var(--border-strong);
+  background: var(--bg-panel-hover);
+}
+
+.playerdot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.playername {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+/* --- reviewing history --------------------------------------------------- */
+
+.board-wrap {
+  position: relative;
+  margin: 8px 0;
+}
+
+/* While reviewing, the board is a record, not a place to act. Desaturating it
+   and blocking pointer events makes that unmistakable — a player should never
+   drag a piece and wonder why nothing happened. */
+.board-wrap.reviewing .board {
+  filter: saturate(0.45) brightness(0.72);
+  cursor: default;
+  pointer-events: none;
+}
+
+.review-banner {
+  position: absolute;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  white-space: nowrap;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  background: rgba(10, 8, 7, 0.92);
+  border: 1px solid var(--accent-amber);
+  color: var(--accent-amber);
+  font-size: 13px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+.review-banner .btn {
+  padding: 5px 12px;
+  font-size: 13px;
+}
+
+@media (max-width: 640px) {
+  .playerbar {
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+  }
+  .review-banner {
+    font-size: 12px;
+    padding: 8px 10px;
+    gap: 8px;
+  }
+}

@@ -67,6 +67,8 @@ export default function GameView({
   const [optimistic, setOptimistic] = useState<BoardState | null>(null);
   // null means "live"; a ply number means the user is reviewing history.
   const [viewingPly, setViewingPly] = useState<number | null>(null);
+  // You sit at the bottom by default; the flip control lets you look from the
+  // other side, which also moves the player bars to match.
   const [flipped, setFlipped] = useState(viewerSide === -1);
 
   // A new server position supersedes any optimistic one.
@@ -160,16 +162,48 @@ export default function GameView({
     return () => window.removeEventListener("keydown", onKey);
   }, [game.ply]);
 
+  // Which side sits at the bottom of the screen.
+  //
+  // `flipped` rotates the board to player 2's perspective, which puts player 2
+  // nearest the viewer — so flipped means player 2 is at the bottom. Since
+  // `flipped` defaults to true for player 2, each player sees themselves at the
+  // bottom, and a spectator sees player 1 there.
+  const bottomSide: Player = flipped ? -1 : 1;
+  const topSide: Player = flipped ? 1 : -1;
+  const seat = (side: Player) => ({
+    name: side === 1 ? game.player1Name : game.player2Name,
+    side,
+    toMove: game.status === "active" && game.turn === side,
+    isYou: viewerSide === side,
+  });
+
   return (
     <div className="grid-2">
       <div>
-        <Board
-          board={displayBoard}
-          interactive={canMove}
-          flipped={flipped}
-          onMove={submit}
-          highlight={highlight}
-        />
+        <PlayerBar {...seat(topSide)} />
+
+        <div className={reviewing ? "board-wrap reviewing" : "board-wrap"}>
+          <Board
+            board={displayBoard}
+            interactive={canMove}
+            flipped={flipped}
+            onMove={submit}
+            highlight={highlight}
+          />
+          {reviewing && (
+            <div className="review-banner">
+              <span>
+                Move {viewingPly} of {game.ply} — you cannot play from here
+              </span>
+              <button className="btn btn-primary" onClick={() => setViewingPly(null)}>
+                Back to live
+              </button>
+            </div>
+          )}
+        </div>
+
+        <PlayerBar {...seat(bottomSide)} />
+
         <div className="row" style={{ marginTop: 14 }}>
           <button className="btn" onClick={() => setFlipped((f) => !f)}>
             Flip board
@@ -280,6 +314,40 @@ export default function GameView({
           </p>
         </div>
       </aside>
+    </div>
+  );
+}
+
+function PlayerBar({
+  name,
+  side,
+  toMove,
+  isYou,
+}: {
+  name: string | null;
+  side: Player;
+  toMove: boolean;
+  isYou: boolean;
+}) {
+  return (
+    <div className={toMove ? "playerbar to-move" : "playerbar"}>
+      <span
+        className="playerdot"
+        style={{
+          background:
+            side === 1 ? "var(--accent-mint)" : "var(--accent-amber)",
+          opacity: toMove ? 1 : 0.4,
+        }}
+      />
+      <span className="playername">
+        {name ? (
+          <Link href={`/player/${encodeURIComponent(name)}`}>{name}</Link>
+        ) : (
+          <span className="muted">waiting for an opponent…</span>
+        )}
+      </span>
+      {isYou && <span className="tag">you</span>}
+      {toMove && <span className="tag tag-turn">to move</span>}
     </div>
   );
 }
