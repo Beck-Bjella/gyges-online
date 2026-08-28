@@ -9,6 +9,8 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "db:reset": "node scripts/reset-db.mjs",
+    "db:migrate": "node --experimental-strip-types scripts/migrate.mjs",
+    "db:backup": "node scripts/backup.mjs",
     "test": "node --experimental-strip-types --test \"tests/**/*.test.ts\"",
     "smoke": "node scripts/smoke.mjs",
     "start:lan": "node scripts/start-lan.mjs"

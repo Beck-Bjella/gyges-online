@@ -1,28 +1,29 @@
 /*
  * Gygès Online — visual system.
  *
- * The board's own palette (docs/BOARD_REFERENCE.md §5) is warm wood and bone.
- * The interface around it takes a cooler, blue-black ground so the board reads
- * as lit rather than as more of the same brown. Accents are used sparingly and
- * always mean something: mint for "your turn / good", amber for "waiting",
- * red for "danger".
+ * A warm, light interface: chalky paper and soft pastels, so the brown wooden
+ * board sits on it the way a real board sits on a table. The board keeps its
+ * own palette (docs/BOARD_REFERENCE.md §5) unchanged.
+ *
+ * Accents mean something consistently: green for "your turn / good", amber for
+ * "waiting", rose for "danger".
  */
 
 :root {
-  /* Interface surfaces — cool, so the warm board sits forward of them. */
-  --bg-deepest: #0b0a0f;
-  --bg-darkest: #100e16;
-  --bg-dark: #15131d;
-  --bg-panel: #191725;
-  --bg-panel-hover: #211e30;
-  --bg-panel-active: #14372c;
+  /* Paper. Warm rather than blue-white, to agree with the board. */
+  --bg-deepest: #f6f1e8;
+  --bg-darkest: #fffdf9;
+  --bg-dark: #f1ebe0;
+  --bg-panel: #fffdf9;
+  --bg-panel-hover: #f8f3e9;
+  --bg-panel-active: #e8f5ef;
 
-  --border-subtle: #262336;
-  --border-strong: #383349;
+  --border-subtle: #e5dccd;
+  --border-strong: #d3c7b3;
 
-  --text-primary: #ece8f5;
-  --text-secondary: #a09ab5;
-  --text-dim: #6c6683;
+  --text-primary: #2e2a24;
+  --text-secondary: #6b6357;
+  --text-dim: #9a9184;
 
   /* Board colours — unchanged from the reference. */
   --board-light: #6e5a40;
@@ -38,10 +39,13 @@
   --piece-dark: #8a7550;
   --piece-ring: #1a1108;
 
-  --accent-mint: #5eead4;
-  --accent-amber: #fbbf6e;
-  --accent-blue: #93a9ff;
-  --accent-red: #f87f8c;
+  /* Pastels, dark enough to read as text on paper. */
+  --accent-mint: #2f9c7c;
+  --accent-mint-soft: #d6f0e6;
+  --accent-amber: #c67f2b;
+  --accent-amber-soft: #fbebd4;
+  --accent-blue: #4d76c4;
+  --accent-red: #c2545f;
 
   --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
     Helvetica, Arial, sans-serif;
@@ -49,7 +53,8 @@
 
   --radius: 10px;
   --radius-sm: 6px;
-  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.25);
+  --shadow: 0 1px 2px rgba(70, 58, 40, 0.06),
+    0 6px 18px rgba(70, 58, 40, 0.07);
 }
 
 * {
@@ -77,9 +82,9 @@ body::before {
   inset: 0 0 auto 0;
   height: 420px;
   background: radial-gradient(
-    ellipse 900px 320px at 50% 0%,
-    rgba(94, 234, 212, 0.05),
-    transparent 70%
+    ellipse 900px 340px at 50% 0%,
+    rgba(214, 240, 230, 0.55),
+    transparent 72%
   );
   pointer-events: none;
   z-index: 0;
@@ -120,7 +125,7 @@ input {
   padding: 0 24px;
   height: 58px;
   border-bottom: 1px solid var(--border-subtle);
-  background: rgba(16, 14, 22, 0.85);
+  background: rgba(255, 253, 249, 0.82);
   backdrop-filter: blur(12px);
   position: sticky;
   top: 0;
@@ -255,13 +260,13 @@ h2 {
 }
 .count-mint {
   color: var(--accent-mint);
-  border-color: rgba(94, 234, 212, 0.3);
-  background: rgba(94, 234, 212, 0.08);
+  border-color: rgba(47, 156, 124, 0.28);
+  background: var(--accent-mint-soft);
 }
 .count-amber {
   color: var(--accent-amber);
-  border-color: rgba(251, 191, 110, 0.3);
-  background: rgba(251, 191, 110, 0.08);
+  border-color: rgba(198, 127, 43, 0.28);
+  background: var(--accent-amber-soft);
 }
 
 .lede {
@@ -330,14 +335,15 @@ h2 {
 }
 
 .btn-primary {
-  background: linear-gradient(180deg, #5eead4, #34c9b0);
-  border-color: transparent;
-  color: #06231d;
+  background: linear-gradient(180deg, #3aab8a, #2f9c7c);
+  border-color: #2a8b6f;
+  color: #fffdf9;
   font-weight: 620;
+  box-shadow: 0 1px 2px rgba(47, 156, 124, 0.25);
 }
 .btn-primary:hover:not(:disabled) {
-  background: linear-gradient(180deg, #74f0dc, #45d5bc);
-  color: #06231d;
+  background: linear-gradient(180deg, #42bd99, #35a888);
+  color: #fffdf9;
 }
 
 .btn-danger:hover:not(:disabled) {
@@ -359,7 +365,7 @@ select {
 input[type="text"]:focus,
 select:focus {
   border-color: var(--accent-mint);
-  box-shadow: 0 0 0 3px rgba(94, 234, 212, 0.12);
+  box-shadow: 0 0 0 3px rgba(47, 156, 124, 0.15);
 }
 input::placeholder {
   color: var(--text-dim);
@@ -409,12 +415,8 @@ input::placeholder {
   background: var(--bg-panel-hover);
 }
 .list-item.urgent {
-  border-color: rgba(94, 234, 212, 0.35);
-  background: linear-gradient(
-    90deg,
-    rgba(94, 234, 212, 0.06),
-    var(--bg-panel) 40%
-  );
+  border-color: rgba(47, 156, 124, 0.35);
+  background: linear-gradient(90deg, var(--accent-mint-soft), var(--bg-panel) 45%);
 }
 
 /* A round initial, so a list of games has some texture. */
@@ -434,14 +436,14 @@ input::placeholder {
   font-weight: 600;
 }
 .avatar-mint {
-  border-color: rgba(94, 234, 212, 0.35);
+  border-color: rgba(47, 156, 124, 0.3);
   color: var(--accent-mint);
-  background: rgba(94, 234, 212, 0.08);
+  background: var(--accent-mint-soft);
 }
 .avatar-amber {
-  border-color: rgba(251, 191, 110, 0.35);
+  border-color: rgba(198, 127, 43, 0.3);
   color: var(--accent-amber);
-  background: rgba(251, 191, 110, 0.08);
+  background: var(--accent-amber-soft);
 }
 
 .tag {
@@ -456,14 +458,14 @@ input::placeholder {
   white-space: nowrap;
 }
 .tag-turn {
-  border-color: rgba(94, 234, 212, 0.4);
+  border-color: rgba(47, 156, 124, 0.35);
   color: var(--accent-mint);
-  background: rgba(94, 234, 212, 0.08);
+  background: var(--accent-mint-soft);
 }
 .tag-waiting {
-  border-color: rgba(251, 191, 110, 0.4);
+  border-color: rgba(198, 127, 43, 0.35);
   color: var(--accent-amber);
-  background: rgba(251, 191, 110, 0.08);
+  background: var(--accent-amber-soft);
 }
 
 .badge {
@@ -473,7 +475,7 @@ input::placeholder {
   padding: 0 6px;
   border-radius: 999px;
   background: var(--accent-mint);
-  color: #06231d;
+  color: #fffdf9;
   font-size: 11px;
   font-weight: 700;
   line-height: 17px;
@@ -594,7 +596,7 @@ td.num {
   font-weight: 700;
   letter-spacing: -0.035em;
   margin: 0 0 14px;
-  background: linear-gradient(135deg, #f4ead0 20%, #d4c498 55%, #8a7550);
+  background: linear-gradient(135deg, #6e5a40 10%, #4a3b28 55%, #2e2a24);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -644,7 +646,8 @@ td.num {
   height: auto;
   display: block;
   margin: 0 auto;
-  background: radial-gradient(ellipse at center, #191410 0%, #0b0a0f 100%);
+  background: radial-gradient(ellipse at center, #4a3b28 0%, #33291c 100%);
+  box-shadow: var(--shadow);
   border-radius: var(--radius);
   user-select: none;
   touch-action: none;
@@ -696,7 +699,7 @@ td.num {
    and blocking pointer events makes that unmistakable — a player should never
    drag a piece and wonder why nothing happened. */
 .board-wrap.reviewing .board {
-  filter: saturate(0.4) brightness(0.68);
+  filter: saturate(0.35) brightness(0.78);
   cursor: default;
   pointer-events: none;
 }
@@ -712,11 +715,11 @@ td.num {
   white-space: nowrap;
   padding: 9px 13px;
   border-radius: var(--radius);
-  background: rgba(11, 10, 15, 0.94);
-  border: 1px solid rgba(251, 191, 110, 0.5);
+  background: rgba(255, 253, 249, 0.97);
+  border: 1px solid rgba(198, 127, 43, 0.5);
   color: var(--accent-amber);
   font-size: 13px;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 8px 28px rgba(70, 58, 40, 0.25);
 }
 .review-banner .btn {
   padding: 5px 11px;
@@ -808,4 +811,47 @@ td.num {
     padding: 8px 10px;
     gap: 8px;
   }
+}
+
+/* --- landing points ------------------------------------------------------ */
+
+.hero-points {
+  list-style: none;
+  margin: 0 0 30px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 50ch;
+}
+
+.hero-points li {
+  position: relative;
+  padding-left: 22px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  font-size: 14.5px;
+}
+
+/* A small ringed disc, echoing the pieces. */
+.hero-points li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 7px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 35% 30%,
+    var(--piece-light),
+    var(--piece-mid) 55%,
+    var(--piece-dark)
+  );
+  box-shadow: inset 0 0 0 2px var(--piece-ring);
+}
+
+.hero-points strong {
+  color: var(--text-primary);
+  font-weight: 600;
 }

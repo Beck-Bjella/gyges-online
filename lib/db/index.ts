@@ -7,8 +7,9 @@
  */
 
 import Database from "better-sqlite3";
-import { readFileSync, mkdirSync } from "node:fs";
+import { mkdirSync } from "node:fs";
 import { join, dirname } from "node:path";
+import { migrate } from "./migrate.ts";
 
 const DB_PATH = process.env.GYGES_DB_PATH ?? join(process.cwd(), ".data", "gyges.db");
 
@@ -26,8 +27,9 @@ export function getDb(): Database.Database {
   // exactly that case.
   db.pragma("busy_timeout = 5000");
 
-  const schema = readFileSync(join(process.cwd(), "lib", "db", "schema.sql"), "utf8");
-  db.exec(schema);
+  // Bring the schema up to date. Safe on every start: migrations already
+  // applied are skipped. See lib/db/migrate.ts.
+  migrate(db);
 
   return db;
 }

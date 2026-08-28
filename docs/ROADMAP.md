@@ -108,6 +108,36 @@ a move to the speed of an email server.
 
 ---
 
+## 4b. Before anything is public
+
+Small, and none of it optional once strangers can reach the site.
+
+- **Age gate at signup (13+).** COPPA applies to any general-audience site with
+  *actual knowledge* it has under-13 users, and a free board game site is
+  exactly what a 12-year-old finds. A neutral date-of-birth field and a "13+"
+  line in the terms covers the ordinary case. This matters much more if chat
+  ships.
+- **Privacy policy and terms of service.** California's CalOPPA requires a
+  posted privacy policy for sites collecting personal information from its
+  residents, wherever the operator is. The terms are what actually protect you:
+  "as is", no uptime guarantee, the right to reclaim usernames, and the right
+  to shut down or wipe.
+- **Audit dependencies for AGPL.** Plain GPL-3.0 imposes *nothing* on a web
+  service — copyleft triggers on distributing a copy, and a visitor receives
+  rendered HTML, not the program. But an AGPL dependency drags the combination
+  under AGPL §13, which *does* oblige you to offer source to every user. Worth
+  one check before launch. (Note the reverse: shipping a desktop build would be
+  distribution, and the GPL obligations would genuinely apply.)
+- **Attribution.** Already in the footer: Gygès was designed by Claude Leroy and
+  is published by Blue Orange, and this is an unofficial implementation. Game
+  *rules* are not copyrightable, so the mechanics are safe; the name, the
+  artwork and the rulebook text are where the exposure is, and all three are
+  either original here or credited.
+
+*None of this is legal advice.*
+
+---
+
 ## 5. Deploy
 
 Independent of the engine. The site is a real site without it.
@@ -115,6 +145,13 @@ Independent of the engine. The site is a real site without it.
 - Vercel for the app, Neon for Postgres, NameHero for the domain only.
 - The database migration is small but not purely mechanical — the known
   differences are listed at the top of `lib/db/schema.sql`.
+- **Migrations are already set up** (`migrations/`, `npm run db:migrate`), which
+  is the thing that makes a hosted schema change routine rather than
+  frightening. Keep writing them: never edit an applied migration.
+- **Use a pooled connection string.** Serverless functions each open their own
+  database connection, and a traffic spike can exhaust the pool while the app
+  itself is fine. Neon provides a pooled URL for exactly this; picking the
+  wrong one is the most common way a small Next.js + Postgres site falls over.
 - **Decide the primary-key story before migrating.** Random text ids port
   syntactically but are not free on Postgres: random keys scatter B-tree
   inserts (page splits, write amplification), and a text key makes every index
@@ -202,12 +239,54 @@ Roughly in value order, none of them large:
 
 ---
 
+## Chat
+
+Asked about specifically, so here is the honest cost.
+
+**The building is easy — half a day.** A `messages` table (game id, user id,
+text, timestamp), an endpoint to post one, a panel beside the board, and the
+existing 5-second poll already picks up new messages for free. Technically it
+is the simplest feature left on this list.
+
+**What is not easy is everything after that.** Chat is the one feature whose
+cost is mostly not engineering:
+
+- **Moderation.** The moment strangers can type at each other, someone will
+  send abuse, and it lands on you to deal with. That means a report button,
+  somewhere for reports to go, and a person — you — reading them.
+- **Children.** COPPA risk rises sharply with free-text fields, because chat is
+  how a child announces they are a child. A game site with chat and no age gate
+  is a meaningfully different legal proposition from one without.
+- **It never stops.** Unlike a feature that ships and is done, moderation is
+  ongoing work for as long as the site is up.
+
+Sequencing that makes it tractable:
+
+1. **Not before real accounts.** Anonymous chat is unmoderatable — banning is
+   meaningless when anyone can be anyone.
+2. **Between opponents only, at first.** Two people already in a game together
+   is a far smaller surface than a public room, and it is the version that
+   actually improves correspondence play ("good game", "sorry, travelling").
+3. **Canned messages are worth considering first.** A fixed list — "good game",
+   "good luck", "thanks", "well played" — gets most of the social value with
+   none of the moderation burden. Several correspondence sites do exactly this,
+   and it is an afternoon's work.
+4. **Free-text later**, with a report button and the ability to mute a player,
+   built at the same time rather than after.
+
+**Recommendation:** canned messages soon, free-text between opponents after
+accounts exist, and no public chat room. The engineering is the easy part; be
+deliberate about signing up for the rest.
+
+---
+
 ## Explicitly not doing
 
 - **Live realtime games with a clock.** This is the expensive one — persistent
-  connections, clock synchronisation, a always-on server. Correspondence was
+  connections, clock synchronisation, an always-on server. Correspondence was
   chosen precisely to avoid it, and it is what keeps hosting near free.
-- **Chat.** Moderation is a real cost, and it is not what the site is for.
+- **Public chat rooms.** Per-game chat between opponents is on the list above;
+  a lobby-wide room is a moderation commitment with little upside here.
 - **Mobile apps.** The site works on a phone browser.
 
 ---
