@@ -21,6 +21,10 @@ export function getDb(): Database.Database {
   db = new Database(DB_PATH);
   db.pragma("journal_mode = WAL");
   db.pragma("foreign_keys = ON");
+  // Without this, a write that meets a held write-lock fails immediately with
+  // SQLITE_BUSY rather than waiting. Two players moving at the same instant is
+  // exactly that case.
+  db.pragma("busy_timeout = 5000");
 
   const schema = readFileSync(join(process.cwd(), "lib", "db", "schema.sql"), "utf8");
   db.exec(schema);
@@ -28,9 +32,22 @@ export function getDb(): Database.Database {
   return db;
 }
 
-/** Run a function inside a transaction. */
+/**
+ * Run a function inside a write transaction.
+ *
+ * Uses BEGIN IMMEDIATE rather than better-sqlite3's default BEGIN DEFERRED. A
+ * deferred transaction starts read-only and upgrades when it first writes — and
+ * if another connection holds the write lock at that moment, SQLite fails
+ * straight away without honouring busy_timeout. Taking the write lock up front
+ * means concurrent writers queue instead of erroring.
+ */
 export function transaction<T>(fn: () => T): T {
-  return getDb().transaction(fn)();
+  return getDb().transaction(fn).immediate();
+}
+
+/** Run a function inside a read-only transaction. */
+export function readTransaction<T>(fn: () => T): T {
+  return getDb().transaction(fn).deferred();
 }
 
 export function now(): number {

@@ -222,6 +222,35 @@ test("settling leaves games inside their deadline alone", () => {
   assert.equal(getGame(gameId)!.status, "active");
 });
 
+// --- concurrency -----------------------------------------------------------
+
+test("the same ply cannot be written twice", () => {
+  const { a, gameId } = twoPlayerGame();
+  submitMove(gameId, a.id, [0, 6]);
+
+  // Simulate a duplicate arriving for a ply that already exists. The primary
+  // key on (game_id, ply) is the backstop if the turn check is ever bypassed.
+  assert.throws(() =>
+    getDb()
+      .prepare(
+        `INSERT INTO moves (game_id, ply, player, move, board_after, created_at)
+         VALUES (?, 1, 1, '0|7', ?, 0)`,
+      )
+      .run(gameId, "0".repeat(38)),
+  );
+
+  assert.equal(getMoves(gameId).length, 1);
+});
+
+test("a second move at the same turn is refused", () => {
+  const { a, gameId } = twoPlayerGame();
+  submitMove(gameId, a.id, [0, 6]);
+  // Whatever else player 1 tries, the turn has already passed to player 2.
+  assert.throws(() => submitMove(gameId, a.id, [1, 7]), /not your turn/i);
+  assert.throws(() => submitMove(gameId, a.id, [2, 8]), /not your turn/i);
+  assert.equal(getGame(gameId)!.ply, 1);
+});
+
 // --- listing and leaderboard ----------------------------------------------
 
 test("sideOf identifies the players", () => {

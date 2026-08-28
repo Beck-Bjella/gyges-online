@@ -65,6 +65,14 @@ the server decides.
 A game is its **ordered list of moves**. The current board position is derived by
 replaying them from the fixed starting position.
 
+One precision worth stating, because an earlier draft of this document
+overclaimed: the `games` row is the authority on a game's *state* (status,
+result, whose turn), and `moves` is the authority on its *history*. They are
+separate because **not every ending is a move** — resignations and timeouts
+finish a game without adding a move row, so replaying the move list alone
+cannot tell you how a game ended. If that ever needs to be reconstructible from
+history alone, terminal events get a `kind` column in `moves`.
+
 Why this matters:
 
 - **Replay and review** come free — any historical position is reachable.

@@ -326,20 +326,41 @@ export function submitMove(gameId: string, userId: string, mv: Move): GameWithPl
        VALUES (?, ?, ?, ?, ?, ?)`,
     ).run(gameId, ply, side, moveToString(mv), encoded, now());
 
-    if (finished) {
-      const won = winner(nextBoard);
-      db.prepare(
-        `UPDATE games
-            SET board = ?, ply = ?, status = 'finished', result = ?, result_reason = 'goal',
-                deadline_at = NULL, updated_at = ?
-          WHERE id = ?`,
-      ).run(encoded, ply, won, now(), gameId);
-    } else {
-      db.prepare(
-        `UPDATE games
-            SET board = ?, ply = ?, turn = ?, deadline_at = ?, updated_at = ?
-          WHERE id = ?`,
-      ).run(encoded, ply, -side, now() + game.move_seconds, now(), gameId);
+    // Optimistic concurrency: the UPDATE only applies if the game is still in
+    // the state we read at the top. If another request moved first, zero rows
+    // change and we abort rather than overwriting their move. The same
+    // condition works on SQLite and Postgres, so this survives the migration.
+    const guard = "WHERE id = ? AND ply = ? AND turn = ? AND status = 'active'";
+    const expectedPly = game.ply;
+
+    const result = finished
+      ? db
+          .prepare(
+            `UPDATE games
+                SET board = ?, ply = ?, status = 'finished', result = ?,
+                    result_reason = 'goal', deadline_at = NULL, updated_at = ?
+              ${guard}`,
+          )
+          .run(encoded, ply, winner(nextBoard), now(), gameId, expectedPly, side)
+      : db
+          .prepare(
+            `UPDATE games
+                SET board = ?, ply = ?, turn = ?, deadline_at = ?, updated_at = ?
+              ${guard}`,
+          )
+          .run(
+            encoded,
+            ply,
+            -side,
+            now() + game.move_seconds,
+            now(),
+            gameId,
+            expectedPly,
+            side,
+          );
+
+    if (result.changes === 0) {
+      throw new GameError("Someone moved first — reload the game.", 409);
     }
 
     return getGame(gameId)!;
@@ -376,23 +397,33 @@ export function resignGame(gameId: string, userId: string): GameWithPlayers {
  * added later as a backstop for games nobody opens.
  */
 export function settleExpiredGames(): number {
-  return transaction(() => {
-    const db = getDb();
-    const expired = db
-      .prepare(
-        `SELECT id, turn FROM games
-          WHERE status = 'active' AND deadline_at IS NOT NULL AND deadline_at <= ?`,
-      )
-      .all(now()) as { id: string; turn: Player }[];
+  const db = getDb();
 
+  // Check with a plain read first. This runs on every page load, and almost
+  // always finds nothing — opening a write transaction each time would
+  // serialise every reader behind a writer for no reason.
+  const expired = db
+    .prepare(
+      `SELECT id, turn FROM games
+        WHERE status = 'active' AND deadline_at IS NOT NULL AND deadline_at <= ?`,
+    )
+    .all(now()) as { id: string; turn: Player }[];
+
+  if (expired.length === 0) return 0;
+
+  return transaction(() => {
     const update = db.prepare(
       `UPDATE games
           SET status = 'finished', result = ?, result_reason = 'timeout',
               deadline_at = NULL, updated_at = ?
-        WHERE id = ?`,
+        WHERE id = ? AND status = 'active' AND deadline_at <= ?`,
     );
-    for (const g of expired) update.run(-g.turn, now(), g.id);
-    return expired.length;
+    let settled = 0;
+    for (const g of expired) {
+      // Re-check inside the transaction: a player may have moved in between.
+      settled += update.run(-g.turn, now(), g.id, now()).changes;
+    }
+    return settled;
   });
 }
 
@@ -425,6 +456,7 @@ export function leaderboard(limit = 25): LeaderboardRow[] {
          FROM users u
          JOIN games g
            ON (g.player1_id = u.id OR g.player2_id = u.id) AND g.status = 'finished'
+        WHERE u.deleted_at IS NULL
         GROUP BY u.id, u.username
         ORDER BY wins DESC, played ASC, u.username ASC
         LIMIT ?`,
