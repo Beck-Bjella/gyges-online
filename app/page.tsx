@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { currentUser } from "@/lib/auth";
 import {
+  listActiveGames,
   listGamesForUser,
   listOpenGames,
+  listRecentFinishedGames,
   settleExpiredGames,
   sideOf,
   type GameWithPlayers,
@@ -21,6 +23,8 @@ export default async function HomePage() {
   const user = await currentUser();
   const myGames = user ? listGamesForUser(user.id) : [];
   const openGames = listOpenGames(user?.id);
+  const activeGames = listActiveGames(user?.id);
+  const recentGames = listRecentFinishedGames();
 
   return (
     <>
@@ -69,6 +73,8 @@ export default async function HomePage() {
                   ))}
                 </ul>
               )}
+
+              <GameFeeds active={activeGames} recent={recentGames} />
             </>
           ) : (
             <>
@@ -86,6 +92,8 @@ export default async function HomePage() {
                   ))}
                 </ul>
               )}
+
+              <GameFeeds active={activeGames} recent={recentGames} />
             </>
           )}
         </section>
@@ -102,6 +110,78 @@ export default async function HomePage() {
           </div>
         </aside>
       </div>
+    </>
+  );
+}
+
+/** Games other people are playing, and recently finished ones. */
+function GameFeeds({
+  active,
+  recent,
+}: {
+  active: GameWithPlayers[];
+  recent: GameWithPlayers[];
+}) {
+  return (
+    <>
+      <h2 style={{ marginTop: 32 }}>Games in progress</h2>
+      {active.length === 0 ? (
+        <p className="muted">No games are being played right now.</p>
+      ) : (
+        <ul className="list">
+          {active.map((g) => (
+            <li key={g.id} className="list-item">
+              <span className="tag">Move {g.ply}</span>
+              <span style={{ flex: 1 }}>
+                <Link href={`/game/${g.id}`}>
+                  {g.player1_name ?? "—"} vs {g.player2_name ?? "—"}
+                </Link>
+                <span className="muted">
+                  {" "}
+                  · {g.turn === 1 ? g.player1_name : g.player2_name} to move
+                </span>
+              </span>
+              <span className="muted">{relativeTime(g.updated_at)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <h2 style={{ marginTop: 32 }}>Recently finished</h2>
+      {recent.length === 0 ? (
+        <p className="muted">No games have finished yet.</p>
+      ) : (
+        <ul className="list">
+          {recent.map((g) => {
+            const winner =
+              g.result === 0
+                ? null
+                : g.result === 1
+                  ? g.player1_name
+                  : g.player2_name;
+            return (
+              <li key={g.id} className="list-item">
+                <span className="tag">{g.ply} moves</span>
+                <span style={{ flex: 1 }}>
+                  <Link href={`/game/${g.id}`}>
+                    {g.player1_name ?? "—"} vs {g.player2_name ?? "—"}
+                  </Link>
+                  <span className="muted">
+                    {" "}
+                    · {winner ? `${winner} won` : "drawn"}
+                    {g.result_reason && g.result_reason !== "goal"
+                      ? ` by ${g.result_reason}`
+                      : ""}
+                  </span>
+                </span>
+                <span className="muted">
+                  {g.finished_at ? relativeTime(g.finished_at) : ""}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </>
   );
 }

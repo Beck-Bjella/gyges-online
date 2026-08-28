@@ -278,6 +278,63 @@ export function listOpenGames(excludeUserId?: string): GameWithPlayers[] {
     .all() as GameWithPlayers[];
 }
 
+/**
+ * Games in progress, for anyone to watch.
+ *
+ * Excludes the viewer's own games, which already have their own list.
+ */
+export function listActiveGames(excludeUserId?: string, limit = 30): GameWithPlayers[] {
+  const db = getDb();
+  if (excludeUserId) {
+    return db
+      .prepare(
+        `SELECT ${GAME_COLUMNS} ${GAME_JOINS}
+          WHERE g.status = 'active'
+            AND g.player1_id <> ? AND g.player2_id <> ?
+          ORDER BY g.updated_at DESC LIMIT ?`,
+      )
+      .all(excludeUserId, excludeUserId, limit) as GameWithPlayers[];
+  }
+  return db
+    .prepare(
+      `SELECT ${GAME_COLUMNS} ${GAME_JOINS}
+        WHERE g.status = 'active'
+        ORDER BY g.updated_at DESC LIMIT ?`,
+    )
+    .all(limit) as GameWithPlayers[];
+}
+
+/**
+ * Recently finished games, for the front page.
+ */
+export function listRecentFinishedGames(limit = 10): GameWithPlayers[] {
+  return getDb()
+    .prepare(
+      `SELECT ${GAME_COLUMNS} ${GAME_JOINS}
+        WHERE g.status = 'finished'
+        ORDER BY g.finished_at DESC LIMIT ?`,
+    )
+    .all(limit) as GameWithPlayers[];
+}
+
+/**
+ * A cheap "has anything changed?" probe for a single game.
+ *
+ * Polled by the game page so a player sees their opponent's move without
+ * reloading. Deliberately returns only what is needed to decide whether to
+ * refresh — not the whole game — so the poll stays small.
+ */
+export function gameVersion(
+  gameId: string,
+): { ply: number; status: string; updated_at: number } | null {
+  return (
+    (getDb()
+      .prepare("SELECT ply, status, updated_at FROM games WHERE id = ?")
+      .get(gameId) as { ply: number; status: string; updated_at: number } | undefined) ??
+    null
+  );
+}
+
 export function listGamesForUser(userId: string): GameWithPlayers[] {
   return getDb()
     .prepare(

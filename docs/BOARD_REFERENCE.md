@@ -169,8 +169,8 @@ in that coordinate space; scale proportionally for responsive layouts.
 ### Square centers
 
 ```
-index 36 (P1 bear-off):  cx = 450, cy = 813
-index 37 (P2 bear-off):  cx = 450, cy = 87
+index 36 (P1 bear-off):  cx = 450, cy = 722
+index 37 (P2 bear-off):  cx = 450, cy = 178
 
 grid (i in 0..35):
   col = i % 6
@@ -187,6 +187,11 @@ Grid pitch is **68 units**. The grid spans 280 → 620 on both axes.
 > widens the diamond and pulls the grid in, giving the corners ~61 units of
 > clearance, and enlarges the pieces to match. `tests/board.test.ts` asserts the
 > corner clearance so it cannot silently regress.
+>
+> The bear-off spaces sit 102 units beyond the nearest grid row — about one and
+> a half row-spacings — so they read as part of the board. An earlier revision
+> placed them 193 units out, nearly three rows of empty space, which made the
+> board look sparse at the top and bottom. A test pins the spacing.
 
 ### Shapes
 

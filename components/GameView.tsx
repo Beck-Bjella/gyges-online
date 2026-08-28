@@ -140,6 +140,52 @@ export default function GameView({
     }
   }, [game.id, router]);
 
+  // Watch for the opponent's move.
+  //
+  // Polling, not a websocket: correspondence moves arrive minutes or days
+  // apart, so holding a connection open per viewer would cost far more than it
+  // saves. The probe returns three numbers, and only a real change triggers a
+  // refresh.
+  //
+  // Polling stops when the game is over, and pauses while the tab is hidden so
+  // a forgotten tab is not making requests all day.
+  useEffect(() => {
+    if (game.status !== "active") return;
+
+    let stopped = false;
+
+    async function poll() {
+      if (stopped || document.hidden) return;
+      try {
+        const res = await fetch(`/api/games/${game.id}/version`, {
+          cache: "no-store",
+        });
+        if (!res.ok) return;
+        const v = (await res.json()) as { ply: number; status: string };
+        // Only refresh on a real change, and never while the player is
+        // mid-drag or has a move in flight.
+        if ((v.ply !== game.ply || v.status !== game.status) && !pending) {
+          router.refresh();
+        }
+      } catch {
+        // A failed poll is not worth surfacing; the next one will retry.
+      }
+    }
+
+    const id = setInterval(poll, 5000);
+    // Check immediately when the tab is brought back to the foreground.
+    const onVisible = () => {
+      if (!document.hidden) poll();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+
+    return () => {
+      stopped = true;
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [game.id, game.ply, game.status, pending, router]);
+
   // Arrow keys step through history, as the desktop versions did.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {

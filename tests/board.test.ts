@@ -59,10 +59,27 @@ test("geometry matches the reference", () => {
   assert.deepEqual(idxToCenter(0), { cx: 280, cy: 620 });
   // Index 35 is f6: top-right.
   assert.deepEqual(idxToCenter(35), { cx: 620, cy: 280 });
-  assert.deepEqual(idxToCenter(P1_GOAL), { cx: 450, cy: 813 });
-  assert.deepEqual(idxToCenter(P2_GOAL), { cx: 450, cy: 87 });
+  assert.deepEqual(idxToCenter(P1_GOAL), { cx: 450, cy: 722 });
+  assert.deepEqual(idxToCenter(P2_GOAL), { cx: 450, cy: 178 });
+  // The goals sit symmetrically about the centre.
+  assert.equal(idxToCenter(P1_GOAL).cy + idxToCenter(P2_GOAL).cy, 900);
   // The grid is centred in the 900x900 space.
   assert.equal(idxToCenter(0).cx + idxToCenter(35).cx, 900);
+});
+
+test("the goals sit near the grid, not adrift near the board's points", () => {
+  // The grid rows are 68 apart. A goal much further out than that reads as
+  // floating off the board rather than belonging to it.
+  const bottomRow = idxToCenter(0).cy;
+  const topRow = idxToCenter(30).cy;
+  const gapBelow = idxToCenter(P1_GOAL).cy - bottomRow;
+  const gapAbove = topRow - idxToCenter(P2_GOAL).cy;
+
+  for (const gap of [gapBelow, gapAbove]) {
+    assert.ok(gap > 68, `a goal should sit clear of the grid (gap ${gap})`);
+    assert.ok(gap < 150, `a goal should not float far off the grid (gap ${gap})`);
+  }
+  assert.equal(gapBelow, gapAbove, "the goals should be symmetric");
 });
 
 test("corner pieces clear the edge of the board", () => {

@@ -68,9 +68,16 @@ export const GRID_PITCH = 68;
 export const GRID_ORIGIN = 280;
 export const PIECE_RADIUS = 32;
 
-/** Bear-off centres, kept clear of the grid and the diamond's points. */
-export const P1_GOAL_CENTER = { cx: 450, cy: 813 };
-export const P2_GOAL_CENTER = { cx: 450, cy: 87 };
+/**
+ * Bear-off centres.
+ *
+ * Set about one and a half grid rows beyond the nearest row (102 units, against
+ * a 68-unit pitch), so they read as part of the board rather than floating off
+ * near its points. They previously sat 193 units out — nearly three rows of
+ * empty space — which made the board look sparse at top and bottom.
+ */
+export const P1_GOAL_CENTER = { cx: 450, cy: 722 };
+export const P2_GOAL_CENTER = { cx: 450, cy: 178 };
 
 export interface Point {
   cx: number;
