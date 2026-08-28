@@ -83,6 +83,13 @@ CREATE TABLE IF NOT EXISTS games (
   -- How it ended: 'goal', 'resign', 'timeout', 'draw'.
   result_reason   TEXT,
 
+  -- The position this game began from, as a 38-character digit string.
+  --
+  -- Stored rather than assumed. Replaying a game means starting somewhere, and
+  -- a client that hardcodes the standard opening would silently redraw every
+  -- historical game wrongly the moment setup variants, handicaps or puzzle
+  -- positions exist. It is written once at creation and never changes.
+  start_board     TEXT NOT NULL,
   -- Derived cache of the current position, as a 38-character digit string.
   board           TEXT NOT NULL,
   -- Number of moves played; equals the count of rows in moves.
@@ -118,9 +125,10 @@ CREATE TABLE IF NOT EXISTS games (
   CHECK (player2_id IS NULL OR player1_id <> player2_id),
   -- Only an open game may be missing its second player.
   CHECK (status = 'open' OR player2_id IS NOT NULL),
-  -- The board must be 38 digits, not merely 38 characters. GLOB is SQLite's
-  -- pattern operator; on Postgres this becomes CHECK (board ~ '^[0-9]{38}$').
-  CHECK (board GLOB '[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]')
+  -- Boards must be 38 digits, not merely 38 characters. GLOB is SQLite's
+  -- pattern operator; on Postgres these become ~ '^[0-9]{38}$'.
+  CHECK (board GLOB '[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]'),
+  CHECK (start_board GLOB '[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]')
 );
 
 CREATE INDEX IF NOT EXISTS games_player1_idx ON games(player1_id);

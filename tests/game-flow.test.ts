@@ -41,7 +41,9 @@ const {
 } = await import("../lib/db/queries.ts");
 
 const { getDb } = await import("../lib/db/index.ts");
-const { P1_GOAL, P2_GOAL } = await import("../lib/game/board.ts");
+const { P1_GOAL, P2_GOAL, replay, startingBoard } = await import(
+  "../lib/game/board.ts"
+);
 
 after(() => {
   try {
@@ -286,6 +288,62 @@ test("settling leaves games inside their deadline alone", () => {
   const { gameId } = twoPlayerGame();
   settleExpiredGames();
   assert.equal(getGame(gameId)!.status, "active");
+});
+
+// --- the starting position --------------------------------------------------
+
+test("a game records the position it started from", () => {
+  const { gameId } = twoPlayerGame();
+  const g = getGame(gameId)!;
+  assert.equal(g.start_board.length, 38);
+  assert.equal(g.start_board, g.board, "before any move, start equals current");
+});
+
+test("the starting position survives every move", () => {
+  const { a, b, gameId } = twoPlayerGame();
+  const start = getGame(gameId)!.start_board;
+
+  submitMove(gameId, a.id, [0, 6]);
+  submitMove(gameId, b.id, [35, 29]);
+
+  const g = getGame(gameId)!;
+  assert.equal(g.start_board, start, "the start position never changes");
+  assert.notEqual(g.board, start, "but the current position has moved on");
+});
+
+test("replaying the moves from the stored start reaches the current position", () => {
+  const { a, b, gameId } = twoPlayerGame();
+  submitMove(gameId, a.id, [0, 6]);
+  submitMove(gameId, b.id, [35, 29]);
+  submitMove(gameId, a.id, [1, 7]);
+
+  const g = getGame(gameId)!;
+  const replayed = replay(
+    getMoves(gameId).map((m) => m.move.split("|").map(Number)),
+    decodeBoard(g.start_board),
+  );
+  assert.equal(
+    replayed.join(""),
+    g.board,
+    "the move list plus the stored start must reproduce the cached position",
+  );
+});
+
+test("a game can start from a non-standard position", () => {
+  // The point of storing the start: a game that did not begin from the
+  // standard setup still replays correctly.
+  const a = createUser(uniqueName("custom"));
+  const b = createUser(uniqueName("custom"));
+  const custom = startingBoard();
+  custom[0] = 0;
+  custom[12] = 3;
+
+  const g = createGame(a.id, 3600, custom);
+  joinGame(g.id, b.id);
+
+  const stored = getGame(g.id)!;
+  assert.equal(stored.start_board, custom.join(""));
+  assert.equal(stored.board, custom.join(""));
 });
 
 // --- timing and stats ------------------------------------------------------

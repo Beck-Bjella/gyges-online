@@ -59,6 +59,8 @@ export interface Game {
   turn: Player;
   result: number | null;
   result_reason: string | null;
+  /** The position this game began from. Never changes. */
+  start_board: string;
   board: string;
   ply: number;
   move_seconds: number;
@@ -209,7 +211,7 @@ export function deleteSession(token: string): void {
 
 const GAME_COLUMNS = `
   g.id, g.player1_id, g.player2_id, g.status, g.turn, g.result, g.result_reason,
-  g.board, g.ply, g.move_seconds, g.deadline_at,
+  g.start_board, g.board, g.ply, g.move_seconds, g.deadline_at,
   g.created_at, g.started_at, g.finished_at, g.updated_at,
   p1.username AS player1_name, p2.username AS player2_name
 `;
@@ -220,8 +222,12 @@ const GAME_JOINS = `
   LEFT JOIN users p2 ON p2.id = g.player2_id
 `;
 
-export function createGame(creatorId: string, moveSeconds = 259200): Game {
-  const board = encodeBoard(startingBoard());
+export function createGame(
+  creatorId: string,
+  moveSeconds = 259200,
+  from: BoardState = startingBoard(),
+): Game {
+  const board = encodeBoard(from);
   const game: Game = {
     id: newId(),
     player1_id: creatorId,
@@ -230,6 +236,7 @@ export function createGame(creatorId: string, moveSeconds = 259200): Game {
     turn: 1,
     result: null,
     result_reason: null,
+    start_board: board,
     board,
     ply: 0,
     move_seconds: moveSeconds,
@@ -243,10 +250,19 @@ export function createGame(creatorId: string, moveSeconds = 259200): Game {
   getDb()
     .prepare(
       `INSERT INTO games
-         (id, player1_id, player2_id, status, turn, board, ply, move_seconds, created_at, updated_at)
-       VALUES (?, ?, NULL, 'open', 1, ?, 0, ?, ?, ?)`,
+         (id, player1_id, player2_id, status, turn, start_board, board, ply,
+          move_seconds, created_at, updated_at)
+       VALUES (?, ?, NULL, 'open', 1, ?, ?, 0, ?, ?, ?)`,
     )
-    .run(game.id, creatorId, board, moveSeconds, game.created_at, game.updated_at);
+    .run(
+      game.id,
+      creatorId,
+      board,
+      board,
+      moveSeconds,
+      game.created_at,
+      game.updated_at,
+    );
 
   return game;
 }

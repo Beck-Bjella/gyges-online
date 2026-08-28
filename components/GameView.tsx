@@ -16,7 +16,6 @@ import Board from "./Board";
 import {
   applyMove,
   moveToNotation,
-  startingBoard,
   type BoardState,
   type Move,
   type Player,
@@ -49,6 +48,8 @@ interface HistoryEntry {
 interface Props {
   game: GameSummary;
   board: BoardState;
+  /** The position the game began from, as recorded on the game. */
+  startBoard: BoardState;
   history: HistoryEntry[];
   viewerSide: Player | null;
   signedIn: boolean;
@@ -57,6 +58,7 @@ interface Props {
 export default function GameView({
   game,
   board,
+  startBoard,
   history,
   viewerSide,
   signedIn,
@@ -79,11 +81,14 @@ export default function GameView({
   const liveBoard = optimistic ?? board;
 
   // viewingPly null = live position; 0 = the starting position; n = after move n.
+  //
+  // The starting position comes from the game record rather than being assumed,
+  // so a game that began from a non-standard setup replays correctly.
   const displayBoard = useMemo(() => {
     if (viewingPly === null) return liveBoard;
-    if (viewingPly === 0) return startingBoard();
+    if (viewingPly === 0) return startBoard;
     return history.find((h) => h.ply === viewingPly)?.boardAfter ?? liveBoard;
-  }, [viewingPly, liveBoard, history]);
+  }, [viewingPly, liveBoard, startBoard, history]);
 
   const reviewing = viewingPly !== null && viewingPly !== game.ply;
 
@@ -239,7 +244,10 @@ export default function GameView({
           {reviewing && (
             <div className="review-banner">
               <span>
-                Move {viewingPly} of {game.ply} — you cannot play from here
+                {viewingPly === 0
+                  ? "Starting position"
+                  : `Move ${viewingPly} of ${game.ply}`}{" "}
+                — you cannot play from here
               </span>
               <button className="btn btn-primary" onClick={() => setViewingPly(null)}>
                 Back to live
@@ -253,6 +261,14 @@ export default function GameView({
         <div className="row" style={{ marginTop: 14 }}>
           <button className="btn" onClick={() => setFlipped((f) => !f)}>
             Flip board
+          </button>
+          <button
+            className="btn"
+            onClick={() => setViewingPly(0)}
+            disabled={game.ply === 0 || viewingPly === 0}
+            title="The position this game started from"
+          >
+            Start
           </button>
           <button
             className="btn"

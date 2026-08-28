@@ -113,6 +113,13 @@ Why this matters:
 The current position may still be cached in a column for cheap list/lobby queries,
 but it is a derived value, not the source of truth.
 
+The **starting** position is different: it is stored on the game and never
+changes. Replaying a move list has to start somewhere, and a client that
+hardcoded the standard opening would silently redraw every historical game
+wrongly the moment setup variants, handicaps or puzzle positions existed. A
+test asserts that replaying the moves from the stored start reproduces the
+cached current position.
+
 ---
 
 ## Where the game rules live

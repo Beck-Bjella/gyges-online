@@ -42,6 +42,7 @@ export default async function GamePage({
         hasPlayer2: game.player2_id !== null,
       }}
       board={decodeBoard(game.board)}
+      startBoard={decodeBoard(game.start_board)}
       history={moves.map((m) => ({
         ply: m.ply,
         player: m.player,
