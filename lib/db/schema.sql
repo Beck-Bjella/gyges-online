@@ -93,10 +93,20 @@ CREATE TABLE IF NOT EXISTS games (
   -- When the side to move forfeits on time. NULL when not active.
   deadline_at     INTEGER,
 
+  -- When the game was opened, when the second player joined, and when it
+  -- ended. started_at is distinct from created_at because a game can sit open
+  -- for days: without it, the first move appears to have taken as long as the
+  -- wait for an opponent. finished_at gives game duration without inferring it
+  -- from updated_at, which any later edit would disturb.
   created_at      INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+  started_at      INTEGER,
+  finished_at     INTEGER,
   updated_at      INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
 
   CHECK (status IN ('open', 'active', 'finished')),
+  -- An open game has not started; a finished one has ended.
+  CHECK ((status = 'open') = (started_at IS NULL)),
+  CHECK ((status = 'finished') = (finished_at IS NOT NULL)),
   CHECK (turn IN (1, -1)),
   CHECK (result IS NULL OR result IN (1, -1, 0)),
   CHECK (ply >= 0),
@@ -143,13 +153,25 @@ CREATE TABLE IF NOT EXISTS moves (
   move        TEXT NOT NULL,
   -- The position this move produced, cached so history views avoid a replay.
   board_after TEXT NOT NULL,
-  created_at  INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+  -- Unix milliseconds, not seconds. Correspondence moves are hours apart so
+  -- seconds would do, but ms costs nothing and keeps the door open for faster
+  -- time controls and for honest "took 4.2s" statistics.
+  created_at  INTEGER NOT NULL,
+  -- How long this player took, in milliseconds: the gap since the previous
+  -- move, or since the game started for ply 1. Stored rather than derived
+  -- because the baseline for ply 1 lives on the game row, and because a
+  -- future pause/vacation feature would make the raw gap misleading.
+  think_ms    INTEGER,
 
   PRIMARY KEY (game_id, ply),
   CHECK (ply >= 1),
   CHECK (player IN (1, -1)),
-  CHECK (length(board_after) = 38)
+  CHECK (length(board_after) = 38),
+  CHECK (think_ms IS NULL OR think_ms >= 0)
 );
+
+-- Stats queries ("moves per day", "average think time") scan by time.
+CREATE INDEX IF NOT EXISTS moves_created_idx ON moves(created_at);
 
 -- ---------------------------------------------------------------------------
 -- Sessions

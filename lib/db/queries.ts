@@ -7,7 +7,7 @@
  * not wired up yet. See docs/ARCHITECTURE.md.
  */
 
-import { getDb, newId, newToken, now, transaction } from "./index.ts";
+import { getDb, newId, newToken, now, nowMs, transaction } from "./index.ts";
 import {
   applyMove,
   boardFromString,
@@ -64,6 +64,10 @@ export interface Game {
   move_seconds: number;
   deadline_at: number | null;
   created_at: number;
+  /** When the second player joined. Null while the game is open. */
+  started_at: number | null;
+  /** When the game ended. Null until finished. */
+  finished_at: number | null;
   updated_at: number;
 }
 
@@ -73,7 +77,10 @@ export interface MoveRow {
   player: Player;
   move: string;
   board_after: string;
+  /** Unix milliseconds. */
   created_at: number;
+  /** How long this player took, in milliseconds. Null only if unknown. */
+  think_ms: number | null;
 }
 
 export interface GameWithPlayers extends Game {
@@ -161,7 +168,8 @@ export function deleteSession(token: string): void {
 
 const GAME_COLUMNS = `
   g.id, g.player1_id, g.player2_id, g.status, g.turn, g.result, g.result_reason,
-  g.board, g.ply, g.move_seconds, g.deadline_at, g.created_at, g.updated_at,
+  g.board, g.ply, g.move_seconds, g.deadline_at,
+  g.created_at, g.started_at, g.finished_at, g.updated_at,
   p1.username AS player1_name, p2.username AS player2_name
 `;
 
@@ -186,6 +194,8 @@ export function createGame(creatorId: string, moveSeconds = 259200): Game {
     move_seconds: moveSeconds,
     deadline_at: null,
     created_at: now(),
+    started_at: null,
+    finished_at: null,
     updated_at: now(),
   };
 
@@ -268,13 +278,21 @@ export function joinGame(gameId: string, userId: string): Game {
     if (game.player2_id) throw new GameError("That game already has two players.");
 
     const deadline = now() + game.move_seconds;
+    const startedAt = now();
     db.prepare(
       `UPDATE games
-          SET player2_id = ?, status = 'active', deadline_at = ?, updated_at = ?
-        WHERE id = ?`,
-    ).run(userId, deadline, now(), gameId);
+          SET player2_id = ?, status = 'active', deadline_at = ?,
+              started_at = ?, updated_at = ?
+        WHERE id = ? AND status = 'open' AND player2_id IS NULL`,
+    ).run(userId, deadline, startedAt, now(), gameId);
 
-    return { ...game, player2_id: userId, status: "active" as const, deadline_at: deadline };
+    return {
+      ...game,
+      player2_id: userId,
+      status: "active" as const,
+      deadline_at: deadline,
+      started_at: startedAt,
+    };
   });
 }
 
@@ -330,10 +348,21 @@ export function submitMove(gameId: string, userId: string, mv: Move): GameWithPl
     const ply = game.ply + 1;
     const finished = isGameOver(nextBoard);
 
+    // Think time: the gap since the previous move, or since the game started
+    // for the first move. Stored rather than derived, because the baseline for
+    // ply 1 lives on the game row and a future pause feature would make the
+    // raw gap misleading.
+    const at = nowMs();
+    const previous = db
+      .prepare("SELECT created_at FROM moves WHERE game_id = ? AND ply = ?")
+      .get(gameId, game.ply) as { created_at: number } | undefined;
+    const since = previous?.created_at ?? (game.started_at ?? now()) * 1000;
+    const thinkMs = Math.max(0, at - since);
+
     db.prepare(
-      `INSERT INTO moves (game_id, ply, player, move, board_after, created_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-    ).run(gameId, ply, side, moveToString(mv), encoded, now());
+      `INSERT INTO moves (game_id, ply, player, move, board_after, created_at, think_ms)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    ).run(gameId, ply, side, moveToString(mv), encoded, at, thinkMs);
 
     // Optimistic concurrency: the UPDATE only applies if the game is still in
     // the state we read at the top. If another request moved first, zero rows
@@ -347,10 +376,11 @@ export function submitMove(gameId: string, userId: string, mv: Move): GameWithPl
           .prepare(
             `UPDATE games
                 SET board = ?, ply = ?, status = 'finished', result = ?,
-                    result_reason = 'goal', deadline_at = NULL, updated_at = ?
+                    result_reason = 'goal', deadline_at = NULL,
+                    finished_at = ?, updated_at = ?
               ${guard}`,
           )
-          .run(encoded, ply, winner(nextBoard), now(), gameId, expectedPly, side)
+          .run(encoded, ply, winner(nextBoard), now(), now(), gameId, expectedPly, side)
       : db
           .prepare(
             `UPDATE games
@@ -389,9 +419,9 @@ export function resignGame(gameId: string, userId: string): GameWithPlayers {
     db.prepare(
       `UPDATE games
           SET status = 'finished', result = ?, result_reason = 'resign',
-              deadline_at = NULL, updated_at = ?
-        WHERE id = ?`,
-    ).run(-side, now(), gameId);
+              deadline_at = NULL, finished_at = ?, updated_at = ?
+        WHERE id = ? AND status = 'active'`,
+    ).run(-side, now(), now(), gameId);
 
     return getGame(gameId)!;
   });
@@ -424,13 +454,13 @@ export function settleExpiredGames(): number {
     const update = db.prepare(
       `UPDATE games
           SET status = 'finished', result = ?, result_reason = 'timeout',
-              deadline_at = NULL, updated_at = ?
+              deadline_at = NULL, finished_at = ?, updated_at = ?
         WHERE id = ? AND status = 'active' AND deadline_at <= ?`,
     );
     let settled = 0;
     for (const g of expired) {
       // Re-check inside the transaction: a player may have moved in between.
-      settled += update.run(-g.turn, now(), g.id, now()).changes;
+      settled += update.run(-g.turn, now(), now(), g.id, now()).changes;
     }
     return settled;
   });
@@ -521,6 +551,46 @@ export function gamesAwaitingUser(userId: string): number {
     )
     .get(userId, userId) as { n: number };
   return row.n;
+}
+
+/**
+ * Timing statistics for a player.
+ *
+ * Everything here is computed from moves.think_ms, which is recorded per move.
+ * This exists partly to prove the stored data supports the stats we will want
+ * later — median think time, moves per day, longest game — without another
+ * schema change.
+ */
+export interface TimingStats {
+  moves: number;
+  medianThinkMs: number | null;
+  fastestMs: number | null;
+  slowestMs: number | null;
+}
+
+export function timingStats(userId: string): TimingStats {
+  const rows = getDb()
+    .prepare(
+      `SELECT m.think_ms AS t
+         FROM moves m
+         JOIN games g ON g.id = m.game_id
+        WHERE m.think_ms IS NOT NULL
+          AND ((g.player1_id = ? AND m.player = 1)
+            OR (g.player2_id = ? AND m.player = -1))
+        ORDER BY m.think_ms ASC`,
+    )
+    .all(userId, userId) as { t: number }[];
+
+  if (rows.length === 0) {
+    return { moves: 0, medianThinkMs: null, fastestMs: null, slowestMs: null };
+  }
+
+  return {
+    moves: rows.length,
+    medianThinkMs: rows[Math.floor(rows.length / 2)].t,
+    fastestMs: rows[0].t,
+    slowestMs: rows[rows.length - 1].t,
+  };
 }
 
 export function leaderboard(limit = 25): LeaderboardRow[] {

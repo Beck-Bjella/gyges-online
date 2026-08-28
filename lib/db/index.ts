@@ -50,8 +50,14 @@ export function readTransaction<T>(fn: () => T): T {
   return getDb().transaction(fn).deferred();
 }
 
+/** Unix seconds — the unit for game-level timestamps. */
 export function now(): number {
   return Math.floor(Date.now() / 1000);
+}
+
+/** Unix milliseconds — the unit for move timestamps and think times. */
+export function nowMs(): number {
+  return Date.now();
 }
 
 /** Short, URL-safe, collision-resistant enough for games and users. */

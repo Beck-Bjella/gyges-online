@@ -32,6 +32,7 @@ const {
   settleExpiredGames,
   sideOf,
   leaderboard,
+  timingStats,
   GameError,
   decodeBoard,
 } = await import("../lib/db/queries.ts");
@@ -220,6 +221,75 @@ test("settling leaves games inside their deadline alone", () => {
   const { gameId } = twoPlayerGame();
   settleExpiredGames();
   assert.equal(getGame(gameId)!.status, "active");
+});
+
+// --- timing and stats ------------------------------------------------------
+
+test("a game records when it started and when it ended", () => {
+  const a = createUser(uniqueName("timing"));
+  const b = createUser(uniqueName("timing"));
+  const g = createGame(a.id, 3600);
+
+  assert.equal(g.started_at, null, "an open game has not started");
+  assert.equal(g.finished_at, null);
+
+  joinGame(g.id, b.id);
+  const joined = getGame(g.id)!;
+  assert.ok(joined.started_at, "joining starts the game");
+  assert.equal(joined.finished_at, null);
+
+  const done = submitMove(g.id, a.id, [30, P2_GOAL]);
+  assert.ok(done.finished_at, "finishing records the end time");
+  assert.ok(done.finished_at! >= joined.started_at!);
+});
+
+test("started_at is distinct from created_at", () => {
+  // A game can sit open for days. Without a separate started_at, the first
+  // move would appear to have taken as long as the wait for an opponent.
+  const a = createUser(uniqueName("waited"));
+  const b = createUser(uniqueName("waited"));
+  const g = createGame(a.id, 3600);
+
+  // Pretend the game was created a week ago.
+  const weekAgo = Math.floor(Date.now() / 1000) - 604800;
+  getDb().prepare("UPDATE games SET created_at = ? WHERE id = ?").run(weekAgo, g.id);
+
+  joinGame(g.id, b.id);
+  submitMove(g.id, a.id, [0, 6]);
+
+  const [first] = getMoves(g.id);
+  assert.ok(
+    first.think_ms !== null && first.think_ms < 60_000,
+    `first move should be measured from the start, not creation (got ${first.think_ms}ms)`,
+  );
+});
+
+test("each move records how long the player took", () => {
+  const { a, b, gameId } = twoPlayerGame();
+  submitMove(gameId, a.id, [0, 6]);
+  submitMove(gameId, b.id, [35, 29]);
+
+  const moves = getMoves(gameId);
+  for (const m of moves) {
+    assert.ok(m.think_ms !== null, `ply ${m.ply} has no think time`);
+    assert.ok(m.think_ms! >= 0);
+    // Move timestamps are milliseconds, so they are far larger than a
+    // seconds-based epoch would be.
+    assert.ok(m.created_at > 1_000_000_000_000, "timestamps should be ms");
+  }
+});
+
+test("timing statistics are derivable from stored moves", () => {
+  const { a, b, gameId } = twoPlayerGame();
+  submitMove(gameId, a.id, [0, 6]);
+  submitMove(gameId, b.id, [35, 29]);
+  submitMove(gameId, a.id, [1, 7]);
+
+  const stats = timingStats(a.id);
+  assert.equal(stats.moves, 2, "counts only this player's moves");
+  assert.ok(stats.medianThinkMs !== null);
+  assert.ok(stats.fastestMs !== null && stats.slowestMs !== null);
+  assert.ok(stats.fastestMs! <= stats.slowestMs!);
 });
 
 // --- concurrency -----------------------------------------------------------
