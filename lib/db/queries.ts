@@ -46,6 +46,8 @@ export function decodeBoard(s: string): BoardState {
 export interface User {
   id: string;
   username: string;
+  /** Set when the account is closed. Games survive; personal fields do not. */
+  deleted_at: number | null;
   created_at: number;
 }
 
@@ -98,7 +100,12 @@ export function createUser(username: string): User {
     .get(trimmed.toLowerCase());
   if (existing) throw new Error("That username is taken.");
 
-  const user: User = { id: newId(), username: trimmed, created_at: now() };
+  const user: User = {
+    id: newId(),
+    username: trimmed,
+    deleted_at: null,
+    created_at: now(),
+  };
   db.prepare(
     "INSERT INTO users (id, username, username_key, created_at) VALUES (?, ?, ?, ?)",
   ).run(user.id, user.username, trimmed.toLowerCase(), user.created_at);
@@ -108,7 +115,9 @@ export function createUser(username: string): User {
 export function findUserByName(username: string): User | null {
   return (
     (getDb()
-      .prepare("SELECT id, username, created_at FROM users WHERE username_key = ?")
+      .prepare(
+        "SELECT id, username, deleted_at, created_at FROM users WHERE username_key = ?",
+      )
       .get(username.trim().toLowerCase()) as User | undefined) ?? null
   );
 }
@@ -116,7 +125,7 @@ export function findUserByName(username: string): User | null {
 export function getUser(id: string): User | null {
   return (
     (getDb()
-      .prepare("SELECT id, username, created_at FROM users WHERE id = ?")
+      .prepare("SELECT id, username, deleted_at, created_at FROM users WHERE id = ?")
       .get(id) as User | undefined) ?? null
   );
 }
@@ -133,10 +142,10 @@ export function userForSession(token: string | undefined): User | null {
   if (!token) return null;
   const row = getDb()
     .prepare(
-      `SELECT u.id, u.username, u.created_at
+      `SELECT u.id, u.username, u.deleted_at, u.created_at
          FROM sessions s
          JOIN users u ON u.id = s.user_id
-        WHERE s.token = ? AND s.expires_at > ?`,
+        WHERE s.token = ? AND s.expires_at > ? AND u.deleted_at IS NULL`,
     )
     .get(token, now()) as User | undefined;
   return row ?? null;
@@ -441,6 +450,77 @@ export interface LeaderboardRow {
   losses: number;
   draws: number;
   played: number;
+}
+
+export interface PlayerStats {
+  user: User;
+  wins: number;
+  losses: number;
+  draws: number;
+  played: number;
+  active: number;
+}
+
+/** A player's public record. Returns null for an unknown name. */
+export function playerStats(username: string): PlayerStats | null {
+  const user = findUserByName(username);
+  if (!user) return null;
+
+  const row = getDb()
+    .prepare(
+      `SELECT
+         SUM(CASE WHEN g.status = 'finished' AND
+                       ((g.player1_id = ? AND g.result = 1)
+                     OR (g.player2_id = ? AND g.result = -1)) THEN 1 ELSE 0 END) AS wins,
+         SUM(CASE WHEN g.status = 'finished' AND
+                       ((g.player1_id = ? AND g.result = -1)
+                     OR (g.player2_id = ? AND g.result = 1)) THEN 1 ELSE 0 END) AS losses,
+         SUM(CASE WHEN g.status = 'finished' AND g.result = 0 THEN 1 ELSE 0 END) AS draws,
+         SUM(CASE WHEN g.status = 'finished' THEN 1 ELSE 0 END) AS played,
+         SUM(CASE WHEN g.status = 'active' THEN 1 ELSE 0 END) AS active
+       FROM games g
+      WHERE g.player1_id = ? OR g.player2_id = ?`,
+    )
+    .get(user.id, user.id, user.id, user.id, user.id, user.id) as {
+    wins: number | null;
+    losses: number | null;
+    draws: number | null;
+    played: number | null;
+    active: number | null;
+  };
+
+  return {
+    user,
+    wins: row.wins ?? 0,
+    losses: row.losses ?? 0,
+    draws: row.draws ?? 0,
+    played: row.played ?? 0,
+    active: row.active ?? 0,
+  };
+}
+
+/** A player's finished games, most recent first. */
+export function finishedGamesForUser(userId: string, limit = 25): GameWithPlayers[] {
+  return getDb()
+    .prepare(
+      `SELECT ${GAME_COLUMNS} ${GAME_JOINS}
+        WHERE (g.player1_id = ? OR g.player2_id = ?) AND g.status = 'finished'
+        ORDER BY g.updated_at DESC
+        LIMIT ?`,
+    )
+    .all(userId, userId, limit) as GameWithPlayers[];
+}
+
+/** How many games are waiting on this player to move. */
+export function gamesAwaitingUser(userId: string): number {
+  const row = getDb()
+    .prepare(
+      `SELECT COUNT(*) AS n FROM games
+        WHERE status = 'active'
+          AND ((player1_id = ? AND turn = 1) OR (player2_id = ? AND turn = -1))`,
+    )
+    .get(userId, userId) as { n: number };
+  return row.n;
 }
 
 export function leaderboard(limit = 25): LeaderboardRow[] {

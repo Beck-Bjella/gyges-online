@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { leaderboard, settleExpiredGames } from "@/lib/db/queries";
 
 export const dynamic = "force-dynamic";
@@ -35,7 +36,11 @@ export default function LeaderboardPage() {
                   <td className="num" style={{ color: "var(--text-dim)" }}>
                     {i + 1}
                   </td>
-                  <td>{r.username}</td>
+                  <td>
+                    <Link href={`/player/${encodeURIComponent(r.username)}`}>
+                      {r.username}
+                    </Link>
+                  </td>
                   <td className="num">{r.wins}</td>
                   <td className="num">{r.losses}</td>
                   <td className="num">{r.draws}</td>

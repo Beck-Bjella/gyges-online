@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { currentUser } from "@/lib/auth";
+import { gamesAwaitingUser } from "@/lib/db/queries";
 import SignOutButton from "@/components/SignOutButton";
 import "./globals.css";
 
@@ -15,6 +16,7 @@ export default async function RootLayout({
   children: React.ReactNode;
 }) {
   const user = await currentUser();
+  const waiting = user ? gamesAwaitingUser(user.id) : 0;
 
   return (
     <html lang="en">
@@ -25,7 +27,10 @@ export default async function RootLayout({
               Gygès
             </Link>
             <nav>
-              <Link href="/">Games</Link>
+              <Link href="/">
+                Games
+                {waiting > 0 && <span className="badge">{waiting}</span>}
+              </Link>
               <Link href="/leaderboard">Leaderboard</Link>
               <Link href="/rules">Rules</Link>
             </nav>
@@ -33,7 +38,10 @@ export default async function RootLayout({
             {user ? (
               <div className="row">
                 <span className="who">
-                  signed in as <strong>{user.username}</strong>
+                  signed in as{" "}
+                  <Link href={`/player/${encodeURIComponent(user.username)}`}>
+                    <strong>{user.username}</strong>
+                  </Link>
                 </span>
                 <SignOutButton />
               </div>

@@ -221,6 +221,7 @@ for (const [name, path] of [
   ["leaderboard", "/leaderboard"],
   ["rules", "/rules"],
   ["game", `/game/${gameId}`],
+  ["player profile", `/player/${alice}`],
 ]) {
   const res = await fetch(`${BASE}${path}`, { headers: { Cookie: aliceCookie } });
   check(`the ${name} page renders`, res.status === 200, `status ${res.status}`);
@@ -231,6 +232,31 @@ check(
   "an unknown game returns 404",
   missing.status === 404,
   `status ${missing.status}`,
+);
+
+const noPlayer = await fetch(`${BASE}/player/nobody-by-that-name`);
+check(
+  "an unknown player returns 404",
+  noPlayer.status === 404,
+  `status ${noPlayer.status}`,
+);
+
+// A finished game must be readable by someone who was not in it.
+const outsider = await signIn(`nosy${suffix}`);
+const spectate = await fetch(`${BASE}/game/${gameId}`, {
+  headers: { Cookie: outsider },
+});
+check(
+  "a non-participant can view a finished game",
+  spectate.status === 200,
+  `status ${spectate.status}`,
+);
+
+const profileHtml = await fetch(`${BASE}/player/${alice}`).then((r) => r.text());
+check(
+  "the profile shows the player's record",
+  profileHtml.includes(alice),
+  "username missing from the page",
 );
 
 // --- resignation -----------------------------------------------------------

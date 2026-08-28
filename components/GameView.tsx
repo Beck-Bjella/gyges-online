@@ -293,6 +293,13 @@ function Status({
   const p1 = game.player1Name ?? "—";
   const p2 = game.player2Name ?? "waiting…";
 
+  const nameLink = (name: string | null) =>
+    name ? (
+      <Link href={`/player/${encodeURIComponent(name)}`}>{name}</Link>
+    ) : (
+      <span>—</span>
+    );
+
   if (game.status === "open") {
     return (
       <>
@@ -333,7 +340,8 @@ function Status({
           </strong>
         </p>
         <p className="muted" style={{ margin: 0 }}>
-          {game.ply} moves · P1 {p1} · P2 {p2}
+          {game.ply} moves · P1 {nameLink(game.player1Name)} · P2{" "}
+          {nameLink(game.player2Name)}
         </p>
       </>
     );
@@ -353,7 +361,7 @@ function Status({
         )}
       </p>
       <p className="muted" style={{ margin: 0, lineHeight: 1.6 }}>
-        P1 {p1} · P2 {p2}
+        P1 {nameLink(game.player1Name)} · P2 {nameLink(game.player2Name)}
         <br />
         {describeTimeControl(game.moveSeconds)}
         {game.deadlineAt ? ` · deadline ${relativeTime(game.deadlineAt)}` : ""}
