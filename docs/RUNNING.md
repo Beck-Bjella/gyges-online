@@ -90,6 +90,39 @@ through the same Node process.
 - **Still no passwords.** Anyone on your wifi can sign in as anyone. Fine for
   family; not fine in public.
 
+### Production mode over the LAN
+
+`npm run dev:lan` is the *development* server: hot reload, the Next.js dev-tools
+badge in the corner, unoptimised code. To test what people will actually get:
+
+```sh
+npm run build
+npm run start:lan
+```
+
+Same address, same port. The difference is that the code is compiled and
+optimised, there is no dev badge, and pages render faster. This is the closest
+thing to the deployed site you can run at home, and it is worth using for any
+real play-testing.
+
+The trade-off is that `npm run build` must be re-run after every code change —
+there is no hot reload in production mode.
+
+### Phones and tablets
+
+The site works on a phone on the same wifi: open `http://192.168.1.11:3000`
+in the phone's browser.
+
+- The layout collapses to a single column below 900px wide.
+- Below 640px the board goes edge-to-edge so the pieces stay big enough to hit
+  with a finger.
+- Dragging works by touch. The board sets `touch-action: none`, which stops the
+  browser scrolling or zooming the page while a finger is on the board.
+
+Worth testing on a real phone rather than trusting the browser's device
+emulator — finger accuracy on the smaller pieces is the thing most likely to
+need adjusting, and only a real thumb will tell you.
+
 ### If they are not on your wifi
 
 A tunnel service gives you a temporary public URL pointing at your machine:
