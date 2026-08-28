@@ -10,12 +10,14 @@
 import { getDb, newId, newToken, now, nowMs, transaction } from "./index.ts";
 import {
   applyMove,
+  applySetup,
   boardFromString,
   boardToString,
   checkMoveStructure,
+  emptyBoard,
   isGameOver,
+  isValidSetup,
   moveToString,
-  startingBoard,
   winner,
   type BoardState,
   type Move,
@@ -55,7 +57,7 @@ export interface Game {
   id: string;
   player1_id: string | null;
   player2_id: string | null;
-  status: "open" | "active" | "finished";
+  status: "open" | "setup" | "active" | "finished";
   turn: Player;
   result: number | null;
   result_reason: string | null;
@@ -77,6 +79,8 @@ export interface MoveRow {
   game_id: string;
   ply: number;
   player: Player;
+  /** 'setup' for a home-row arrangement, 'move' for ordinary play. */
+  kind: "setup" | "move";
   move: string;
   board_after: string;
   /** Unix milliseconds. */
@@ -225,8 +229,10 @@ const GAME_JOINS = `
 export function createGame(
   creatorId: string,
   moveSeconds = 259200,
-  from: BoardState = startingBoard(),
+  from: BoardState = emptyBoard(),
 ): Game {
+  // A game begins from an empty board: both players arrange their home row
+  // before play starts. See the setup section below.
   const board = encodeBoard(from);
   const game: Game = {
     id: newId(),
@@ -305,7 +311,7 @@ export function listActiveGames(excludeUserId?: string, limit = 30): GameWithPla
     return db
       .prepare(
         `SELECT ${GAME_COLUMNS} ${GAME_JOINS}
-          WHERE g.status = 'active'
+          WHERE g.status IN ('active', 'setup')
             AND g.player1_id <> ? AND g.player2_id <> ?
           ORDER BY g.updated_at DESC LIMIT ?`,
       )
@@ -314,7 +320,7 @@ export function listActiveGames(excludeUserId?: string, limit = 30): GameWithPla
   return db
     .prepare(
       `SELECT ${GAME_COLUMNS} ${GAME_JOINS}
-        WHERE g.status = 'active'
+        WHERE g.status IN ('active', 'setup')
         ORDER BY g.updated_at DESC LIMIT ?`,
     )
     .all(limit) as GameWithPlayers[];
@@ -395,7 +401,7 @@ export function joinGame(gameId: string, userId: string): Game {
     const startedAt = now();
     db.prepare(
       `UPDATE games
-          SET player2_id = ?, status = 'active', deadline_at = ?,
+          SET player2_id = ?, status = 'setup', deadline_at = ?,
               started_at = ?, updated_at = ?
         WHERE id = ? AND status = 'open' AND player2_id IS NULL`,
     ).run(userId, deadline, startedAt, now(), gameId);
@@ -403,7 +409,7 @@ export function joinGame(gameId: string, userId: string): Game {
     return {
       ...game,
       player2_id: userId,
-      status: "active" as const,
+      status: "setup" as const,
       deadline_at: deadline,
       started_at: startedAt,
     };
@@ -419,6 +425,87 @@ export function sideOf(game: Game, userId: string | null): Player | null {
 }
 
 /**
+ * Submit a home-row arrangement.
+ *
+ * The two setup plies are recorded in the moves table like any other action,
+ * so a game replays from an empty board. They are marked kind='setup' because
+ * they are not positions the engine can evaluate — it assumes twelve pieces,
+ * and after player 1's setup there are six.
+ *
+ * Player 1 arranges first, then player 2, who can see what they are facing.
+ * Once both are placed the game moves to 'active' and player 1 moves first.
+ */
+export function submitSetup(
+  gameId: string,
+  userId: string,
+  arrangement: number[],
+): GameWithPlayers {
+  return transaction(() => {
+    const db = getDb();
+    const game = db.prepare("SELECT * FROM games WHERE id = ?").get(gameId) as
+      | Game
+      | undefined;
+    if (!game) throw new GameError("Game not found.", 404);
+    if (game.status !== "setup") {
+      throw new GameError("This game is not being set up.");
+    }
+
+    const side = sideOf(game, userId);
+    if (side === null) throw new GameError("You are not a player in this game.", 403);
+    if (side !== game.turn) throw new GameError("It is not your turn to place.", 409);
+
+    if (!isValidSetup(arrangement)) {
+      throw new GameError("A setup must use each of the six pieces exactly once.");
+    }
+
+    const board = decodeBoard(game.board);
+    const nextBoard = applySetup(board, side, arrangement);
+    const encoded = encodeBoard(nextBoard);
+    const ply = game.ply + 1;
+    // Player 1 places first, so after player 2 places, both are done.
+    const bothPlaced = ply >= 2;
+
+    const at = nowMs();
+    const previous = db
+      .prepare("SELECT created_at FROM moves WHERE game_id = ? AND ply = ?")
+      .get(gameId, game.ply) as { created_at: number } | undefined;
+    const since = previous?.created_at ?? (game.started_at ?? now()) * 1000;
+
+    db.prepare(
+      `INSERT INTO moves
+         (game_id, ply, player, kind, move, board_after, created_at, think_ms)
+       VALUES (?, ?, ?, 'setup', ?, ?, ?, ?)`,
+    ).run(gameId, ply, side, arrangement.join(""), encoded, at, Math.max(0, at - since));
+
+    const result = db
+      .prepare(
+        `UPDATE games
+            SET board = ?, ply = ?, status = ?, turn = ?, deadline_at = ?,
+                updated_at = ?
+          WHERE id = ? AND ply = ? AND turn = ? AND status = 'setup'`,
+      )
+      .run(
+        encoded,
+        ply,
+        bothPlaced ? "active" : "setup",
+        // Player 1 places, then player 2 places, then player 1 moves first.
+        bothPlaced ? 1 : -1,
+        now() + game.move_seconds,
+        now(),
+        gameId,
+        game.ply,
+        side,
+      );
+
+    if (result.changes === 0) {
+      throw new GameError("Someone acted first — reload the game.", 409);
+    }
+
+    return getGame(gameId)!;
+  });
+}
+
+/**
  * Submit a move.
  *
  * The server checks authority (is this your game, is it your turn) and that the
@@ -431,6 +518,9 @@ export function submitMove(gameId: string, userId: string, mv: Move): GameWithPl
     const db = getDb();
     const game = db.prepare("SELECT * FROM games WHERE id = ?").get(gameId) as Game | undefined;
     if (!game) throw new GameError("Game not found.", 404);
+    if (game.status === "setup") {
+      throw new GameError("Both players must place their pieces first.");
+    }
     if (game.status !== "active") throw new GameError("That game is not in progress.");
 
     const side = sideOf(game, userId);
@@ -474,8 +564,9 @@ export function submitMove(gameId: string, userId: string, mv: Move): GameWithPl
     const thinkMs = Math.max(0, at - since);
 
     db.prepare(
-      `INSERT INTO moves (game_id, ply, player, move, board_after, created_at, think_ms)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO moves
+         (game_id, ply, player, kind, move, board_after, created_at, think_ms)
+       VALUES (?, ?, ?, 'move', ?, ?, ?, ?)`,
     ).run(gameId, ply, side, moveToString(mv), encoded, at, thinkMs);
 
     // Optimistic concurrency: the UPDATE only applies if the game is still in
@@ -525,7 +616,9 @@ export function resignGame(gameId: string, userId: string): GameWithPlayers {
     const db = getDb();
     const game = db.prepare("SELECT * FROM games WHERE id = ?").get(gameId) as Game | undefined;
     if (!game) throw new GameError("Game not found.", 404);
-    if (game.status !== "active") throw new GameError("That game is not in progress.");
+    if (game.status !== "active" && game.status !== "setup") {
+      throw new GameError("That game is not in progress.");
+    }
 
     const side = sideOf(game, userId);
     if (side === null) throw new GameError("You are not a player in this game.", 403);
@@ -534,7 +627,7 @@ export function resignGame(gameId: string, userId: string): GameWithPlayers {
       `UPDATE games
           SET status = 'finished', result = ?, result_reason = 'resign',
               deadline_at = NULL, finished_at = ?, updated_at = ?
-        WHERE id = ? AND status = 'active'`,
+        WHERE id = ? AND status IN ('active', 'setup')`,
     ).run(-side, now(), now(), gameId);
 
     return getGame(gameId)!;
@@ -558,7 +651,8 @@ export function settleExpiredGames(): number {
   const expired = db
     .prepare(
       `SELECT id, turn FROM games
-        WHERE status = 'active' AND deadline_at IS NOT NULL AND deadline_at <= ?`,
+        WHERE status IN ('active', 'setup')
+          AND deadline_at IS NOT NULL AND deadline_at <= ?`,
     )
     .all(now()) as { id: string; turn: Player }[];
 
@@ -569,7 +663,7 @@ export function settleExpiredGames(): number {
       `UPDATE games
           SET status = 'finished', result = ?, result_reason = 'timeout',
               deadline_at = NULL, finished_at = ?, updated_at = ?
-        WHERE id = ? AND status = 'active' AND deadline_at <= ?`,
+        WHERE id = ? AND status IN ('active', 'setup') AND deadline_at <= ?`,
     );
     let settled = 0;
     for (const g of expired) {
@@ -621,7 +715,7 @@ export function playerStats(username: string): PlayerStats | null {
                      OR (g.player2_id = ? AND g.result = 1)) THEN 1 ELSE 0 END) AS losses,
          SUM(CASE WHEN g.status = 'finished' AND g.result = 0 THEN 1 ELSE 0 END) AS draws,
          SUM(CASE WHEN g.status = 'finished' THEN 1 ELSE 0 END) AS played,
-         SUM(CASE WHEN g.status = 'active' THEN 1 ELSE 0 END) AS active
+         SUM(CASE WHEN g.status IN ('active', 'setup') THEN 1 ELSE 0 END) AS active
        FROM games g
       WHERE g.player1_id = ? OR g.player2_id = ?`,
     )
@@ -660,7 +754,7 @@ export function gamesAwaitingUser(userId: string): number {
   const row = getDb()
     .prepare(
       `SELECT COUNT(*) AS n FROM games
-        WHERE status = 'active'
+        WHERE status IN ('active', 'setup')
           AND ((player1_id = ? AND turn = 1) OR (player2_id = ? AND turn = -1))`,
     )
     .get(userId, userId) as { n: number };

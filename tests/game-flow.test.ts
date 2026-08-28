@@ -24,6 +24,7 @@ const {
   renameUser,
   createGame,
   joinGame,
+  submitSetup,
   submitMove,
   resignGame,
   getGame,
@@ -41,9 +42,10 @@ const {
 } = await import("../lib/db/queries.ts");
 
 const { getDb } = await import("../lib/db/index.ts");
-const { P1_GOAL, P2_GOAL, replay, startingBoard } = await import(
-  "../lib/game/board.ts"
-);
+const { P1_GOAL, P2_GOAL, replay, startingBoard, SETUP_PIECES, emptyBoard } =
+  await import("../lib/game/board.ts");
+
+const STANDARD = [...SETUP_PIECES];
 
 after(() => {
   try {
@@ -59,7 +61,16 @@ function uniqueName(prefix: string): string {
   return `${prefix}${n++}`;
 }
 
+/** A game that has finished setup and is ready for ordinary play. */
 function twoPlayerGame(moveSeconds = 3600) {
+  const { a, b, gameId } = gameInSetup(moveSeconds);
+  submitSetup(gameId, a.id, STANDARD);
+  submitSetup(gameId, b.id, STANDARD);
+  return { a, b, gameId };
+}
+
+/** A game with both players present, waiting for player 1 to place. */
+function gameInSetup(moveSeconds = 3600) {
   const a = createUser(uniqueName("alice"));
   const b = createUser(uniqueName("bob"));
   const g = createGame(a.id, moveSeconds);
@@ -88,6 +99,8 @@ test("renaming keeps every past game", () => {
   const b = createUser(uniqueName("opponent"));
   const g = createGame(a.id, 3600);
   joinGame(g.id, b.id);
+  submitSetup(g.id, a.id, STANDARD);
+  submitSetup(g.id, b.id, STANDARD);
   submitMove(g.id, a.id, [0, 6]);
 
   const newName = uniqueName("newname");
@@ -102,7 +115,7 @@ test("renaming keeps every past game", () => {
   assert.ok(listGamesForUser(a.id).some((x) => x.id === g.id));
 
   // And their moves are untouched.
-  assert.equal(getMoves(g.id).length, 1);
+  assert.equal(getMoves(g.id).length, 3, "two setups and a move");
 });
 
 test("renaming frees the old name and keeps the new one unique", () => {
@@ -175,6 +188,102 @@ test("the creator cannot join their own game", () => {
   assert.throws(() => joinGame(g.id, a.id), /your own/i);
 });
 
+// --- setup -----------------------------------------------------------------
+
+test("a game starts from an empty board", () => {
+  const a = createUser(uniqueName("empty"));
+  const g = createGame(a.id, 3600);
+  assert.equal(g.board, emptyBoard().join(""), "no pieces before setup");
+  assert.equal(g.start_board, emptyBoard().join(""));
+});
+
+test("joining begins the setup phase, not play", () => {
+  const { gameId } = gameInSetup();
+  const g = getGame(gameId)!;
+  assert.equal(g.status, "setup");
+  assert.equal(g.turn, 1, "player 1 places first");
+});
+
+test("no moves are accepted during setup", () => {
+  const { a, gameId } = gameInSetup();
+  assert.throws(() => submitMove(gameId, a.id, [0, 6]), /place their pieces/i);
+});
+
+test("players place in turn, then play begins", () => {
+  const { a, b, gameId } = gameInSetup();
+
+  assert.throws(() => submitSetup(gameId, b.id, STANDARD), /not your turn/i);
+
+  const afterP1 = submitSetup(gameId, a.id, STANDARD);
+  assert.equal(afterP1.status, "setup", "still setup after one placement");
+  assert.equal(afterP1.turn, -1, "now player 2 places");
+  assert.equal(decodeBoard(afterP1.board).filter((v) => v !== 0).length, 6);
+
+  const afterP2 = submitSetup(gameId, b.id, STANDARD);
+  assert.equal(afterP2.status, "active", "both placed, play begins");
+  assert.equal(afterP2.turn, 1, "player 1 moves first");
+  assert.equal(decodeBoard(afterP2.board).filter((v) => v !== 0).length, 12);
+});
+
+test("a placement must use each of the six pieces exactly once", () => {
+  const { a, gameId } = gameInSetup();
+  assert.throws(() => submitSetup(gameId, a.id, [3, 3, 3, 3, 3, 3]), /exactly once/i);
+  assert.throws(() => submitSetup(gameId, a.id, [3, 2, 1]), /exactly once/i);
+  assert.throws(() => submitSetup(gameId, a.id, [3, 2, 1, 1, 2, 0]), /exactly once/i);
+});
+
+test("a player may choose a non-standard arrangement", () => {
+  const { a, b, gameId } = gameInSetup();
+  const custom = [1, 1, 2, 2, 3, 3];
+  submitSetup(gameId, a.id, custom);
+  submitSetup(gameId, b.id, STANDARD);
+
+  const board = decodeBoard(getGame(gameId)!.board);
+  assert.deepEqual(board.slice(0, 6), custom, "player 1's row matches");
+  assert.deepEqual(board.slice(30, 36), STANDARD, "player 2's row matches");
+});
+
+test("setup plies are recorded as history, marked as setup", () => {
+  const { gameId } = twoPlayerGame();
+  const moves = getMoves(gameId);
+  assert.equal(moves.length, 2, "both placements are recorded");
+  assert.equal(moves[0].kind, "setup");
+  assert.equal(moves[1].kind, "setup");
+  assert.equal(moves[0].move, STANDARD.join(""));
+  assert.equal(moves[0].player, 1);
+  assert.equal(moves[1].player, -1);
+});
+
+test("the whole game replays from the empty board", () => {
+  const { a, b, gameId } = twoPlayerGame();
+  submitMove(gameId, a.id, [0, 6]);
+  submitMove(gameId, b.id, [35, 29]);
+
+  const g = getGame(gameId)!;
+  const rows = getMoves(gameId);
+
+  // Setup plies place a row; move plies move a piece. Replaying both from the
+  // stored (empty) start must reproduce the current position.
+  let board = decodeBoard(g.start_board);
+  for (const r of rows) {
+    if (r.kind === "setup") {
+      const arrangement = Array.from(r.move, Number);
+      const row = r.player === 1 ? [0, 1, 2, 3, 4, 5] : [30, 31, 32, 33, 34, 35];
+      const next = [...board];
+      row.forEach((idx, i) => (next[idx] = arrangement[i]));
+      board = next;
+    } else {
+      board = replay([r.move.split("|").map(Number)], board);
+    }
+  }
+  assert.equal(board.join(""), g.board);
+});
+
+test("a placement cannot be submitted once play has begun", () => {
+  const { a, gameId } = twoPlayerGame();
+  assert.throws(() => submitSetup(gameId, a.id, STANDARD), /not being set up/i);
+});
+
 // --- turn order ------------------------------------------------------------
 
 test("only a participant may move", () => {
@@ -197,22 +306,27 @@ test("each move appends to the record and advances the ply", () => {
   submitMove(gameId, b.id, [35, 29]);
 
   const g = getGame(gameId)!;
-  assert.equal(g.ply, 2);
+  // Plies 1 and 2 are the two setups; play starts at ply 3.
+  assert.equal(g.ply, 4);
   assert.equal(g.turn, 1);
 
   const moves = getMoves(gameId);
-  assert.equal(moves.length, 2);
+  assert.equal(moves.length, 4);
   assert.deepEqual(
     moves.map((m) => m.ply),
-    [1, 2],
+    [1, 2, 3, 4],
+  );
+  assert.deepEqual(
+    moves.map((m) => m.kind),
+    ["setup", "setup", "move", "move"],
   );
   assert.deepEqual(
     moves.map((m) => m.player),
-    [1, -1],
+    [1, -1, 1, -1],
   );
-  assert.equal(moves[0].move, "0|6");
+  assert.equal(moves[2].move, "0|6");
   // The cached position matches the last move's result.
-  assert.equal(g.board, moves[1].board_after);
+  assert.equal(g.board, moves[3].board_after);
 });
 
 test("structurally invalid moves are rejected", () => {
@@ -220,9 +334,9 @@ test("structurally invalid moves are rejected", () => {
   assert.throws(() => submitMove(gameId, a.id, [20, 21]), /no piece/i);
   assert.throws(() => submitMove(gameId, a.id, [0, 1]), /occupied/i);
   assert.throws(() => submitMove(gameId, a.id, [0]), /2 or 3/i);
-  // None of the rejections left a trace.
-  assert.equal(getGame(gameId)!.ply, 0);
-  assert.equal(getMoves(gameId).length, 0);
+  // None of the rejections left a trace beyond the two setup plies.
+  assert.equal(getGame(gameId)!.ply, 2);
+  assert.equal(getMoves(gameId).length, 2);
 });
 
 // --- endings ---------------------------------------------------------------
@@ -293,15 +407,17 @@ test("settling leaves games inside their deadline alone", () => {
 // --- the starting position --------------------------------------------------
 
 test("a game records the position it started from", () => {
-  const { gameId } = twoPlayerGame();
-  const g = getGame(gameId)!;
+  const a = createUser(uniqueName("startrec"));
+  const g = createGame(a.id, 3600);
   assert.equal(g.start_board.length, 38);
-  assert.equal(g.start_board, g.board, "before any move, start equals current");
+  assert.equal(g.start_board, g.board, "before any placement, start equals current");
+  assert.equal(g.start_board, emptyBoard().join(""), "and the board is empty");
 });
 
 test("the starting position survives every move", () => {
   const { a, b, gameId } = twoPlayerGame();
   const start = getGame(gameId)!.start_board;
+  assert.equal(start, emptyBoard().join(""));
 
   submitMove(gameId, a.id, [0, 6]);
   submitMove(gameId, b.id, [35, 29]);
@@ -311,36 +427,32 @@ test("the starting position survives every move", () => {
   assert.notEqual(g.board, start, "but the current position has moved on");
 });
 
-test("replaying the moves from the stored start reaches the current position", () => {
+test("replaying the moves from the post-setup position reaches the current one", () => {
   const { a, b, gameId } = twoPlayerGame();
+  const afterSetup = getMoves(gameId).find((m) => m.ply === 2)!.board_after;
+
   submitMove(gameId, a.id, [0, 6]);
   submitMove(gameId, b.id, [35, 29]);
   submitMove(gameId, a.id, [1, 7]);
 
   const g = getGame(gameId)!;
   const replayed = replay(
-    getMoves(gameId).map((m) => m.move.split("|").map(Number)),
-    decodeBoard(g.start_board),
+    getMoves(gameId)
+      .filter((m) => m.kind === "move")
+      .map((m) => m.move.split("|").map(Number)),
+    decodeBoard(afterSetup),
   );
-  assert.equal(
-    replayed.join(""),
-    g.board,
-    "the move list plus the stored start must reproduce the cached position",
-  );
+  assert.equal(replayed.join(""), g.board);
 });
 
-test("a game can start from a non-standard position", () => {
-  // The point of storing the start: a game that did not begin from the
-  // standard setup still replays correctly.
+test("a game can be created from a non-empty position", () => {
+  // Storing the start keeps puzzles and handicaps possible later.
   const a = createUser(uniqueName("custom"));
-  const b = createUser(uniqueName("custom"));
   const custom = startingBoard();
   custom[0] = 0;
   custom[12] = 3;
 
   const g = createGame(a.id, 3600, custom);
-  joinGame(g.id, b.id);
-
   const stored = getGame(g.id)!;
   assert.equal(stored.start_board, custom.join(""));
   assert.equal(stored.board, custom.join(""));
@@ -361,6 +473,8 @@ test("a game records when it started and when it ended", () => {
   assert.ok(joined.started_at, "joining starts the game");
   assert.equal(joined.finished_at, null);
 
+  submitSetup(g.id, a.id, STANDARD);
+  submitSetup(g.id, b.id, STANDARD);
   const done = submitMove(g.id, a.id, [30, P2_GOAL]);
   assert.ok(done.finished_at, "finishing records the end time");
   assert.ok(done.finished_at! >= joined.started_at!);
@@ -378,7 +492,7 @@ test("started_at is distinct from created_at", () => {
   getDb().prepare("UPDATE games SET created_at = ? WHERE id = ?").run(weekAgo, g.id);
 
   joinGame(g.id, b.id);
-  submitMove(g.id, a.id, [0, 6]);
+  submitSetup(g.id, a.id, STANDARD);
 
   const [first] = getMoves(g.id);
   assert.ok(
@@ -409,7 +523,8 @@ test("timing statistics are derivable from stored moves", () => {
   submitMove(gameId, a.id, [1, 7]);
 
   const stats = timingStats(a.id);
-  assert.equal(stats.moves, 2, "counts only this player's moves");
+  // Two moves plus one setup placement.
+  assert.equal(stats.moves, 3, "counts only this player's actions");
   assert.ok(stats.medianThinkMs !== null);
   assert.ok(stats.fastestMs !== null && stats.slowestMs !== null);
   assert.ok(stats.fastestMs! <= stats.slowestMs!);
@@ -426,13 +541,13 @@ test("the same ply cannot be written twice", () => {
   assert.throws(() =>
     getDb()
       .prepare(
-        `INSERT INTO moves (game_id, ply, player, move, board_after, created_at)
-         VALUES (?, 1, 1, '0|7', ?, 0)`,
+        `INSERT INTO moves (game_id, ply, player, kind, move, board_after, created_at)
+         VALUES (?, 3, 1, 'move', '0|7', ?, 0)`,
       )
       .run(gameId, "0".repeat(38)),
   );
 
-  assert.equal(getMoves(gameId).length, 1);
+  assert.equal(getMoves(gameId).length, 3, "two setups and one move");
 });
 
 test("a second move at the same turn is refused", () => {
@@ -441,7 +556,7 @@ test("a second move at the same turn is refused", () => {
   // Whatever else player 1 tries, the turn has already passed to player 2.
   assert.throws(() => submitMove(gameId, a.id, [1, 7]), /not your turn/i);
   assert.throws(() => submitMove(gameId, a.id, [2, 8]), /not your turn/i);
-  assert.equal(getGame(gameId)!.ply, 1);
+  assert.equal(getGame(gameId)!.ply, 3, "two setups plus the one move");
 });
 
 // --- listing and leaderboard ----------------------------------------------
@@ -470,6 +585,8 @@ test("the leaderboard counts finished games", () => {
   for (let i = 0; i < 2; i++) {
     const g = createGame(w.id);
     joinGame(g.id, l.id);
+    submitSetup(g.id, w.id, STANDARD);
+    submitSetup(g.id, l.id, STANDARD);
     submitMove(g.id, w.id, [30, P2_GOAL]);
   }
 

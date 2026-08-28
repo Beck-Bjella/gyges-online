@@ -37,6 +37,67 @@ export const GRID_SIZE = 36;
 export const P1_GOAL = 36;
 export const P2_GOAL = 37;
 
+/**
+ * The pieces each player places during setup: two each of the one-, two- and
+ * three-ring pieces, arranged in whatever order the player chooses.
+ *
+ * A game does not begin from a fixed position. The board starts empty; player 1
+ * arranges these six on their home row, then player 2 does the same. Only then
+ * does normal play begin. The arrangement is a real decision and part of the
+ * record.
+ */
+export const SETUP_PIECES: readonly number[] = [3, 2, 1, 1, 2, 3];
+
+/** The board before either player has placed anything. */
+export const EMPTY_BOARD: BoardState = new Array<number>(BOARD_SIZE).fill(0);
+
+export function emptyBoard(): BoardState {
+  return new Array<number>(BOARD_SIZE).fill(0);
+}
+
+/**
+ * A player's home row, where they place their six pieces.
+ * Player 1 uses indices 0..5; player 2 uses 30..35.
+ */
+export function homeRow(player: Player): number[] {
+  return player === 1 ? [0, 1, 2, 3, 4, 5] : [30, 31, 32, 33, 34, 35];
+}
+
+/**
+ * Whether an arrangement is a legal setup: exactly the six standard pieces,
+ * in some order.
+ */
+export function isValidSetup(arrangement: number[]): boolean {
+  if (arrangement.length !== 6) return false;
+  const sorted = [...arrangement].sort();
+  const expected = [...SETUP_PIECES].sort();
+  return sorted.every((v, i) => v === expected[i]);
+}
+
+/** Place a player's arrangement onto their home row. */
+export function applySetup(
+  board: BoardState,
+  player: Player,
+  arrangement: number[],
+): BoardState {
+  const next = [...board];
+  const row = homeRow(player);
+  row.forEach((idx, i) => {
+    next[idx] = arrangement[i];
+  });
+  return next;
+}
+
+/** Read a player's home row back out of a board. */
+export function readSetup(board: BoardState, player: Player): number[] {
+  return homeRow(player).map((i) => board[i]);
+}
+
+/**
+ * The position both players' setups produce — the standard opening, when both
+ * choose the conventional order. Kept because tests and the engine's board
+ * string both reference it.
+ */
 export const STARTING_BOARD: BoardState = [
   3, 2, 1, 1, 2, 3,
   0, 0, 0, 0, 0, 0,

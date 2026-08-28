@@ -71,8 +71,14 @@ CREATE TABLE IF NOT EXISTS games (
   player2_id      TEXT REFERENCES users(id) ON DELETE RESTRICT,
 
   -- 'open'     waiting for a second player
-  -- 'active'   in progress
+  -- 'setup'    both players present; each arranges their home row in turn
+  -- 'active'   normal play
   -- 'finished' concluded
+  --
+  -- A game does not begin from a fixed position. The board starts empty,
+  -- player 1 arranges their six pieces, then player 2 does. Only then does
+  -- normal play begin. Those two arrangements are recorded as the first two
+  -- plies, so the whole game replays from an empty board.
   status          TEXT NOT NULL DEFAULT 'open',
 
   -- 1 or -1: whose turn it is. Meaningless once finished.
@@ -110,7 +116,7 @@ CREATE TABLE IF NOT EXISTS games (
   finished_at     INTEGER,
   updated_at      INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
 
-  CHECK (status IN ('open', 'active', 'finished')),
+  CHECK (status IN ('open', 'setup', 'active', 'finished')),
   -- An open game has not started; a finished one has ended.
   CHECK ((status = 'open') = (started_at IS NULL)),
   CHECK ((status = 'finished') = (finished_at IS NOT NULL)),
@@ -163,7 +169,14 @@ CREATE TABLE IF NOT EXISTS moves (
   ply         INTEGER NOT NULL,
   -- Which side made it: 1 or -1.
   player      INTEGER NOT NULL,
-  -- Board indices joined by "|", e.g. "12|18" or "12|18|24".
+  -- 'setup' for a home-row arrangement, 'move' for ordinary play.
+  --
+  -- The two setup plies are not positions the engine can evaluate: it assumes
+  -- twelve pieces on the board, and after ply 1 there are only six. They are
+  -- the prelude that produces the first real position.
+  kind        TEXT NOT NULL DEFAULT 'move',
+  -- For a move: board indices joined by "|", e.g. "12|18" or "12|18|24".
+  -- For a setup: the six ring counts in home-row order, e.g. "321123".
   move        TEXT NOT NULL,
   -- The position this move produced, cached so history views avoid a replay.
   board_after TEXT NOT NULL,
@@ -180,6 +193,7 @@ CREATE TABLE IF NOT EXISTS moves (
   PRIMARY KEY (game_id, ply),
   CHECK (ply >= 1),
   CHECK (player IN (1, -1)),
+  CHECK (kind IN ('setup', 'move')),
   CHECK (length(board_after) = 38),
   CHECK (think_ms IS NULL OR think_ms >= 0)
 );

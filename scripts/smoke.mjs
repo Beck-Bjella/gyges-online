@@ -128,7 +128,61 @@ const joined = await api(`/api/games/${gameId}/join`, {
   cookie: bobCookie,
 });
 check("a second player can join", joined.status === 200, `status ${joined.status}`);
-check("joining starts the game", joined.body?.game?.status === "active");
+check("joining begins setup", joined.body?.game?.status === "setup");
+
+// --- setup: each player arranges their home row before play ---------------
+
+const STANDARD = [3, 2, 1, 1, 2, 3];
+
+const earlyMove = await api(`/api/games/${gameId}/move`, {
+  method: "POST",
+  cookie: aliceCookie,
+  body: { move: [0, 6] },
+});
+check(
+  "no moves are accepted before both players have placed",
+  earlyMove.status === 400,
+  `status ${earlyMove.status}`,
+);
+
+const outOfTurnSetup = await api(`/api/games/${gameId}/setup`, {
+  method: "POST",
+  cookie: bobCookie,
+  body: { arrangement: STANDARD },
+});
+check(
+  "player 2 cannot place first",
+  outOfTurnSetup.status === 409,
+  `status ${outOfTurnSetup.status}`,
+);
+
+const badSetup = await api(`/api/games/${gameId}/setup`, {
+  method: "POST",
+  cookie: aliceCookie,
+  body: { arrangement: [3, 3, 3, 3, 3, 3] },
+});
+check(
+  "an arrangement must use each piece once",
+  badSetup.status === 400,
+  `status ${badSetup.status}`,
+);
+
+const setup1 = await api(`/api/games/${gameId}/setup`, {
+  method: "POST",
+  cookie: aliceCookie,
+  body: { arrangement: STANDARD },
+});
+check("player 1 can place", setup1.status === 200, `status ${setup1.status}`);
+check("still in setup after one placement", setup1.body?.game?.status === "setup");
+
+const setup2 = await api(`/api/games/${gameId}/setup`, {
+  method: "POST",
+  cookie: bobCookie,
+  body: { arrangement: STANDARD },
+});
+check("player 2 can place", setup2.status === 200, `status ${setup2.status}`);
+check("play begins once both have placed", setup2.body?.game?.status === "active");
+check("player 1 moves first", setup2.body?.game?.turn === 1);
 
 // --- turn order ------------------------------------------------------------
 
@@ -160,7 +214,7 @@ const firstMove = await api(`/api/games/${gameId}/move`, {
   body: { move: [0, 6] },
 });
 check("player 1 can move", firstMove.status === 200, `status ${firstMove.status}`);
-check("the move advances the ply", firstMove.body?.game?.ply === 1);
+check("the move advances the ply", firstMove.body?.game?.ply === 3);
 check("the turn passes to player 2", firstMove.body?.game?.turn === -1);
 
 const twice = await api(`/api/games/${gameId}/move`, {
@@ -180,7 +234,7 @@ const secondMove = await api(`/api/games/${gameId}/move`, {
   body: { move: [35, 29] },
 });
 check("player 2 can reply", secondMove.status === 200, `status ${secondMove.status}`);
-check("the ply advances again", secondMove.body?.game?.ply === 2);
+check("the ply advances again", secondMove.body?.game?.ply === 4);
 
 // --- structural rejection --------------------------------------------------
 
@@ -306,6 +360,16 @@ const second = await api("/api/games", {
 });
 const gameB = second.body?.game?.id;
 await api(`/api/games/${gameB}/join`, { method: "POST", cookie: bobCookie });
+await api(`/api/games/${gameB}/setup`, {
+  method: "POST",
+  cookie: aliceCookie,
+  body: { arrangement: STANDARD },
+});
+await api(`/api/games/${gameB}/setup`, {
+  method: "POST",
+  cookie: bobCookie,
+  body: { arrangement: STANDARD },
+});
 const resigned = await api(`/api/games/${gameB}/resign`, {
   method: "POST",
   cookie: aliceCookie,

@@ -46,7 +46,12 @@ export default async function GamePage({
       history={moves.map((m) => ({
         ply: m.ply,
         player: m.player,
-        move: moveFromString(m.move),
+        kind: m.kind,
+        // A setup ply records six ring counts ("321123"), not board indices.
+        move:
+          m.kind === "setup"
+            ? Array.from(m.move, Number)
+            : moveFromString(m.move),
         boardAfter: decodeBoard(m.board_after),
         thinkMs: m.think_ms,
       }))}

@@ -63,7 +63,26 @@ A board state is a **flat array of 38 integers**.
 also the movement distance. Ownership does not exist in this game — only the row
 nearest you determines what you may move.
 
-### Starting position
+### How a game begins
+
+A game does **not** start from a fixed position. The board begins **empty**, and
+each player arranges their own six pieces on their home row:
+
+1. Player 1 places their six pieces on row 0, in any order they choose.
+2. Player 2 then does the same on row 5, having seen player 1's arrangement.
+3. Play begins, with player 1 moving first.
+
+Each player places exactly `3, 2, 1, 1, 2, 3` — two each of the one-, two- and
+three-ring pieces — giving 6!/(2!·2!·2!) = **90 distinct arrangements** per side.
+
+The two placements are recorded as the first two plies of the game (with
+`kind = 'setup'`), so a game replays from an empty board.
+
+**These two positions are not engine-analysable.** The engine assumes twelve
+pieces on the board; after player 1 places there are six. They are the prelude
+that produces the first position the engine can evaluate.
+
+### The conventional arrangement
 
 ```
 [ 3, 2, 1, 1, 2, 3,     <- row 0, P1 home
@@ -75,8 +94,9 @@ nearest you determines what you may move.
   0, 0 ]                <- bear-off 36, 37
 ```
 
-Alternate string form used by the `gyges` Rust library
-(rows from your side outward, `/`-separated):
+This is what both players choosing the conventional order produces, and what
+the engine's board string describes. Alternate string form used by the `gyges`
+Rust library (rows from your side outward, `/`-separated):
 
 ```
 321123/000000/000000/000000/000000/321123

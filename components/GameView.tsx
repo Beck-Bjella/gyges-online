@@ -13,8 +13,11 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Board from "./Board";
+import SetupPanel from "./SetupPanel";
 import {
   applyMove,
+  applySetup,
+  homeRow,
   moveToNotation,
   type BoardState,
   type Move,
@@ -24,7 +27,7 @@ import { describeThinkTime, describeTimeControl, relativeTime } from "@/lib/form
 
 interface GameSummary {
   id: string;
-  status: "open" | "active" | "finished";
+  status: "open" | "setup" | "active" | "finished";
   turn: Player;
   result: number | null;
   resultReason: string | null;
@@ -39,6 +42,7 @@ interface GameSummary {
 interface HistoryEntry {
   ply: number;
   player: Player;
+  kind: "setup" | "move";
   move: Move;
   boardAfter: BoardState;
   /** How long the player took, in milliseconds. */
@@ -69,6 +73,8 @@ export default function GameView({
   const [optimistic, setOptimistic] = useState<BoardState | null>(null);
   // null means "live"; a ply number means the user is reviewing history.
   const [viewingPly, setViewingPly] = useState<number | null>(null);
+  // A live preview of the arrangement while a player places their pieces.
+  const [setupPreview, setSetupPreview] = useState<(number | null)[] | null>(null);
   // You sit at the bottom by default; the flip control lets you look from the
   // other side, which also moves the player bars to match.
   const [flipped, setFlipped] = useState(viewerSide === -1);
@@ -90,16 +96,37 @@ export default function GameView({
     return history.find((h) => h.ply === viewingPly)?.boardAfter ?? liveBoard;
   }, [viewingPly, liveBoard, startBoard, history]);
 
+  // While arranging, show the pieces on the board as they are chosen.
+  const previewBoard = useMemo(() => {
+    if (!setupPreview || viewerSide === null) return null;
+    const filled = setupPreview.map((p) => p ?? 0);
+    return applySetup(displayBoard, viewerSide, filled);
+  }, [setupPreview, viewerSide, displayBoard]);
+
+  const shownBoard = previewBoard ?? displayBoard;
+
   const reviewing = viewingPly !== null && viewingPly !== game.ply;
 
   const yourTurn =
     game.status === "active" && viewerSide !== null && viewerSide === game.turn;
   const canMove = yourTurn && !pending && !reviewing;
+  // For the status panel, "your turn" covers placing as well as moving.
+  const yourTurnOrPlacement =
+    viewerSide !== null &&
+    viewerSide === game.turn &&
+    (game.status === "active" || game.status === "setup");
+
+  // Placing pieces: the board starts empty and each player arranges their home
+  // row before play begins.
+  const inSetup = game.status === "setup";
+  const yourPlacement = inSetup && viewerSide !== null && viewerSide === game.turn;
 
   const lastMove = history.length ? history[history.length - 1].move : [];
-  const highlight = reviewing
-    ? (history.find((h) => h.ply === viewingPly)?.move ?? [])
-    : lastMove;
+  const highlight = yourPlacement
+    ? homeRow(viewerSide!)
+    : reviewing
+      ? (history.find((h) => h.ply === viewingPly)?.move ?? [])
+      : lastMove;
 
   const submit = useCallback(
     async (mv: Move) => {
@@ -127,6 +154,32 @@ export default function GameView({
       }
     },
     [game.id, liveBoard, router],
+  );
+
+  const submitSetupArrangement = useCallback(
+    async (arrangement: number[]) => {
+      setError(null);
+      setPending(true);
+      try {
+        const res = await fetch(`/api/games/${game.id}/setup`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ arrangement }),
+        });
+        if (!res.ok) {
+          const body = (await res.json().catch(() => ({}))) as { error?: string };
+          setError(body.error ?? "The server rejected that placement.");
+        } else {
+          setSetupPreview(null);
+          router.refresh();
+        }
+      } catch {
+        setError("Could not reach the server.");
+      } finally {
+        setPending(false);
+      }
+    },
+    [game.id, router],
   );
 
   const resign = useCallback(async () => {
@@ -235,7 +288,7 @@ export default function GameView({
 
         <div className={reviewing ? "board-wrap reviewing" : "board-wrap"}>
           <Board
-            board={displayBoard}
+            board={shownBoard}
             interactive={canMove}
             flipped={flipped}
             onMove={submit}
@@ -245,8 +298,8 @@ export default function GameView({
             <div className="review-banner">
               <span>
                 {viewingPly === 0
-                  ? "Starting position"
-                  : `Move ${viewingPly} of ${game.ply}`}{" "}
+                  ? "Empty board"
+                  : describePly(history, viewingPly!, game.ply)}{" "}
                 — you cannot play from here
               </span>
               <button className="btn btn-primary" onClick={() => setViewingPly(null)}>
@@ -287,12 +340,22 @@ export default function GameView({
       </div>
 
       <aside style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        {yourPlacement && (
+          <SetupPanel
+            side={viewerSide!}
+            pending={pending}
+            error={error}
+            onSubmit={submitSetupArrangement}
+            onPreview={setSetupPreview}
+          />
+        )}
+
         <div className="panel">
           <h2>Status</h2>
           <Status
             game={game}
             viewerSide={viewerSide}
-            yourTurn={yourTurn}
+            yourTurn={yourTurnOrPlacement}
             signedIn={signedIn}
           />
           {game.status === "active" && viewerSide !== null && (
@@ -352,7 +415,11 @@ export default function GameView({
                       <span style={{ minWidth: 22 }}>
                         {h.player === 1 ? "P1" : "P2"}
                       </span>
-                      <span style={{ flex: 1 }}>{moveToNotation(h.move)}</span>
+                      <span style={{ flex: 1 }}>
+                        {h.kind === "setup"
+                          ? `set ${h.move.join("")}`
+                          : moveToNotation(h.move)}
+                      </span>
                       <span style={{ color: "var(--text-dim)" }}>
                         {describeThinkTime(h.thinkMs)}
                       </span>
@@ -378,6 +445,20 @@ export default function GameView({
       </aside>
     </div>
   );
+}
+
+/** How to describe a point in the history: a placement, or a move number. */
+function describePly(
+  history: HistoryEntry[],
+  ply: number,
+  total: number,
+): string {
+  const entry = history.find((h) => h.ply === ply);
+  if (entry?.kind === "setup") {
+    return `Setup — player ${entry.player === 1 ? "1" : "2"} places`;
+  }
+  const setupPlies = history.filter((h) => h.kind === "setup").length;
+  return `Move ${ply - setupPlies} of ${total - setupPlies}`;
 }
 
 function PlayerBar({
@@ -448,6 +529,27 @@ function Status({
           ) : (
             "Sign in to join."
           )}
+        </p>
+      </>
+    );
+  }
+
+  if (game.status === "setup") {
+    const placing = game.turn === 1 ? p1 : p2;
+    return (
+      <>
+        <p style={{ margin: "0 0 8px" }}>
+          {yourTurn ? (
+            <strong style={{ color: "var(--accent-mint)" }}>
+              Place your pieces
+            </strong>
+          ) : (
+            <span>Waiting for {placing} to place their pieces</span>
+          )}
+        </p>
+        <p className="muted" style={{ margin: 0, lineHeight: 1.6 }}>
+          The board starts empty. Player 1 arranges their home row, then
+          player 2, and then play begins.
         </p>
       </>
     );
