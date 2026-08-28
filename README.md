@@ -116,10 +116,14 @@ PostgreSQL for production.
 
 ## History
 
-This repository previously held desktop clients for the Gygès engine
-(macroquad, Slint, Tauri). They were removed to make room for the web
-application; the original macroquad app remains in git history at commit
-`82db53c`.
+This repository was once **GygesUI**, a set of desktop clients for the Gygès
+engine (macroquad, Slint, Tauri). It is now the website, and was renamed to
+match. Those clients were removed to make room for it; the original macroquad
+app remains in git history at commit `82db53c`.
+
+The engine itself lives in its own project,
+[Beck-Bjella/Gyges](https://github.com/Beck-Bjella/Gyges), and is not part of
+this repository.
 
 ## License
 
