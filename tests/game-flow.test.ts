@@ -30,6 +30,7 @@ const {
   getGame,
   getMoves,
   listOpenGames,
+  listActiveGames,
   listGamesForUser,
   settleExpiredGames,
   sideOf,
@@ -172,7 +173,7 @@ test("joining activates the game and sets a deadline", () => {
   const g = getGame(gameId)!;
   assert.equal(g.status, "active");
   assert.ok(g.deadline_at! > Math.floor(Date.now() / 1000));
-  // It is no longer offered to other players.
+  // It is no longer waiting for a player, so it leaves the open list.
   assert.equal(listOpenGames().some((x) => x.id === gameId), false);
 });
 
@@ -568,6 +569,42 @@ test("sideOf identifies the players", () => {
   assert.equal(sideOf(g, b.id), -1);
   assert.equal(sideOf(g, "nobody"), null);
   assert.equal(sideOf(g, null), null);
+});
+
+test("the public lists show everyone's games, including your own", () => {
+  // These lists must mean the same thing to every viewer. Hiding the viewer's
+  // own games made a game vanish from "in progress" for the people playing it,
+  // which is exactly who would look for it.
+  const { a, b, gameId } = twoPlayerGame();
+
+  const active = listActiveGames();
+  assert.ok(
+    active.some((g) => g.id === gameId),
+    "an active game appears in the public list",
+  );
+
+  // And it looks the same to a participant as to a stranger: the query takes
+  // no viewer at all.
+  const again = listActiveGames();
+  assert.deepEqual(
+    again.map((g) => g.id),
+    active.map((g) => g.id),
+  );
+  void a;
+  void b;
+});
+
+test("an open game is listed for its host as well as everyone else", () => {
+  const host = createUser(uniqueName("host"));
+  const g = createGame(host.id, 3600);
+
+  assert.ok(
+    listOpenGames().some((x) => x.id === g.id),
+    "the host can see their own game waiting",
+  );
+
+  // Joining it is still refused; visibility and permission are separate.
+  assert.throws(() => joinGame(g.id, host.id), /your own/i);
 });
 
 test("a player's games are listed for them", () => {

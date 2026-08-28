@@ -281,18 +281,15 @@ export function getGame(id: string): GameWithPlayers | null {
   );
 }
 
-export function listOpenGames(excludeUserId?: string): GameWithPlayers[] {
-  const db = getDb();
-  if (excludeUserId) {
-    return db
-      .prepare(
-        `SELECT ${GAME_COLUMNS} ${GAME_JOINS}
-          WHERE g.status = 'open' AND (g.player1_id IS NULL OR g.player1_id <> ?)
-          ORDER BY g.created_at DESC LIMIT 50`,
-      )
-      .all(excludeUserId) as GameWithPlayers[];
-  }
-  return db
+/**
+ * Every game waiting for a second player.
+ *
+ * Includes the viewer's own, marked rather than hidden: someone who has just
+ * hosted a game should be able to see it sitting in the list. Joining your own
+ * is refused by joinGame regardless.
+ */
+export function listOpenGames(): GameWithPlayers[] {
+  return getDb()
     .prepare(
       `SELECT ${GAME_COLUMNS} ${GAME_JOINS}
         WHERE g.status = 'open' ORDER BY g.created_at DESC LIMIT 50`,
@@ -301,23 +298,14 @@ export function listOpenGames(excludeUserId?: string): GameWithPlayers[] {
 }
 
 /**
- * Games in progress, for anyone to watch.
+ * Every game in progress.
  *
- * Excludes the viewer's own games, which already have their own list.
+ * Deliberately includes the viewer's own games. "In progress" should mean the
+ * same thing to everyone looking at it — a list that silently omits your games
+ * is confusing, and the caller can mark them instead.
  */
-export function listActiveGames(excludeUserId?: string, limit = 30): GameWithPlayers[] {
-  const db = getDb();
-  if (excludeUserId) {
-    return db
-      .prepare(
-        `SELECT ${GAME_COLUMNS} ${GAME_JOINS}
-          WHERE g.status IN ('active', 'setup')
-            AND g.player1_id <> ? AND g.player2_id <> ?
-          ORDER BY g.updated_at DESC LIMIT ?`,
-      )
-      .all(excludeUserId, excludeUserId, limit) as GameWithPlayers[];
-  }
-  return db
+export function listActiveGames(limit = 30): GameWithPlayers[] {
+  return getDb()
     .prepare(
       `SELECT ${GAME_COLUMNS} ${GAME_JOINS}
         WHERE g.status IN ('active', 'setup')

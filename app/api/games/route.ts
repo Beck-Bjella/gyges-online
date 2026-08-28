@@ -4,8 +4,7 @@ import { createGame, listOpenGames, settleExpiredGames } from "@/lib/db/queries"
 
 export async function GET() {
   settleExpiredGames();
-  const user = await currentUser();
-  return NextResponse.json({ games: listOpenGames(user?.id) });
+  return NextResponse.json({ games: listOpenGames() });
 }
 
 export async function POST(req: Request) {

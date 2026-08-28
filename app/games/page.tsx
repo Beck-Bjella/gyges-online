@@ -25,8 +25,8 @@ export default async function GamesPage() {
   settleExpiredGames();
 
   const user = await currentUser();
-  const openGames = listOpenGames(user?.id);
-  const activeGames = listActiveGames(user?.id);
+  const openGames = listOpenGames();
+  const activeGames = listActiveGames();
   const recentGames = listRecentFinishedGames();
 
   return (
@@ -71,10 +71,12 @@ export default async function GamesPage() {
                       opened {relativeTime(g.created_at)}
                     </span>
                   </span>
-                  {user ? (
-                    <JoinGameButton gameId={g.id} />
-                  ) : (
+                  {!user ? (
                     <span className="muted">sign in to join</span>
+                  ) : g.player1_id === user.id ? (
+                    <span className="tag tag-turn">yours</span>
+                  ) : (
+                    <JoinGameButton gameId={g.id} />
                   )}
                 </li>
               ))}
@@ -92,7 +94,16 @@ export default async function GamesPage() {
           ) : (
             <ul className="list">
               {activeGames.map((g) => (
-                <GameLine key={g.id} game={g} kind="active" />
+                <GameLine
+                  key={g.id}
+                  game={g}
+                  kind="active"
+                  yours={
+                    user
+                      ? g.player1_id === user.id || g.player2_id === user.id
+                      : false
+                  }
+                />
               ))}
             </ul>
           )}
@@ -107,7 +118,16 @@ export default async function GamesPage() {
           ) : (
             <ul className="list">
               {recentGames.map((g) => (
-                <GameLine key={g.id} game={g} kind="finished" />
+                <GameLine
+                  key={g.id}
+                  game={g}
+                  kind="finished"
+                  yours={
+                    user
+                      ? g.player1_id === user.id || g.player2_id === user.id
+                      : false
+                  }
+                />
               ))}
             </ul>
           )}
@@ -166,9 +186,12 @@ function initial(name: string | null): string {
 function GameLine({
   game,
   kind,
+  yours,
 }: {
   game: GameWithPlayers;
   kind: "active" | "finished";
+  /** Marked rather than hidden, so the list means the same thing to everyone. */
+  yours: boolean;
 }) {
   const winner =
     game.result === 0 ? null : game.result === 1 ? game.player1_name : game.player2_name;
@@ -184,6 +207,7 @@ function GameLine({
           <span className="muted"> vs </span>
           <strong>{game.player2_name ?? "—"}</strong>
         </Link>
+        {yours && <span className="tag tag-turn" style={{ marginLeft: 8 }}>yours</span>}
         <br />
         <span className="muted">
           {kind === "active"
