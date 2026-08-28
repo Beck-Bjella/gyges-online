@@ -92,7 +92,8 @@ export interface GameWithPlayers extends Game {
 // Users and sessions
 // ---------------------------------------------------------------------------
 
-export function createUser(username: string): User {
+/** Shared by createUser and renameUser. Returns the cleaned name. */
+function validateUsername(username: string): string {
   const trimmed = username.trim();
   if (trimmed.length < 2 || trimmed.length > 24) {
     throw new Error("Username must be between 2 and 24 characters.");
@@ -100,6 +101,11 @@ export function createUser(username: string): User {
   if (!/^[A-Za-z0-9_-]+$/.test(trimmed)) {
     throw new Error("Username may contain only letters, numbers, hyphens and underscores.");
   }
+  return trimmed;
+}
+
+export function createUser(username: string): User {
+  const trimmed = validateUsername(username);
 
   const db = getDb();
   const existing = db
@@ -117,6 +123,41 @@ export function createUser(username: string): User {
     "INSERT INTO users (id, username, username_key, created_at) VALUES (?, ?, ?, ?)",
   ).run(user.id, user.username, trimmed.toLowerCase(), user.created_at);
   return user;
+}
+
+/**
+ * Change a username.
+ *
+ * This is a single-row update. Games reference users by id, never by name, so
+ * every past game, move, and session follows the rename automatically — which
+ * is the whole reason the schema stores ids rather than copies of the name.
+ *
+ * Changing case only ("beck" -> "Beck") is allowed, since the uniqueness key is
+ * case-insensitive and would otherwise report the name as taken by yourself.
+ */
+export function renameUser(userId: string, newUsername: string): User {
+  const trimmed = validateUsername(newUsername);
+  const key = trimmed.toLowerCase();
+
+  return transaction(() => {
+    const db = getDb();
+    const user = getUser(userId);
+    if (!user) throw new GameError("No such account.", 404);
+    if (user.deleted_at) throw new GameError("That account is closed.", 403);
+
+    const clash = db
+      .prepare("SELECT id FROM users WHERE username_key = ? AND id <> ?")
+      .get(key, userId);
+    if (clash) throw new GameError("That username is taken.");
+
+    db.prepare("UPDATE users SET username = ?, username_key = ? WHERE id = ?").run(
+      trimmed,
+      key,
+      userId,
+    );
+
+    return { ...user, username: trimmed };
+  });
 }
 
 export function findUserByName(username: string): User | null {

@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { currentUser, signIn, signOut } from "@/lib/auth";
-import { createGame, joinGame, GameError } from "@/lib/db/queries";
+import { createGame, joinGame, renameUser, GameError } from "@/lib/db/queries";
 
 export interface ActionState {
   error?: string;
@@ -66,4 +66,25 @@ export async function joinGameAction(
     return { error: "Could not join that game." };
   }
   redirect(`/game/${gameId}`);
+}
+
+export async function renameAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const user = await currentUser();
+  if (!user) return { error: "Sign in first." };
+
+  const username = String(formData.get("username") ?? "");
+  if (username.trim() === user.username) return {};
+
+  try {
+    renameUser(user.id, username);
+  } catch (err) {
+    if (err instanceof GameError) return { error: err.message };
+    return { error: err instanceof Error ? err.message : "Could not rename." };
+  }
+
+  revalidatePath("/", "layout");
+  redirect(`/player/${encodeURIComponent(username.trim())}`);
 }

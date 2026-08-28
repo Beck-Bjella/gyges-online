@@ -8,6 +8,8 @@ import {
   sideOf,
 } from "@/lib/db/queries";
 import { relativeTime } from "@/lib/format";
+import { currentUser } from "@/lib/auth";
+import RenameForm from "@/components/RenameForm";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +25,8 @@ export default async function PlayerPage({
   if (!stats) notFound();
 
   const { user } = stats;
+  const viewer = await currentUser();
+  const isMe = viewer?.id === user.id;
 
   // A closed account keeps its games but shows nothing personal.
   if (user.deleted_at) {
@@ -43,6 +47,13 @@ export default async function PlayerPage({
       <p className="lede">
         Member since {relativeTime(user.created_at)}.
       </p>
+
+      {isMe && (
+        <div className="panel" style={{ marginBottom: 24 }}>
+          <h2>Your account</h2>
+          <RenameForm current={user.username} />
+        </div>
+      )}
 
       <div className="panel" style={{ marginBottom: 24 }}>
         <div className="statrow">

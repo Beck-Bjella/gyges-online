@@ -21,6 +21,7 @@ process.env.GYGES_DB_PATH = join(dir, "test.db");
 
 const {
   createUser,
+  renameUser,
   createGame,
   joinGame,
   submitMove,
@@ -33,6 +34,8 @@ const {
   sideOf,
   leaderboard,
   timingStats,
+  createSession,
+  userForSession,
   GameError,
   decodeBoard,
 } = await import("../lib/db/queries.ts");
@@ -74,6 +77,68 @@ test("usernames are validated", () => {
   assert.throws(() => createUser("x"), /between/i);
   assert.throws(() => createUser("has spaces"), /only/i);
   assert.throws(() => createUser("a".repeat(25)), /between/i);
+});
+
+// --- renaming --------------------------------------------------------------
+
+test("renaming keeps every past game", () => {
+  const a = createUser(uniqueName("oldname"));
+  const b = createUser(uniqueName("opponent"));
+  const g = createGame(a.id, 3600);
+  joinGame(g.id, b.id);
+  submitMove(g.id, a.id, [0, 6]);
+
+  const newName = uniqueName("newname");
+  const renamed = renameUser(a.id, newName);
+  assert.equal(renamed.username, newName);
+  assert.equal(renamed.id, a.id, "the id never changes");
+
+  // The game still belongs to them, and now shows the new name.
+  const game = getGame(g.id)!;
+  assert.equal(game.player1_id, a.id);
+  assert.equal(game.player1_name, newName);
+  assert.ok(listGamesForUser(a.id).some((x) => x.id === g.id));
+
+  // And their moves are untouched.
+  assert.equal(getMoves(g.id).length, 1);
+});
+
+test("renaming frees the old name and keeps the new one unique", () => {
+  const first = uniqueName("freed");
+  const a = createUser(first);
+  renameUser(a.id, uniqueName("moved"));
+
+  // The old name is available again.
+  const b = createUser(first);
+  assert.notEqual(b.id, a.id);
+
+  // And it cannot be taken back while someone else holds it.
+  assert.throws(() => renameUser(a.id, first), /taken/i);
+});
+
+test("renaming validates like signing up", () => {
+  const a = createUser(uniqueName("valid"));
+  assert.throws(() => renameUser(a.id, "x"), /between/i);
+  assert.throws(() => renameUser(a.id, "has spaces"), /only/i);
+});
+
+test("changing only the case of your own name is allowed", () => {
+  const name = uniqueName("Casechange");
+  const a = createUser(name.toLowerCase());
+  const renamed = renameUser(a.id, name.toUpperCase());
+  assert.equal(renamed.username, name.toUpperCase());
+});
+
+test("a session survives a rename", () => {
+  const a = createUser(uniqueName("sessionkeep"));
+  const token = createSession(a.id);
+  const newName = uniqueName("renamed");
+  renameUser(a.id, newName);
+
+  const stillMe = userForSession(token);
+  assert.ok(stillMe, "the session is still valid");
+  assert.equal(stillMe!.id, a.id);
+  assert.equal(stillMe!.username, newName, "and reflects the new name");
 });
 
 // --- joining ---------------------------------------------------------------
