@@ -167,6 +167,16 @@ check(
   `status ${badSetup.status}`,
 );
 
+// The version probe is what drives auto-refresh. It must change during setup,
+// not only during play: waiting for an opponent to place their pieces is
+// exactly when the page needs to update itself.
+const versionBefore = await api(`/api/games/${gameId}/version`);
+check(
+  "the version probe works during setup",
+  versionBefore.status === 200 && versionBefore.body?.status === "setup",
+  `status ${versionBefore.status}`,
+);
+
 const setup1 = await api(`/api/games/${gameId}/setup`, {
   method: "POST",
   cookie: aliceCookie,
@@ -174,6 +184,13 @@ const setup1 = await api(`/api/games/${gameId}/setup`, {
 });
 check("player 1 can place", setup1.status === 200, `status ${setup1.status}`);
 check("still in setup after one placement", setup1.body?.game?.status === "setup");
+
+const versionAfterP1 = await api(`/api/games/${gameId}/version`);
+check(
+  "placing pieces changes the version probe",
+  versionAfterP1.body?.ply !== versionBefore.body?.ply,
+  `ply ${versionBefore.body?.ply} -> ${versionAfterP1.body?.ply}`,
+);
 
 const setup2 = await api(`/api/games/${gameId}/setup`, {
   method: "POST",
@@ -183,6 +200,14 @@ const setup2 = await api(`/api/games/${gameId}/setup`, {
 check("player 2 can place", setup2.status === 200, `status ${setup2.status}`);
 check("play begins once both have placed", setup2.body?.game?.status === "active");
 check("player 1 moves first", setup2.body?.game?.turn === 1);
+
+const versionAfterP2 = await api(`/api/games/${gameId}/version`);
+check(
+  "finishing setup changes the probe's status",
+  versionAfterP2.body?.status === "active" &&
+    versionAfterP1.body?.status === "setup",
+  `${versionAfterP1.body?.status} -> ${versionAfterP2.body?.status}`,
+);
 
 // --- turn order ------------------------------------------------------------
 

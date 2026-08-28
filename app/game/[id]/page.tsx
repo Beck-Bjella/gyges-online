@@ -37,6 +37,7 @@ export default async function GamePage({
         ply: game.ply,
         moveSeconds: game.move_seconds,
         deadlineAt: game.deadline_at,
+        updatedAt: game.updated_at,
         player1Name: game.player1_name,
         player2Name: game.player2_name,
         hasPlayer2: game.player2_id !== null,
