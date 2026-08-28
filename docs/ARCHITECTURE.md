@@ -453,7 +453,7 @@ each can be added later without restructuring.
 ## Repository layout
 
 ```
-GygesUI/
+gyges-online/
 ├── docs/
 │   ├── BOARD_REFERENCE.md   board topology, piece encoding, geometry, colors
 │   └── ARCHITECTURE.md      this file
