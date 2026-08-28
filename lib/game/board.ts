@@ -56,9 +56,21 @@ export function startingBoard(): BoardState {
 // ---------------------------------------------------------------------------
 
 export const VIEWBOX = 900;
-export const GRID_PITCH = 75;
-export const GRID_ORIGIN = 262.5;
-export const PIECE_RADIUS = 30;
+/**
+ * Grid spacing and the piece size.
+ *
+ * The grid is pulled in from the original 75/262.5 so the corner squares are
+ * not crowded against the edge of the diamond: at pitch 75 a corner piece had
+ * only ~15 units of clearance, against ~86 for the bear-off spaces. At pitch 68
+ * with a larger diamond that becomes ~61, and the pieces themselves are bigger.
+ */
+export const GRID_PITCH = 68;
+export const GRID_ORIGIN = 280;
+export const PIECE_RADIUS = 32;
+
+/** Bear-off centres, kept clear of the grid and the diamond's points. */
+export const P1_GOAL_CENTER = { cx: 450, cy: 813 };
+export const P2_GOAL_CENTER = { cx: 450, cy: 87 };
 
 export interface Point {
   cx: number;
@@ -67,8 +79,8 @@ export interface Point {
 
 /** Centre point of a board index, in the 900x900 coordinate space. */
 export function idxToCenter(i: number): Point {
-  if (i === P1_GOAL) return { cx: 450, cy: 750 };
-  if (i === P2_GOAL) return { cx: 450, cy: 150 };
+  if (i === P1_GOAL) return { ...P1_GOAL_CENTER };
+  if (i === P2_GOAL) return { ...P2_GOAL_CENTER };
   const col = i % 6;
   const row = 5 - Math.floor(i / 6); // row 0 renders at the bottom
   return {

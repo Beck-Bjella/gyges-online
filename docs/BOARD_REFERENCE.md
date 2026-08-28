@@ -169,32 +169,43 @@ in that coordinate space; scale proportionally for responsive layouts.
 ### Square centers
 
 ```
-index 36 (P1 bear-off):  cx = 450, cy = 750
-index 37 (P2 bear-off):  cx = 450, cy = 150
+index 36 (P1 bear-off):  cx = 450, cy = 813
+index 37 (P2 bear-off):  cx = 450, cy = 87
 
 grid (i in 0..35):
   col = i % 6
   row = 5 - floor(i / 6)          <- row 0 renders at the BOTTOM
-  cx  = 262.5 + col * 75
-  cy  = 262.5 + row * 75
+  cx  = 280 + col * 68
+  cy  = 280 + row * 68
 ```
 
-Grid pitch is **75 units**. The grid spans 262.5 → 637.5 on both axes.
+Grid pitch is **68 units**. The grid spans 280 → 620 on both axes.
+
+> The desktop versions used pitch 75 from an origin of 262.5, with a smaller
+> diamond. That left the corner squares only ~15 units clear of the board edge
+> against ~86 for the bear-off spaces, which read as crowded. The web version
+> widens the diamond and pulls the grid in, giving the corners ~61 units of
+> clearance, and enlarges the pieces to match. `tests/board.test.ts` asserts the
+> corner clearance so it cannot silently regress.
 
 ### Shapes
 
 | Element | Geometry |
 |---------|----------|
-| Board diamond (outer) | `M 450 32 L 868 450 L 450 868 L 32 450 Z` |
-| Board diamond (inner rule line) | `M 450 52 L 848 450 L 450 848 L 52 450 Z` |
-| Grid spot | circle, `r = 28` |
-| Bear-off spot | circle, `r = 32` |
-| Piece body | circle, `r = 30` |
-| Piece ring 1 (always) | circle, `r = 25`, stroke only, width 2.5 |
-| Piece ring 2 (if kind ≥ 2) | circle, `r = 18`, stroke only, width 2.5 |
-| Piece ring 3 (if kind = 3) | circle, `r = 11`, stroke only, width 2.5 |
-| Snap-target highlight | circle, `r = 34`, stroke only |
-| Hit radius for picking up a piece | 30 |
+| Board diamond (outer) | `M 450 17 L 883 450 L 450 883 L 17 450 Z` |
+| Board diamond (inner rule line) | `M 450 37 L 863 450 L 450 863 L 37 450 Z` |
+| Grid spot | circle, `r = 30` |
+| Bear-off spot | circle, `r = 34` |
+| Piece body | circle, `r = 32` |
+| Piece ring 1 (always) | circle, `r = 26`, stroke only, width 2.5 |
+| Piece ring 2 (if kind ≥ 2) | circle, `r = 19`, stroke only, width 2.5 |
+| Piece ring 3 (if kind = 3) | circle, `r = 12`, stroke only, width 2.5 |
+| Snap-target highlight | circle, `r = 36`, stroke only |
+| Last-move highlight | circle, `r = 35`, stroke only |
+| Hit radius for picking up a piece | 32 (`PIECE_RADIUS`) |
+
+*(The desktop versions used a smaller diamond, pitch 75, and `r = 30` pieces.
+See the note in the geometry section above.)*
 
 The board is a **diamond** (square rotated 45°) with the 6×6 grid upright inside it.
 

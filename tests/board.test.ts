@@ -16,6 +16,7 @@ import {
   GRID_SIZE,
   P1_GOAL,
   P2_GOAL,
+  PIECE_RADIUS,
   applyMove,
   boardFromString,
   boardToString,
@@ -55,11 +56,29 @@ test("startingBoard returns a fresh array each call", () => {
 
 test("geometry matches the reference", () => {
   // Index 0 is a1: bottom-left of the grid.
-  assert.deepEqual(idxToCenter(0), { cx: 262.5, cy: 637.5 });
+  assert.deepEqual(idxToCenter(0), { cx: 280, cy: 620 });
   // Index 35 is f6: top-right.
-  assert.deepEqual(idxToCenter(35), { cx: 637.5, cy: 262.5 });
-  assert.deepEqual(idxToCenter(P1_GOAL), { cx: 450, cy: 750 });
-  assert.deepEqual(idxToCenter(P2_GOAL), { cx: 450, cy: 150 });
+  assert.deepEqual(idxToCenter(35), { cx: 620, cy: 280 });
+  assert.deepEqual(idxToCenter(P1_GOAL), { cx: 450, cy: 813 });
+  assert.deepEqual(idxToCenter(P2_GOAL), { cx: 450, cy: 87 });
+  // The grid is centred in the 900x900 space.
+  assert.equal(idxToCenter(0).cx + idxToCenter(35).cx, 900);
+});
+
+test("corner pieces clear the edge of the board", () => {
+  // The board is a diamond with half-diagonal 433 centred at (450, 450), so a
+  // point is inside when |x-450| + |y-450| < 433. The corner squares used to
+  // sit only ~15 units clear, which read as crowded.
+  const HALF_DIAGONAL = 433;
+  for (const i of [0, 5, 30, 35]) {
+    const { cx, cy } = idxToCenter(i);
+    const distance = Math.abs(cx - 450) + Math.abs(cy - 450);
+    const clearance = HALF_DIAGONAL - distance - PIECE_RADIUS;
+    assert.ok(
+      clearance > 40,
+      `corner ${i} has only ${clearance} units of clearance`,
+    );
+  }
 });
 
 test("notation matches the reference", () => {

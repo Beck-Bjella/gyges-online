@@ -237,14 +237,14 @@ export default function Board({
 
       <g filter="url(#board-shadow)">
         <path
-          d="M 450 32 L 868 450 L 450 868 L 32 450 Z"
+          d="M 450 17 L 883 450 L 450 883 L 17 450 Z"
           fill="url(#board-gradient)"
           stroke="var(--board-edge)"
           strokeWidth="2"
         />
       </g>
       <path
-        d="M 450 52 L 848 450 L 450 848 L 52 450 Z"
+        d="M 450 37 L 863 450 L 450 863 L 37 450 Z"
         fill="none"
         stroke="rgba(184, 154, 112, 0.18)"
         strokeWidth="1"
@@ -257,7 +257,7 @@ export default function Board({
             key={`spot${i}`}
             cx={cx}
             cy={cy}
-            r="28"
+            r="30"
             fill="url(#gridspot-gradient)"
             stroke="rgba(20,12,5,0.5)"
             strokeWidth="1"
@@ -272,7 +272,7 @@ export default function Board({
             key={`goal${i}`}
             cx={cx}
             cy={cy}
-            r="32"
+            r="34"
             fill="url(#bearoff-gradient)"
             stroke="rgba(20,12,5,0.5)"
             strokeWidth="1"
@@ -287,7 +287,7 @@ export default function Board({
             key={`hl${i}`}
             cx={cx}
             cy={cy}
-            r="33"
+            r="35"
             fill="none"
             stroke="var(--accent-blue)"
             strokeWidth="2.5"
@@ -300,7 +300,7 @@ export default function Board({
         <circle
           cx={idxToCenter(snapTarget).cx}
           cy={idxToCenter(snapTarget).cy}
-          r="34"
+          r="36"
           fill="none"
           stroke="var(--accent-mint)"
           strokeWidth="2.5"
@@ -321,12 +321,12 @@ export default function Board({
             stroke="#3a2818"
             strokeWidth="1"
           />
-          <circle r="25" fill="none" stroke="var(--piece-ring)" strokeWidth="2.5" />
+          <circle r="26" fill="none" stroke="var(--piece-ring)" strokeWidth="2.5" />
           {p.kind >= 2 && (
-            <circle r="18" fill="none" stroke="var(--piece-ring)" strokeWidth="2.5" />
+            <circle r="19" fill="none" stroke="var(--piece-ring)" strokeWidth="2.5" />
           )}
           {p.kind >= 3 && (
-            <circle r="11" fill="none" stroke="var(--piece-ring)" strokeWidth="2.5" />
+            <circle r="12" fill="none" stroke="var(--piece-ring)" strokeWidth="2.5" />
           )}
         </g>
       ))}
