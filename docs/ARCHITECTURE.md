@@ -198,11 +198,10 @@ and there is nothing to keep alive.
 
 ### What it took
 
-Four changes to the engine, all `cfg`-gated so native builds are untouched
+Three changes to the engine, all `cfg`-gated so native builds are untouched
 (the diff is kept at `docs/engine-wasm.patch`):
 
 - a portable software fallback for `_pext_u64`, the one x86-only instruction;
-- `getrandom`'s `js` feature, so randomness comes from the browser;
 - the evaluation network compiled in with `include_bytes!`, since a browser has
   no filesystem to read weights from;
 - the search runs inline rather than on a spawned thread, because wasm32 has no

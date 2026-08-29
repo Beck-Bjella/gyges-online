@@ -1,18 +1,3 @@
-diff --git a/gyges/Cargo.toml b/gyges/Cargo.toml
-index 44b319e..09f373d 100644
---- a/gyges/Cargo.toml
-+++ b/gyges/Cargo.toml
-@@ -24,6 +24,10 @@ debug = false
- [dependencies]
- rand = "0.8.5"
- 
-+# wasm32 has no OS entropy source; route getrandom at the browser Crypto API.
-+[target.'cfg(target_arch = "wasm32")'.dependencies]
-+getrandom = { version = "0.2", features = ["js"] }
-+
- [dev-dependencies]
- criterion = {version = "0.3", features = ["html_reports"]}
- 
 diff --git a/gyges/src/moves/movegen.rs b/gyges/src/moves/movegen.rs
 index ded79ee..97ea340 100644
 --- a/gyges/src/moves/movegen.rs
