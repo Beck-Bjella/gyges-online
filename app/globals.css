@@ -911,3 +911,10 @@ td.num {
   color: var(--text-primary);
   font-weight: 600;
 }
+
+/* A move chosen but not yet sent. Outlined in the accent colour so it reads as
+   pending rather than settled — the board is showing a position that is not
+   yet real. */
+.staged-move {
+  border-color: var(--accent-mint);
+}

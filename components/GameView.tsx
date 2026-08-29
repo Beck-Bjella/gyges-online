@@ -81,14 +81,28 @@ export default function GameView({
   const [viewingPly, setViewingPly] = useState<number | null>(null);
   // A live preview of the arrangement while a player places their pieces.
   const [setupPreview, setSetupPreview] = useState<(number | null)[] | null>(null);
+  // A move chosen but not yet sent. Dragging a piece stages the move and shows
+  // the position it would produce; nothing reaches the server until Submit.
+  // A move is hard to take back once played, and dragging is easy to misjudge,
+  // so the confirmation step is worth the extra click — it also matches how
+  // placing pieces already works.
+  const [staged, setStaged] = useState<Move | null>(null);
   // You sit at the bottom by default; the flip control lets you look from the
   // other side, which also moves the player bars to match.
   const [flipped, setFlipped] = useState(viewerSide === -1);
 
-  // A new server position supersedes any optimistic one.
+  // A new server position supersedes any optimistic one, and any move staged
+  // against the old position — which is no longer a move that makes sense.
+  //
+  // Keyed on the board's CONTENTS, not the array, because the page re-renders
+  // with a fresh array whenever the server component does. Keying on identity
+  // would throw away a move the player had staged but not yet sent, every time
+  // anything refreshed.
+  const boardKey = board.join("");
   useEffect(() => {
     setOptimistic(null);
-  }, [board]);
+    setStaged(null);
+  }, [boardKey]);
 
   const liveBoard = optimistic ?? board;
 
@@ -109,13 +123,21 @@ export default function GameView({
     return applySetup(displayBoard, viewerSide, filled);
   }, [setupPreview, viewerSide, displayBoard]);
 
-  const shownBoard = previewBoard ?? displayBoard;
+  // A staged move is shown as though played, so the player judges the position
+  // they would actually get. Not applied while reviewing history, where the
+  // board is showing some earlier position instead.
+  const stagedBoard = useMemo(() => {
+    if (!staged || viewingPly !== null) return null;
+    return applyMove(displayBoard, staged);
+  }, [staged, viewingPly, displayBoard]);
+
+  const shownBoard = previewBoard ?? stagedBoard ?? displayBoard;
 
   const reviewing = viewingPly !== null && viewingPly !== game.ply;
 
   const yourTurn =
     game.status === "active" && viewerSide !== null && viewerSide === game.turn;
-  const canMove = yourTurn && !pending && !reviewing;
+  const canMove = yourTurn && !pending && !reviewing && staged === null;
 
   // The engine's turn. Only a participant's browser runs the search — a
   // spectator watching the game should not be made to do the work, and the
@@ -144,16 +166,31 @@ export default function GameView({
   const yourPlacement = inSetup && viewerSide !== null && viewerSide === game.turn;
 
   const lastMove = history.length ? history[history.length - 1].move : [];
-  const highlight = yourPlacement
+  const highlight = staged && viewingPly === null
+    ? staged
+    : yourPlacement
     ? homeRow(viewerSide!)
     : reviewing
       ? (history.find((h) => h.ply === viewingPly)?.move ?? [])
       : lastMove;
 
+  /** Choose a move without sending it. Replaces any move already staged. */
+  const stage = useCallback((mv: Move) => {
+    setError(null);
+    setStaged(mv);
+  }, []);
+
+  /** Take back a staged move and go back to choosing. */
+  const resetStaged = useCallback(() => {
+    setError(null);
+    setStaged(null);
+  }, []);
+
   const submit = useCallback(
     async (mv: Move) => {
       setError(null);
       setPending(true);
+      setStaged(null);
       setOptimistic(applyMove(liveBoard, mv));
       try {
         const res = await fetch(`/api/games/${game.id}/move`, {
@@ -326,7 +363,7 @@ export default function GameView({
             board={shownBoard}
             interactive={canMove}
             flipped={flipped}
-            onMove={submit}
+            onMove={stage}
             highlight={highlight}
             // Marks legal destinations while dragging. A convenience only —
             // the server validates every move regardless. Passing undefined
@@ -350,6 +387,29 @@ export default function GameView({
         </div>
 
         <PlayerBar {...seat(bottomSide)} />
+
+        {/* A staged move, waiting to be sent. Placed under the board because
+            that is where the player is looking once they have dragged. */}
+        {staged && viewingPly === null && (
+          <div className="panel staged-move" style={{ marginTop: 14 }}>
+            <div className="row">
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <strong>{moveToNotation(staged)}</strong>
+                <span className="muted"> · not sent yet</span>
+              </span>
+              <button
+                className="btn btn-primary"
+                onClick={() => submit(staged)}
+                disabled={pending}
+              >
+                {pending ? "…" : "Submit move"}
+              </button>
+              <button className="btn" onClick={resetStaged} disabled={pending}>
+                Reset
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="row" style={{ marginTop: 14 }}>
           <button className="btn" onClick={() => setFlipped((f) => !f)}>
