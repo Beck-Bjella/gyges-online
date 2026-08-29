@@ -243,6 +243,13 @@ a tally rather than a ranking.
 
 Roughly in value order, none of them large:
 
+- **An explore board.** Move a staged move is already halfway there: the board
+  can show a position that is not the game's real one. Explore would let a
+  player go further — move any piece, try a line out, then throw it away — with
+  nothing sent to the server. Since the position is already derived from the
+  move list, an exploration is just a local branch that is never submitted, and
+  the engine could give an opinion on it for free. The confirm-before-send flow
+  was built with this in mind.
 - **Draw offers.** The schema already permits `result = 0` with reason
   `'draw'`, but there is no way to offer or accept one. Needs a
   `draw_offered_by` column.
