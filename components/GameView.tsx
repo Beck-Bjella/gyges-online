@@ -271,6 +271,18 @@ export default function GameView({
   // Deliberately paused while the player has a move staged or in flight: a
   // refresh would replace the board under them, and discard the move they were
   // about to send.
+  //
+  // How far it backs off depends on whether the player is actually waiting.
+  // When it is the opponent's turn they are watching for a reply, and a move
+  // that takes a minute to appear is the difference between the page feeling
+  // live and feeling broken — so the interval is capped at ten seconds. When
+  // it is the player's own turn nothing can change until they act, so it backs
+  // off the whole way and costs almost nothing.
+  const waitingForOpponent =
+    (game.status === "active" || game.status === "setup") &&
+    viewerSide !== null &&
+    game.turn !== viewerSide;
+
   useAutoRefresh(
     `/api/games/${game.id}/version`,
     [game.ply, game.status, game.updatedAt].join(":"),
@@ -279,6 +291,7 @@ export default function GameView({
         (game.status === "active" || game.status === "setup") &&
         !pending &&
         staged === null,
+      maxMs: waitingForOpponent ? 10000 : 60000,
     },
   );
 
