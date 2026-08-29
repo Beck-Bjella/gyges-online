@@ -65,10 +65,19 @@ const COMMON: Record<string, string | number | boolean> = {
 /**
  * The bots, weakest first.
  *
- * `maxNodes` is the strength-and-patience dial in one: it decides both how
- * well the bot plays and how long a player waits. Pick budgets a phone can
- * finish — an interrupted search is discarded, not resumed, so a bot nobody
- * can afford to sit through is a bot nobody can play.
+ * `maxNodes` is the strength-and-patience dial in one: it decides both how well
+ * the bot plays and how long a player waits. An interrupted search is discarded
+ * rather than resumed, so a budget nobody can afford to sit through is a bot
+ * nobody can play.
+ *
+ * The times below were measured against this build searching the opening
+ * position: roughly 26,000 nodes a second on a desktop. A phone is two to four
+ * times slower, so the wait scales but — because the budget is work rather than
+ * time — the move does not change.
+ *
+ *   20,000 nodes  ~0.8s desktop   ~3s phone
+ *   60,000 nodes  ~2.3s desktop   ~9s phone
+ *  200,000 nodes ~14.6s desktop  ~60s phone
  */
 export const BOTS: BotSpec[] = [
   {
@@ -76,21 +85,21 @@ export const BOTS: BotSpec[] = [
     strength: 20,
     engineBuild: ENGINE_BUILD,
     description: "Plays quickly and makes real mistakes. A good first opponent.",
-    options: { ...COMMON, maxNodes: 200_000 },
+    options: { ...COMMON, maxNodes: 20_000 },
   },
   {
     username: "Helios-Club",
     strength: 55,
     engineBuild: ENGINE_BUILD,
     description: "Solid. Punishes anything obvious.",
-    options: { ...COMMON, maxNodes: 2_000_000 },
+    options: { ...COMMON, maxNodes: 60_000 },
   },
   {
     username: "Helios-Full",
     strength: 100,
     engineBuild: ENGINE_BUILD,
-    description: "Full strength. Expect to wait on a phone.",
-    options: { ...COMMON, maxNodes: 20_000_000 },
+    description: "The deepest search on offer. Expect a long wait on a phone.",
+    options: { ...COMMON, maxNodes: 200_000 },
   },
 ];
 

@@ -198,66 +198,59 @@ query calls need adapting.
 
 ---
 
-## Where the engine process fits
+## Where the engine fits
 
-This is the part that has no equivalent in what runs today, because it has not
-been built yet.
+**There is no engine process to host.** Two things that were once expected to
+need one are both handled without a second program:
 
-**Today** there is exactly one program: the Node process. It serves pages,
-handles moves, and reads the database. Nothing checks whether a move is legal.
+**Move legality** is in the web app itself (`lib/game/rules.ts`). It is a
+bounded walk over 36 squares rather than a search, so it costs microseconds and
+belongs in the request that submits the move.
 
-**Once the engine is connected** there are two programs:
+**Bot moves** are searched by the engine compiled to WebAssembly, running in the
+player's own browser:
 
 ```
-┌─────────────────────────┐        ┌──────────────────────────┐
-│  The web app (Node)     │        │  The engine service      │
-│                         │        │                          │
-│  • pages                │  HTTP  │  • a thin bridge         │
-│  • accounts, sessions   │───────▶│      ↕ stdin/stdout      │
-│  • the game record      │◀───────│  • gyges_engine.exe      │
-│  • talks to the database│        │                          │
-└─────────────────────────┘        └──────────────────────────┘
+┌─────────────────────────┐        ┌──────────────────────────────┐
+│  The web app (Node)     │        │  The player's browser        │
+│                         │  HTTP  │                              │
+│  • pages                │───────▶│  • the board                 │
+│  • accounts, sessions   │◀───────│  • gyges_engine.wasm         │
+│  • the game record      │        │      ↕ stdin/stdout (WASI)   │
+│  • the rules of Gygès   │        │    in a Web Worker           │
+└─────────────────────────┘        └──────────────────────────────┘
 ```
 
-The web app does not contain the rules. When a move arrives it asks the engine
-service "is this legal?", and only writes the move if the answer is yes. Later,
-for a bot game, it asks "what move should you play?" and records the reply.
+The worker writes UGI commands to the module's stdin and reads `bestmove` from
+its stdout — the engine's real interface, unchanged from the desktop binary. The
+server hands over a position, and validates whatever comes back exactly as it
+validates a human's move.
 
-The engine service is a small program you write that:
+### Why this is better than a service
 
-1. Starts `gyges_engine.exe` as a child process, exactly as the old desktop UIs
-   did.
-2. Exposes HTTP endpoints (`/legal-moves`, `/validate`, `/bot-move`).
-3. Translates an HTTP request into UGI text on the engine's stdin, reads the
-   reply from its stdout, and returns it as JSON.
+The original plan was an always-on box running the engine behind HTTP, at
+roughly $2-5/mo. Running it in the browser instead means:
 
-That is the whole job — a translator between HTTP and the text protocol the
-engine already speaks.
+- **No compute to pay for**, and no second host to keep alive.
+- **No engine downtime.** There is no process that can be down.
+- **It scales for free** — every player brings their own CPU.
 
-### Why it is separate
+The cost is a 28 MB download on a player's first visit, cached afterwards, and
+that a slow device waits longer for a move. Because bots are bounded by node
+count rather than seconds, waiting longer does not mean facing a stronger
+opponent: the move is identical either way.
 
-Not because of the languages. Because the two jobs have opposite shapes:
-
-| | The web app | The engine |
-|---|---|---|
-| A request takes | milliseconds | seconds, for a bot search |
-| Wants | many concurrent requests | a whole CPU core to itself |
-| Can run serverless | yes | no — needs threads and time |
-
-Vercel functions are bounded and short-lived, which suits pages and move
-submissions and does not suit a multi-second search. So the engine needs an
-ordinary always-on host (Railway or Fly, roughly $2-5/mo) while the web app
-stays on Vercel.
-
-This is the same split Lichess uses: `scalachess` for rules, Stockfish
-elsewhere entirely. See `ARCHITECTURE.md`.
+Note this differs from Lichess, which runs Stockfish server-side for analysis
+and hands bot play to operators running their own hardware. It is available here
+because this engine is small and self-contained enough to ship whole.
 
 ### Running the engine locally
 
-There is nothing to run. Move legality is enforced in-process by
-`lib/game/rules.ts`, and bot play is planned to run as WebAssembly in the
-player's own browser rather than as a service — see docs/ARCHITECTURE.md. Local
-development is one terminal.
+Nothing to run — it is part of the page. `public/engine/gyges_engine.wasm` is
+served like any other static file, so local development is one terminal.
+
+Rebuilding it is a separate job in the engine repository; the changes that make
+it compile for the web are kept at `docs/engine-wasm.patch`.
 
 ---
 

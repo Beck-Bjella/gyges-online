@@ -14,6 +14,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Board from "./Board";
 import SetupPanel from "./SetupPanel";
+import { useBotTurn } from "./useBotTurn";
 import {
   applyMove,
   applySetup,
@@ -39,6 +40,9 @@ interface GameSummary {
   player1Name: string | null;
   player2Name: string | null;
   hasPlayer2: boolean;
+  /** The engine's side, when one of the players is a bot. Null for human games. */
+  botSide: Player | null;
+  botName: string | null;
 }
 
 interface HistoryEntry {
@@ -112,6 +116,22 @@ export default function GameView({
   const yourTurn =
     game.status === "active" && viewerSide !== null && viewerSide === game.turn;
   const canMove = yourTurn && !pending && !reviewing;
+
+  // The engine's turn. Only a participant's browser runs the search — a
+  // spectator watching the game should not be made to do the work, and the
+  // server refuses them anyway.
+  const isBotTurn =
+    game.botSide !== null &&
+    viewerSide !== null &&
+    game.turn === game.botSide &&
+    (game.status === "active" || game.status === "setup");
+
+  const onBotMoved = useCallback(() => {
+    setOptimistic(null);
+    router.refresh();
+  }, [router]);
+
+  const bot = useBotTurn(game.id, isBotTurn, onBotMoved);
   // For the status panel, "your turn" covers placing as well as moving.
   const yourTurnOrPlacement =
     viewerSide !== null &&
@@ -368,6 +388,26 @@ export default function GameView({
             onSubmit={submitSetupArrangement}
             onPreview={setSetupPreview}
           />
+        )}
+
+        {(bot.thinking || bot.error) && (
+          <div className="panel">
+            <h2>{bot.botName ?? game.botName ?? "The engine"}</h2>
+            {bot.thinking ? (
+              <>
+                <p className="muted" style={{ margin: 0, lineHeight: 1.6 }}>
+                  Thinking… <strong>{bot.elapsed.toFixed(1)}s</strong>
+                </p>
+                <p className="hint" style={{ marginTop: 8 }}>
+                  The engine is running in this tab. Leaving now discards the
+                  search — it starts again from the beginning next time, so the
+                  move you get is the same either way.
+                </p>
+              </>
+            ) : (
+              <p className="error" style={{ margin: 0 }}>{bot.error}</p>
+            )}
+          </div>
         )}
 
         <div className="panel">

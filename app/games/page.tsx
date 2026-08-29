@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { currentUser } from "@/lib/auth";
 import {
+  botLeaderboard,
   listActiveGames,
   listOpenGames,
   listRecentFinishedGames,
@@ -9,6 +10,7 @@ import {
 } from "@/lib/db/queries";
 import { relativeTime, describeTimeControl, endingSuffix } from "@/lib/format";
 import NewGameForm from "@/components/NewGameForm";
+import NewBotGameForm from "@/components/NewBotGameForm";
 import JoinGameButton from "@/components/JoinGameButton";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +30,25 @@ export default async function GamesPage() {
   const openGames = listOpenGames();
   const activeGames = listActiveGames();
   const recentGames = listRecentFinishedGames();
+
+  // The engine's accounts, as choosable opponents. maxNodes is pulled out of
+  // the stored UGI options only so the form can estimate a wait; the site does
+  // not otherwise interpret them.
+  const botOptions = botLeaderboard().map((b) => {
+    let maxNodes: number | null = null;
+    try {
+      const parsed = JSON.parse(b.options ?? "{}") as Record<string, unknown>;
+      if (typeof parsed.maxNodes === "number") maxNodes = parsed.maxNodes;
+    } catch {
+      /* a malformed row simply has no estimate */
+    }
+    return {
+      id: b.id,
+      username: b.username,
+      description: b.description,
+      maxNodes,
+    };
+  });
 
   return (
     <>
@@ -135,7 +156,10 @@ export default async function GamesPage() {
 
         <aside className="rail">
           {user ? (
-            <NewGameForm />
+            <>
+              <NewGameForm />
+              <NewBotGameForm bots={botOptions} />
+            </>
           ) : (
             <div className="panel">
               <h2>Want to play?</h2>

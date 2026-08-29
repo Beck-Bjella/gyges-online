@@ -4,6 +4,7 @@ import {
   getGame,
   getMoves,
   settleExpiredGames,
+  botInGame,
   sideOf,
   decodeBoard,
 } from "@/lib/db/queries";
@@ -25,6 +26,9 @@ export default async function GamePage({
 
   const user = await currentUser();
   const moves = getMoves(id);
+  // Which player, if either, is the engine. The client needs this to know when
+  // to run a search; it is never trusted for anything else.
+  const bot = botInGame(game);
 
   return (
     <GameView
@@ -41,6 +45,8 @@ export default async function GamePage({
         player1Name: game.player1_name,
         player2Name: game.player2_name,
         hasPlayer2: game.player2_id !== null,
+        botSide: bot ? sideOf(game, bot.id) : null,
+        botName: bot?.username ?? null,
       }}
       board={decodeBoard(game.board)}
       startBoard={decodeBoard(game.start_board)}

@@ -177,32 +177,40 @@ Independent of the engine. The site is a real site without it.
 
 ---
 
-## 6. The engine service
+## 6. The engine — **DONE**
 
-The one genuinely unbuilt piece. See `ARCHITECTURE.md` for the design.
+Both halves, and neither the way this section originally planned.
 
-**6a. Move legality — DONE, but not this way.**
+**6a. Move legality.** Implemented in TypeScript (`lib/game/rules.ts`) and
+called directly from `submitMove`, rather than over a bridge to the engine. It
+is a port of `MoveGen`, checked against 300 stored positions the engine itself
+produced (`tests/engine-parity.test.ts`) and verified against 60,000 random
+positions with zero differences.
 
-Implemented in TypeScript (`lib/game/rules.ts`) and called directly from
-`submitMove`, rather than over a bridge to the engine. The reasoning is in
-ARCHITECTURE.md under "Where the game rules live"; briefly, legality is a walk
-over 36 squares, and a network service for it would have cost a hosting bill, a
-hop per move, and an outage mode, for nothing.
+**6b. Bot play.** The engine is compiled to WebAssembly and searches **in the
+player's browser** — no queued job, no second machine, no hosting bill. It keeps
+its ordinary UGI interface: a Web Worker writes `setpos`/`go` to stdin and reads
+`bestmove` from stdout. Four `cfg`-gated changes to the engine made this
+possible; the diff is at `docs/engine-wasm.patch`.
 
-Both things this was meant to unlock are done: illegal moves are rejected, and
-the browser highlights legal destinations while dragging — the latter for free,
-because the rules module is pure and runs on both sides.
+Each strength is an ordinary `users` row, so profiles, history and the
+leaderboard work on bots with no special-casing. Play is bounded by node count
+rather than time, so the same bot plays the same move on every device.
 
-The divergence risk this created (two rule implementations, once the engine
-arrives) is acknowledged in ARCHITECTURE.md, along with what makes it
-manageable: the engine's moves will be validated by the same checker, so a
-disagreement shows up as a rejected bot move rather than a corrupt game.
+And, as this section always intended: **the bot's move goes through the same
+validation as a human's**. A tampered client cannot make it move out of turn or
+play an illegal move.
 
-**6b. Bot play.** A search takes seconds and wants a CPU core, so it runs as a
-queued job on a second engine instance, not inline with a request. The bot is a
-`users` row like any other player, and — importantly — **its move goes through
-the same validation as a human's.** Lichess does exactly this: the engine
-returns a proposed move and the server validates it like any other.
+Still worth doing:
+
+- **A strength dial.** The engine's `randomize` option is all-or-nothing —
+  perfect play or a uniformly random move. Sampling from the scored root move
+  list by how much worse each move is than the best would give a genuine
+  gradient, which is what makes a weak bot fun rather than merely weak. Node
+  budgets are the only lever today, and they are a blunt one.
+- **Varying the setup arrangement.** Bots always place the conventional
+  `321123`, which makes them predictable from move zero.
+- **Quantising the network.** 23 MB of the 28 MB download is weights.
 
 ---
 

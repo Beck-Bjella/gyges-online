@@ -422,6 +422,100 @@ check(
   `status ${afterEnd.status}`,
 );
 
+// --- playing the engine ----------------------------------------------------
+//
+// The search itself runs in the browser, so what is checked here is the part
+// the server owns: that a bot game can be created, that the engine's home row
+// is placed, that only a participant may drive it, and — the property that
+// matters most — that a move claimed to be the engine's is validated exactly
+// like a human's.
+{
+  const bots = await api("/api/bots");
+  const bot = bots.body?.bots?.[0];
+  check("the engine's accounts are listed", Boolean(bot), JSON.stringify(bots.body));
+
+  if (bot) {
+    const made = await api("/api/games", {
+      method: "POST",
+      cookie: aliceCookie,
+      body: { moveSeconds: 3600, botId: bot.id },
+    });
+    check("a game against the engine can be created", made.status === 201, `status ${made.status}`);
+    const botGameId = made.body?.game?.id;
+    check("it starts in setup with both seats filled", made.body?.game?.status === "setup");
+
+    // A stranger must not be able to drive someone else's engine.
+    const outsiderDrive = await api(`/api/games/${botGameId}/bot-move`, {
+      method: "POST",
+      cookie: bobCookie,
+    });
+    check(
+      "a non-participant cannot drive the engine",
+      outsiderDrive.status === 403,
+      `status ${outsiderDrive.status}`,
+    );
+
+    // It is the human's turn first, so the engine has nothing to do yet.
+    const tooEarly = await api(`/api/games/${botGameId}/bot-move`, {
+      method: "POST",
+      cookie: aliceCookie,
+    });
+    check(
+      "the engine will not act out of turn",
+      tooEarly.status === 409,
+      `status ${tooEarly.status}`,
+    );
+
+    await api(`/api/games/${botGameId}/setup`, {
+      method: "POST",
+      cookie: aliceCookie,
+      body: { arrangement: STANDARD },
+    });
+
+    const placed = await api(`/api/games/${botGameId}/bot-move`, {
+      method: "POST",
+      cookie: aliceCookie,
+    });
+    check("the engine places its home row", placed.status === 200, `status ${placed.status}`);
+    check("play begins once both have placed", placed.body?.game?.status === "active");
+
+    // Now the human moves, so it becomes the engine's turn.
+    await api(`/api/games/${botGameId}/move`, {
+      method: "POST",
+      cookie: aliceCookie,
+      body: { move: P1_FIRST },
+    });
+
+    const plan = await api(`/api/games/${botGameId}/bot-move`, {
+      method: "POST",
+      cookie: aliceCookie,
+    });
+    check("the server says what the engine should search", plan.status === 200 && !plan.body?.done);
+    check(
+      "the position is handed over as 38 digits",
+      typeof plan.body?.board === "string" && /^[0-9]{38}$/.test(plan.body.board),
+    );
+    check(
+      "the engine's node budget travels with it",
+      typeof plan.body?.options?.maxNodes === "number",
+      JSON.stringify(plan.body?.options),
+    );
+
+    // The security property: the browser runs the engine, so it could claim
+    // anything. An illegal move must be refused exactly as a human's would be.
+    const cheat = await api(`/api/games/${botGameId}/bot-move`, {
+      method: "POST",
+      cookie: aliceCookie,
+      body: { move: "0|37" },
+    });
+    check(
+      "an illegal move attributed to the engine is refused",
+      cheat.status === 400,
+      `status ${cheat.status} ${cheat.body?.error ?? ""}`,
+    );
+  }
+}
+
 // --- pages render ----------------------------------------------------------
 
 for (const [name, path] of [

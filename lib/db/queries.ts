@@ -590,6 +590,48 @@ export function joinGame(gameId: string, userId: string): Game {
   });
 }
 
+/**
+ * Create a game against a bot, already past the join step.
+ *
+ * An ordinary game in every respect — same table, same rules, same validation.
+ * The only difference from createGame + joinGame is that the second seat is
+ * filled immediately, because a bot does not browse the lobby.
+ *
+ * The human is player 1 and moves first, which also means the human places
+ * first during setup.
+ */
+export function createBotGame(
+  userId: string,
+  botId: string,
+  moveSeconds = 259200,
+): Game {
+  return transaction(() => {
+    const bot = getUser(botId);
+    if (!bot || bot.bot_strength === null) {
+      throw new GameError("That opponent is not an engine account.", 404);
+    }
+    if (bot.deleted_at) throw new GameError("That bot is retired.", 410);
+    if (bot.id === userId) throw new GameError("You cannot play yourself.");
+
+    const game = createGame(userId, moveSeconds);
+    return joinGame(game.id, botId);
+  });
+}
+
+/**
+ * The bot seated in this game, or null if both players are people.
+ *
+ * Used to decide whether the browser should be running a search at all.
+ */
+export function botInGame(game: Game): User | null {
+  for (const id of [game.player1_id, game.player2_id]) {
+    if (!id) continue;
+    const user = getUser(id);
+    if (user && user.bot_strength !== null) return user;
+  }
+  return null;
+}
+
 /** Which side this user plays, or null if they are not a participant. */
 export function sideOf(game: Game, userId: string | null): Player | null {
   if (!userId) return null;

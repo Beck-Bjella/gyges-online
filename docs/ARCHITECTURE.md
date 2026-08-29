@@ -17,7 +17,11 @@ rules of Gygès**. 135 unit tests and 63 end-to-end checks pass.
 rather than Postgres, on a schema deliberately restricted to the portable
 subset. Everything else below describes the intended production shape.
 
-**Not built yet:** email notifications, bot play, and ratings.
+**Playing the engine works**, and nothing about it runs on the server: the
+engine is compiled to WebAssembly and searches in the player's own browser. See
+"The engine runs in the browser" below.
+
+**Not built yet:** email notifications and ratings.
 
 **Reversed decision — move legality is no longer waiting on the engine.** It is
 implemented in `lib/game/rules.ts`, in TypeScript, in-process. See "Where the
@@ -178,10 +182,70 @@ is the battle-tested one — and this module gets fixed.
 
 ### What the engine is still for
 
-Search. That is the part that genuinely needs a persistent process, a CPU core,
-and a large transposition table, and it is why bot play is a queued job on a
-separate machine rather than anything Vercel could host. Nothing about that
-changed.
+Search — and that now happens in the browser too. See the next section.
+
+---
+
+## The engine runs in the browser
+
+Bot play was expected to need a machine: a search takes seconds and wants a
+core, which is the one thing serverless hosting is bad at. The plan was a small
+always-on box reached over HTTP.
+
+That is not what was built. The engine compiles to `wasm32-wasip1` and runs in
+the player's own browser, which means **the server does no engine work at all**
+and there is nothing to keep alive.
+
+### What it took
+
+Four changes to the engine, all `cfg`-gated so native builds are untouched
+(the diff is kept at `docs/engine-wasm.patch`):
+
+- a portable software fallback for `_pext_u64`, the one x86-only instruction;
+- `getrandom`'s `js` feature, so randomness comes from the browser;
+- the evaluation network compiled in with `include_bytes!`, since a browser has
+  no filesystem to read weights from;
+- the search runs inline rather than on a spawned thread, because wasm32 has no
+  threads — and a smaller transposition table, since 400 MB per open tab is not
+  reasonable.
+
+Nothing else. The engine keeps its ordinary UGI interface: the worker in
+`public/engine/engine-worker.js` writes `setpos`/`go` to stdin and reads
+`bestmove` from stdout, exactly as a terminal would. WASI is what gives a wasm
+module those streams, and the module imports precisely eight WASI functions —
+small enough that the host is a hundred lines of JavaScript with no dependency.
+
+### Reproducibility
+
+A bot is bounded by **node count**, never by time. Bounding by time would make a
+fast machine face a stronger opponent, so a bot's record would describe its
+opponents' hardware rather than the bot. With a node budget a phone and a
+desktop play the identical game; only the waiting differs. Verified: the native
+binary and the wasm build return the same move and score for the same position
+and budget.
+
+Each search gets a fresh instance, so it also starts with an empty
+transposition table. An interrupted search is discarded rather than resumed —
+resuming with a half-filled table is a different search, and could produce a
+different move.
+
+### What the browser is trusted with
+
+Nothing. The bot's move is submitted through an endpoint that validates it with
+`lib/game/rules.ts`, exactly as a human's move is validated: a tampered client
+cannot make the engine move out of turn or play an illegal move.
+
+It *can* make the engine play a legal but weak move, and so beat it. That is
+inherent to running the engine on the player's machine, and it is worth being
+plain about: a bot's win/loss record is a record of games as they were played,
+not a proof of the engine's strength.
+
+### What it costs
+
+The wasm is 28 MB — 5 MB of engine and 23 MB of network — which the browser
+caches after the first visit. On Vercel's free tier that is roughly 3,500 first
+visits a month before bandwidth becomes the limit; quantising the network would
+push that considerably further. Compute is free, because there is none.
 
 ### What the database does NOT do
 

@@ -3,7 +3,13 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { changePassword, currentUser, signIn, signOut, signUp } from "@/lib/auth";
-import { createGame, joinGame, renameUser, GameError } from "@/lib/db/queries";
+import {
+  createBotGame,
+  createGame,
+  joinGame,
+  renameUser,
+  GameError,
+} from "@/lib/db/queries";
 
 export interface ActionState {
   error?: string;
@@ -92,6 +98,37 @@ export async function createGameAction(
     id = createGame(user.id, seconds).id;
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Could not create the game." };
+  }
+  redirect(`/game/${id}`);
+}
+
+/**
+ * Start a game against the engine.
+ *
+ * Separate from createGameAction because there is no lobby step: the second
+ * seat is filled immediately, so this goes straight to a playable game.
+ */
+export async function createBotGameAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const user = await currentUser();
+  if (!user) return { error: "Sign in first." };
+
+  const botId = String(formData.get("bot_id") ?? "");
+  if (!botId) return { error: "Choose an opponent." };
+
+  const seconds = Number(formData.get("move_seconds") ?? 259200);
+  if (!Number.isFinite(seconds) || seconds <= 0) {
+    return { error: "Invalid time control." };
+  }
+
+  let id: string;
+  try {
+    id = createBotGame(user.id, botId, seconds).id;
+  } catch (err) {
+    if (err instanceof GameError) return { error: err.message };
+    return { error: "Could not start that game." };
   }
   redirect(`/game/${id}`);
 }

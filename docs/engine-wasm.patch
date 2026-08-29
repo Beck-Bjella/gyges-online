@@ -1,0 +1,182 @@
+diff --git a/gyges/Cargo.toml b/gyges/Cargo.toml
+index 44b319e..09f373d 100644
+--- a/gyges/Cargo.toml
++++ b/gyges/Cargo.toml
+@@ -24,6 +24,10 @@ debug = false
+ [dependencies]
+ rand = "0.8.5"
+ 
++# wasm32 has no OS entropy source; route getrandom at the browser Crypto API.
++[target.'cfg(target_arch = "wasm32")'.dependencies]
++getrandom = { version = "0.2", features = ["js"] }
++
+ [dev-dependencies]
+ criterion = {version = "0.3", features = ["html_reports"]}
+ 
+diff --git a/gyges/src/moves/movegen.rs b/gyges/src/moves/movegen.rs
+index ded79ee..97ea340 100644
+--- a/gyges/src/moves/movegen.rs
++++ b/gyges/src/moves/movegen.rs
+@@ -865,12 +865,42 @@ impl<T> Drop for FixedStack<T> {
+ }
+ 
+ /// Extracts specific bits from a 64-bit integer using a mask. 
++#[cfg(target_arch = "x86_64")]
+ #[inline(always)]
+ pub unsafe fn compress_pext(mask: u64, val: u64) -> u16 {
+     core::arch::x86_64::_pext_u64(val, mask) as u16
+ 
+ }
+ 
++/// Portable software PEXT, for targets without BMI2 (wasm32 in particular).
++///
++/// Gathers the bits of `val` selected by `mask` into the low bits of the result,
++/// in ascending bit order — bit-for-bit identical to `_pext_u64`. Loops once per
++/// set bit in `mask`, isolating the lowest with `m & m.wrapping_neg()`, so the
++/// cost is popcount(mask) rather than 64. The masks this is called with
++/// (ALL_TWO_INTERCEPTS, ALL_THREE_INTERCEPTS) hold 2..12 bits.
++///
++/// x86_64 builds are unaffected: this function is not compiled there.
++#[cfg(not(target_arch = "x86_64"))]
++#[inline(always)]
++pub unsafe fn compress_pext(mask: u64, val: u64) -> u16 {
++    let mut res: u64 = 0;
++    let mut bit: u32 = 0;
++    let mut m = mask;
++    while m != 0 {
++        let low = m & m.wrapping_neg();
++        if val & low != 0 {
++            res |= 1u64 << bit;
++
++        }
++        bit += 1;
++        m ^= low;
++
++    }
++    res as u16
++
++}
++
+ /// The result of a move generation.
+ /// 
+ /// Threat is mututally exclusive with all other fields.
+diff --git a/gyges_engine/src/search/network.rs b/gyges_engine/src/search/network.rs
+index 625e288..1891ee3 100644
+--- a/gyges_engine/src/search/network.rs
++++ b/gyges_engine/src/search/network.rs
+@@ -3,6 +3,7 @@
+ //! Output in [-NETWORK_SCALE, +NETWORK_SCALE], positive = side-to-move winning.
+ 
+ use gyges::{board::*, core::*};
++#[cfg(not(target_arch = "wasm32"))]
+ use std::fs;
+ 
+ /// Global network instance — loaded via `load_network`, read during search.
+@@ -10,9 +11,31 @@ use std::fs;
+ static mut NETWORK: Option<GygesNet> = None;
+ static mut NETWORK_NAME: Option<String> = None;
+ 
++/// The weights compiled into a wasm build.
++///
++/// A browser has no filesystem, so the network cannot be read from a path.
++/// Embedding it keeps the module self-contained and means the UGI interface —
++/// including `setoption weightsPath` — needs no special case: on wasm every
++/// path resolves to these bytes.
++#[cfg(target_arch = "wasm32")]
++const DEFAULT_WEIGHTS: &[u8] = include_bytes!("../../../weights/default.bin");
++
++/// Install the compiled-in weights. The path is ignored; see DEFAULT_WEIGHTS.
++#[cfg(target_arch = "wasm32")]
++pub fn load_network(_path: &str) -> Result<(), String> {
++    let net = GygesNet::from_bytes(DEFAULT_WEIGHTS)?;
++    unsafe {
++        NETWORK = Some(net);
++        NETWORK_NAME = Some("default.bin (embedded)".to_string());
++    }
++    Ok(())
++
++}
++
+ /// Load weights from `path` and install them as the active network.
+ /// Can be called multiple times to swap weights — must only be called when no
+ /// search is running.
++#[cfg(not(target_arch = "wasm32"))]
+ pub fn load_network(path: &str) -> Result<(), String> {
+     let net = GygesNet::load(path)?;
+     let name = std::path::Path::new(path)
+@@ -85,10 +108,20 @@ pub struct GygesNet {
+ 
+ impl GygesNet {
+     /// Load weights from the binary file produced by the Python training script.
++    #[cfg(not(target_arch = "wasm32"))]
+     pub fn load(path: &str) -> Result<Self, String> {
+         let bytes = fs::read(path)
+             .map_err(|e| format!("Cannot read weight file '{}': {}", path, e))?;
++        Self::from_bytes(&bytes)
++
++    }
+ 
++    /// Parse weights already in memory.
++    ///
++    /// Split out of `load` so a target with no filesystem — a browser, via
++    /// wasm — can hand over bytes it fetched itself. The parsing below is
++    /// unchanged; only the source of `bytes` differs.
++    pub fn from_bytes(bytes: &[u8]) -> Result<Self, String> {
+         let expected_floats = L1_SIZE * FEATURE_COUNT + L1_SIZE + L1_SIZE + 1;
+         let expected_bytes = expected_floats * 4;
+         if bytes.len() != expected_bytes {
+diff --git a/gyges_engine/src/ugi.rs b/gyges_engine/src/ugi.rs
+index 779dedf..94ab3ed 100644
+--- a/gyges_engine/src/ugi.rs
++++ b/gyges_engine/src/ugi.rs
+@@ -38,6 +38,17 @@ impl Ugi {
+     /// Initializes the engine
+     pub fn init(&self) {
+         // Initialize transposition table
++        // The transposition table.
++        //
++        // wasm32 has a 4 GB address space and runs inside a browser tab, where
++        // holding 400 MB per open game would be antisocial and, with the
++        // network embedded alongside it, close to the practical ceiling. The
++        // browser build therefore pins a small table at compile time — which
++        // also makes a search reproducible for a given build, since table size
++        // changes eviction and so can change the move chosen.
++        #[cfg(target_arch = "wasm32")]
++        init_tt(2usize.pow(18)); // ~25 MB
++        #[cfg(not(target_arch = "wasm32"))]
+         init_tt(2usize.pow(22)); // 400 MB
+ 
+         // Load default network
+@@ -278,12 +289,30 @@ impl Ugi {
+ 
+         let options = self.search_options.clone();
+         let signal = stop_signal.clone();
+-        self.main_thread = Some(thread::spawn(move || {
++
++        // wasm32 has no threads, so the search runs inline and `go` blocks
++        // until it prints `bestmove`. That is the same observable protocol —
++        // a caller reads stdout until bestmove either way — and it is what
++        // lets the engine drive from a single-threaded host such as a browser.
++        #[cfg(target_arch = "wasm32")]
++        {
+             let mut searcher = Searcher::new(options, signal.clone());
+             searcher.go();
+             signal.store(true, AtomicOrdering::Relaxed);
++            self.searching = false;
++
++        }
+ 
+-        }));
++        #[cfg(not(target_arch = "wasm32"))]
++        {
++            self.main_thread = Some(thread::spawn(move || {
++                let mut searcher = Searcher::new(options, signal.clone());
++                searcher.go();
++                signal.store(true, AtomicOrdering::Relaxed);
++
++            }));
++
++        }
+ 
+     }
+ 

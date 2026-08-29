@@ -70,16 +70,18 @@ that the server enforces turn order and participation.
 - **History** — every move is stored; step back through a game with the arrow
   keys or by clicking the move list.
 - **Endings** — reaching the opponent's goal, resignation, and forfeit on time.
-- **Leaderboard** — win/loss counts across finished games.
+- **Leaderboard** — win/loss counts across finished games, with the engine's
+  accounts listed separately.
+- **Play the engine** — the [Gygès engine](https://github.com/Beck-Bjella/Gyges)
+  compiled to WebAssembly and run in your own browser. Each strength is an
+  ordinary account with its own record and profile, so a game against one is a
+  game like any other. Nothing runs on the server: see
+  [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## What is deliberately missing
 
 - **No notifications.** Correspondence play needs "it's your turn" email; not
   built yet.
-- **No bot.** Playing the [Gygès engine](https://github.com/Beck-Bjella/Gyges)
-  is a later feature. Unlike move legality, a search genuinely needs a CPU core
-  and a persistent process, so it belongs on its own machine — see
-  [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 - **No ratings.** The leaderboard counts wins. Glicko-2 is planned; see
   [docs/ROADMAP.md](docs/ROADMAP.md).
 
@@ -92,9 +94,13 @@ lib/
   game/       pure, no I/O
     board.ts    encoding, geometry, move format
     rules.ts    move legality — the rules of Gygès
+    engine.ts   handing a position to the engine, and reading its answer
   db/         schema and queries; the server-side rules of engagement
   auth.ts     sessions and sign-in
+  bots.ts     the engine's accounts, reconciled into the database on start
   password.ts scrypt hashing
+public/
+  engine/     the engine as WebAssembly, and the worker that drives it
 tests/        unit tests
 scripts/      smoke test and database reset
 docs/         architecture and board reference
