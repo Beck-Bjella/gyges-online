@@ -7,7 +7,7 @@ import {
   settleExpiredGames,
   sideOf,
 } from "@/lib/db/queries";
-import { relativeTime } from "@/lib/format";
+import { relativeTime, endingSuffix } from "@/lib/format";
 import { currentUser } from "@/lib/auth";
 import RenameForm from "@/components/RenameForm";
 
@@ -111,9 +111,7 @@ export default async function PlayerPage({
                   <span className="muted">
                     {" "}
                     · {g.ply} moves
-                    {g.result_reason && g.result_reason !== "goal"
-                      ? ` · by ${g.result_reason}`
-                      : ""}
+                    {endingSuffix(g.result_reason, " · by ")}
                   </span>
                 </span>
                 <span className="muted">{relativeTime(g.updated_at)}</span>

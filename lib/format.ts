@@ -41,3 +41,20 @@ export function describeThinkTime(ms: number | null): string {
   if (seconds < 86400) return `${(seconds / 3600).toFixed(1)}h`;
   return `${(seconds / 86400).toFixed(1)}d`;
 }
+
+/**
+ * How a finished game ended, as a suffix — " by resignation", or "" for a goal.
+ *
+ * Reaching the goal is the ordinary way to win, so saying "by goal" adds
+ * nothing; the other reasons are worth naming. Three pages render an outcome
+ * with different wording (viewer-relative on the dashboard and profile, neutral
+ * in the lobby), but all three need this same rule, and it was written out
+ * three times before.
+ */
+export function endingSuffix(
+  resultReason: string | null,
+  separator = " by ",
+): string {
+  if (!resultReason || resultReason === "goal") return "";
+  return `${separator}${resultReason}`;
+}

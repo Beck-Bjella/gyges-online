@@ -13,12 +13,13 @@
 --   INTEGER epoch columns -> keep as BIGINT, or move to timestamptz
 --   TEXT status columns   -> keep as TEXT with CHECK, or a real enum
 --
--- Also note: TEXT primary keys holding random ids port syntactically but are
--- not free on Postgres. Random keys scatter B-tree inserts, causing page
--- splits and write amplification, and a text key makes every index comparison
--- a collation-aware string compare. Before migrating, consider a native
--- uuid (v7, time-ordered) primary key with the short random id kept as a
--- separate public "slug" column for URLs. See docs/ROADMAP.md.
+-- On the TEXT primary keys: ids are generated time-ordered (see newId() in
+-- lib/db/index.ts), so inserts append to the end of the index rather than
+-- scattering through it — which is what would otherwise cause page splits and
+-- write amplification on Postgres. What remains is that a text key makes every
+-- index comparison a collation-aware string compare; a native uuid column would
+-- avoid that, at the cost of rewriting every foreign key. Not worth doing until
+-- it measurably hurts.
 --
 -- Constraints here are BOOKKEEPING ONLY. The database holds no knowledge of
 -- Gygès: not what a ring is, not what a legal move is. See docs/ARCHITECTURE.md.

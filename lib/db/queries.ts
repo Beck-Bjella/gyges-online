@@ -2,17 +2,15 @@
  * Data access, and the server-side rules of engagement.
  *
  * This is where "the server is the authority" is actually enforced: who may
- * act, when they may act, and what the record says. It does NOT decide whether
- * a move is legal under the rules of Gygès — that is the engine's job and is
- * not wired up yet. See docs/ARCHITECTURE.md.
+ * act, when they may act, and what the record says. Move legality is enforced
+ * here too, by calling lib/game/rules.ts — but the rules themselves live there,
+ * not in this file and not in the schema. See docs/ARCHITECTURE.md.
  */
 
 import { getDb, newId, newToken, now, nowMs, transaction } from "./index.ts";
 import {
   applyMove,
   applySetup,
-  boardFromString,
-  boardToString,
   checkMoveStructure,
   emptyBoard,
   isGameOver,
@@ -684,10 +682,8 @@ export function submitSetup(
 /**
  * Submit a move.
  *
- * The server checks authority (is this your game, is it your turn) and that the
- * move is structurally coherent. It does NOT check the rules of Gygès — that
- * arrives with the engine service. Until then any structurally valid move is
- * accepted, which is a deliberate, documented choice.
+ * The server checks authority — is this your game, is it your turn — and then
+ * that the move is legal under the rules of Gygès, via lib/game/rules.ts.
  */
 export function submitMove(gameId: string, userId: string, mv: Move): GameWithPlayers {
   return transaction(() => {
@@ -704,10 +700,9 @@ export function submitMove(gameId: string, userId: string, mv: Move): GameWithPl
     if (side !== game.turn) throw new GameError("It is not your turn.", 409);
 
     const board = decodeBoard(game.board);
-    const structure = checkMoveStructure(board, mv);
-    if (!structure.ok) throw new GameError(structure.reason ?? "Malformed move.");
 
-    // The rules check. Everything above establishes authority — the game
+    // The rules check. checkMoveLegality re-checks structure itself, so there
+    // is no separate structural pass here. Everything above establishes authority — the game
     // exists, it is running, you are a player, it is your turn, and the move is
     // structurally coherent. This is the part that asks whether the rules of
     // Gygès actually allow it.
@@ -851,8 +846,8 @@ export function settleExpiredGames(): number {
 // ---------------------------------------------------------------------------
 // Leaderboard
 //
-// A plain win count for now. Ratings wait for move validation, since ranking
-// players is meaningless while illegal moves are accepted.
+// A plain win count for now. Ratings (Glicko-2) are the next step here; see
+// docs/ROADMAP.md.
 // ---------------------------------------------------------------------------
 
 export interface LeaderboardRow {
@@ -1048,11 +1043,6 @@ export function botLeaderboard(): BotRow[] {
     .all() as BotRow[];
 }
 
-/** Whether an account is an engine rather than a person. */
-export function isBot(user: User): boolean {
-  return user.bot_strength !== null;
-}
-
 /**
  * Create a bot account.
  *
@@ -1119,5 +1109,3 @@ export function createBot(spec: BotSpec): User {
     bot_engine_build: engineBuild.trim(),
   };
 }
-
-export { boardFromString, boardToString };

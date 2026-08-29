@@ -58,6 +58,7 @@ import {
   P1_GOAL,
   P2_GOAL,
   checkMoveStructure,
+  goalFor,
   type BoardState,
   type Move,
   type Player,
@@ -66,16 +67,6 @@ import {
 const COLS = 6;
 const ROWS = 6;
 
-/**
- * The bear-off square a player is trying to reach.
- *
- * Player 1 moves up the board and scores in P2_GOAL (beyond player 2's home
- * row); player 2 scores in P1_GOAL. This mirrors goalFor() in board.ts, which
- * is the same mapping stated the same way round.
- */
-export function goalSquare(player: Player): number {
-  return player === 1 ? P2_GOAL : P1_GOAL;
-}
 
 /**
  * Where a displaced piece may be put.
@@ -215,7 +206,7 @@ export function reachableFrom(
   from: number,
 ): Set<number> {
   const ends = new Set<number>();
-  const goal = goalSquare(player);
+  const goal = goalFor(player);
 
   if (from < 0 || from >= GRID_SIZE || board[from] === 0) return ends;
 
@@ -394,7 +385,7 @@ export function checkMoveLegality(
   // A piece that reaches the goal has won; there is nothing to displace, and
   // the move must be the simple two-index form.
   if (to === P1_GOAL || to === P2_GOAL) {
-    if (to !== goalSquare(player)) {
+    if (to !== goalFor(player)) {
       return { legal: false, reason: "That is not your goal." };
     }
     if (mv.length !== 2) {
@@ -434,7 +425,7 @@ export function legalMoves(board: BoardState, player: Player): Move[] {
   const line = activeLine(board, player);
   if (!line) return [];
 
-  const goal = goalSquare(player);
+  const goal = goalFor(player);
   const moves: Move[] = [];
 
   for (const from of line) {

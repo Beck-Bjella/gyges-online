@@ -27,7 +27,6 @@ const {
   checkMoveLegality,
   legalMoves,
   hasLegalMove,
-  goalSquare,
 } = await import("../lib/game/rules.ts");
 
 const { emptyBoard, startingBoard, P1_GOAL, P2_GOAL, BOARD_SIZE } = await import(
@@ -191,11 +190,6 @@ test("a piece may end on an occupied square (a displacement)", () => {
 });
 
 // --- the goal --------------------------------------------------------------
-
-test("each player's goal is the far bear-off square", () => {
-  assert.equal(goalSquare(1), P2_GOAL);
-  assert.equal(goalSquare(-1), P1_GOAL);
-});
 
 test("bearing off spends the last step leaving the far row", () => {
   // A one-ring piece at 24 reaches row 5 — and stops there. Its count is spent

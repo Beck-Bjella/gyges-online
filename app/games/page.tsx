@@ -7,7 +7,7 @@ import {
   settleExpiredGames,
   type GameWithPlayers,
 } from "@/lib/db/queries";
-import { relativeTime, describeTimeControl } from "@/lib/format";
+import { relativeTime, describeTimeControl, endingSuffix } from "@/lib/format";
 import NewGameForm from "@/components/NewGameForm";
 import JoinGameButton from "@/components/JoinGameButton";
 
@@ -212,11 +212,9 @@ function GameLine({
         <span className="muted">
           {kind === "active"
             ? `${game.status === "setup" ? "placing pieces" : `${game.turn === 1 ? game.player1_name : game.player2_name} to move`} · ${relativeTime(game.updated_at)}`
-            : `${winner ? `${winner} won` : "drawn"}${
-                game.result_reason && game.result_reason !== "goal"
-                  ? ` by ${game.result_reason}`
-                  : ""
-              } · ${game.ply} plies`}
+            : `${winner ? `${winner} won` : "drawn"}${endingSuffix(
+                game.result_reason,
+              )} · ${game.ply} plies`}
         </span>
       </span>
     </li>

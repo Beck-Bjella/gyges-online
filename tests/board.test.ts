@@ -2,7 +2,7 @@
  * Tests for the pure board module.
  *
  * These cover encoding, geometry, transforms and structural checks. They do
- * NOT test the rules of Gygès — legality is the engine's job and is not
+ * NOT test the rules of Gygès — legality lives in rules.ts and is not
  * implemented here. See docs/ARCHITECTURE.md.
  *
  * Run with: npm test

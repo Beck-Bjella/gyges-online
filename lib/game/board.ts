@@ -5,8 +5,9 @@
  * runs unchanged in the browser and on the server. See docs/BOARD_REFERENCE.md
  * for the full specification these values come from.
  *
- * It deliberately contains NO rules. Move legality is the engine's job; see
- * docs/ARCHITECTURE.md.
+ * It deliberately contains no rules: this module is about how a board is
+ * encoded and drawn, not about what a legal move is. Legality lives next door
+ * in rules.ts.
  */
 
 /** A board is 38 slots: a 6x6 grid (0..35) plus two bear-off spaces. */
@@ -49,8 +50,6 @@ export const P2_GOAL = 37;
 export const SETUP_PIECES: readonly number[] = [3, 2, 1, 1, 2, 3];
 
 /** The board before either player has placed anything. */
-export const EMPTY_BOARD: BoardState = new Array<number>(BOARD_SIZE).fill(0);
-
 export function emptyBoard(): BoardState {
   return new Array<number>(BOARD_SIZE).fill(0);
 }
@@ -88,10 +87,6 @@ export function applySetup(
   return next;
 }
 
-/** Read a player's home row back out of a board. */
-export function readSetup(board: BoardState, player: Player): number[] {
-  return homeRow(player).map((i) => board[i]);
-}
 
 /**
  * The position both players' setups produce — the standard opening, when both
@@ -327,7 +322,7 @@ export function moveToNotation(mv: Move): string {
 // NOT rules validation. This only checks that a move is well-formed and
 // internally consistent with the board — indices in range, a piece to move,
 // the right shape for its length. Whether the move is *legal* under the rules
-// of Gygès is the engine's job and is not decided here.
+// of Gygès is decided by rules.ts, not here.
 // ---------------------------------------------------------------------------
 
 export interface StructuralCheck {

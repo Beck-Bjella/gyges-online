@@ -16,8 +16,9 @@ npm run dev
 Then open <http://localhost:3000>. The database is created automatically at
 `.data/gyges.db` on first request — there is nothing to install or configure.
 
-Sign in with any username to claim it. To play a full game against yourself,
-open a second browser profile (or a private window) and sign in as someone else.
+Create an account with a username and a password. To play a full game against
+yourself, open a second browser profile (or a private window) and create a
+second account.
 
 ### Playing with someone else on your wifi
 

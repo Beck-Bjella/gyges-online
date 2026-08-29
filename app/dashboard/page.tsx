@@ -9,7 +9,7 @@ import {
   sideOf,
   type GameWithPlayers,
 } from "@/lib/db/queries";
-import { relativeTime, describeThinkTime } from "@/lib/format";
+import { relativeTime, describeThinkTime, endingSuffix } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Dashboard · Gygès" };
@@ -245,10 +245,8 @@ function MyGame({
     label = yourTurn ? "place your pieces" : "opponent is placing";
   } else if (game.status === "finished") {
     label =
-      game.result === 0 ? "drawn" : game.result === side ? "you won" : "you lost";
-    if (game.result_reason && game.result_reason !== "goal") {
-      label += ` by ${game.result_reason}`;
-    }
+      (game.result === 0 ? "drawn" : game.result === side ? "you won" : "you lost") +
+      endingSuffix(game.result_reason);
   } else {
     label = yourTurn ? "your move" : "their move";
   }

@@ -3,7 +3,8 @@
  *
  * SQLite for local development — no server to install, and the file lives in
  * .data/. The schema sticks to a subset that ports to PostgreSQL for
- * production; see lib/db/schema.sql.
+ * production; it is defined by the files in migrations/, which are the single
+ * source of truth for what the database looks like.
  */
 
 import Database from "better-sqlite3";
@@ -83,10 +84,6 @@ export function transaction<T>(fn: () => T): T {
   return getDb().transaction(fn).immediate();
 }
 
-/** Run a function inside a read-only transaction. */
-export function readTransaction<T>(fn: () => T): T {
-  return getDb().transaction(fn).deferred();
-}
 
 /** Unix seconds — the unit for game-level timestamps. */
 export function now(): number {
@@ -110,7 +107,7 @@ export function nowMs(): number {
  *
  * A primary key is stored in a sorted index. Fully random ids therefore insert
  * into the *middle* of that index every time, splitting pages and rewriting
- * them — the write amplification lib/db/schema.sql warns about. Time-ordered
+ * them — the write amplification described in migrations/0001_initial.sql. Time-ordered
  * ids always append at the end, which is the access pattern B-trees are good
  * at. This is the same idea as UUIDv7, kept in the short hex form the URLs
  * already use.

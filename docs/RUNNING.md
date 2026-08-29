@@ -169,7 +169,7 @@ not a rewrite — it is the same program, somewhere else.
 
 The one real code change is the database connection. Locally the app opens a
 file; hosted, it connects to Postgres over the network. That is why
-`lib/db/schema.sql` is deliberately restricted to SQL both understand: the
+The schema in `migrations/` is deliberately restricted to SQL both understand: the
 tables, columns, and constraints port as-is, and only `lib/db/index.ts` and the
 query calls need adapting.
 
@@ -254,25 +254,17 @@ elsewhere entirely. See `ARCHITECTURE.md`.
 
 ### Running the engine locally
 
-When it exists, local development will mean two terminals:
-
-```sh
-# terminal 1
-npm run dev
-
-# terminal 2
-cd ../engine-service && cargo run
-```
-
-The web app reaches it at `GYGES_ENGINE_URL` (see `.env.example`). Same shape as
-production, just both processes on your machine instead of two rented ones.
+There is nothing to run. Move legality is enforced in-process by
+`lib/game/rules.ts`, and bot play is planned to run as WebAssembly in the
+player's own browser rather than as a service — see docs/ARCHITECTURE.md. Local
+development is one terminal.
 
 ---
 
 ## Order of work
 
 1. **Now** — play over the LAN, find what feels wrong.
-2. **Real accounts** — passwords or magic links. Required before anyone outside
+2. **Real accounts** — done; passwords. Required before anyone outside
    your home can reach it.
 3. **Deploy** — Vercel plus Neon, swap SQLite for Postgres, point the domain.
 4. **Engine service** — move legality first, bot play after.

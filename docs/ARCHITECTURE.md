@@ -11,7 +11,7 @@ things get built and assumptions get tested.
 passwords, sessions, creating and joining games, an interactive SVG board with
 displacement moves, per-move history with review, resignation, forfeit on time,
 and a leaderboard. The server enforces participation, turn order, **and the
-rules of Gygès**. 133 unit tests and 63 end-to-end checks pass.
+rules of Gygès**. 135 unit tests and 63 end-to-end checks pass.
 
 **Local stack differs from the target in one place:** development uses SQLite
 rather than Postgres, on a schema deliberately restricted to the portable
@@ -47,19 +47,17 @@ What the server decides, starting in v1:
 - **who may act** — that the requester is a participant in this game
 - **when they may act** — that it is their turn
 - **the record** — the ordered move list, and the fact that a game has ended
+- **legality** — that the move is allowed by the rules of Gygès, checked with
+  `lib/game/rules.ts`. See "Where the game rules live" below.
 
-What the server does **not** decide in the first version: whether a move is
-*legal*. Validation comes from the Rust move generator and is wired in later —
-see "Where the game rules live" below.
-
-The distinction matters. "Server-authoritative" is about **who owns the truth**,
-not about how much of it is rule-checked. Even with no rules, the server must be
-the one that says whose turn it is and what the move history contains, because a
-player can edit their own JavaScript. Any check written on the client is a
-convenience for the player, never a guarantee against them.
-
-When validation is added, it slots into this same structure as one more thing
-the server decides.
+The distinction between authority and rule-checking still matters, because they
+are separable and were separate for a while. "Server-authoritative" is about
+**who owns the truth**, not about how much of it is rule-checked: even with no
+rules at all, the server must be the one that says whose turn it is and what the
+move history contains, because a player can edit their own JavaScript. The
+browser now highlights legal moves from the same module the server validates
+with, and that highlighting is a convenience for the player — never a guarantee
+against them.
 
 ---
 

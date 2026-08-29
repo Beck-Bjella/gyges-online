@@ -41,9 +41,8 @@ What was built:
 - Expired sessions are now purged, opportunistically on sign-in.
 - Changing a password ends every *other* session.
 
-**Accounts created before this keep their games.** `password_hash` is nullable;
-the first sign-in to such an account sets its password and claims it. See the
-note in the migration for why that is not a regression.
+`password_hash` is nullable only so bots can exist — the engine's accounts store
+no password, and an account without one cannot be signed in to at all.
 
 Still open, and deliberately not built: **password reset.** It needs email, so
 it belongs with step 4. Until then a forgotten password means a lost account —
@@ -154,7 +153,7 @@ Independent of the engine. The site is a real site without it.
 
 - Vercel for the app, Neon for Postgres, NameHero for the domain only.
 - The database migration is small but not purely mechanical — the known
-  differences are listed at the top of `lib/db/schema.sql`.
+  differences are listed at the top of `migrations/0001_initial.sql`.
 - **Migrations are already set up** (`migrations/`, `npm run db:migrate`), which
   is the thing that makes a hosted schema change routine rather than
   frightening. Keep writing them: never edit an applied migration.
@@ -162,14 +161,13 @@ Independent of the engine. The site is a real site without it.
   database connection, and a traffic spike can exhaust the pool while the app
   itself is fine. Neon provides a pooled URL for exactly this; picking the
   wrong one is the most common way a small Next.js + Postgres site falls over.
-- **Decide the primary-key story before migrating.** Random text ids port
-  syntactically but are not free on Postgres: random keys scatter B-tree
-  inserts (page splits, write amplification), and a text key makes every index
-  comparison a collation-aware string compare. The mature pattern is an
-  internal `uuid` v7 primary key plus a short public slug for URLs — which is
-  what Lichess does with its 8-character game ids, and pychess-variants with
-  its 8-character ids. Changing this after there is real data is far more
-  painful than before.
+- **Primary keys are already time-ordered.** `newId()` puts a millisecond
+  timestamp in front of the random half, so inserts append to the end of the
+  index rather than scattering through it — which was the page-split and
+  write-amplification problem. What remains is that a TEXT key makes every index
+  comparison a collation-aware string compare; a native `uuid` column would
+  avoid that at the cost of rewriting every foreign key, and is not worth doing
+  until it measurably hurts.
 - **`listGamesForUser` will be the first slow query.** `WHERE player1_id = ?
   OR player2_id = ?` cannot use one index, so Postgres bitmap-ORs two indexes
   and then sorts every match before applying LIMIT. Invisible at 50 games,
