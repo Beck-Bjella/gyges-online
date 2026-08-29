@@ -60,7 +60,7 @@ export default async function GamesPage() {
 
   return (
     <>
-      <AutoRefresh version={version} />
+      <AutoRefresh version={version} everyMs={15000} />
       <header className="page-head">
         <div>
           <h1>Games</h1>

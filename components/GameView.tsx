@@ -272,12 +272,11 @@ export default function GameView({
   // refresh would replace the board under them, and discard the move they were
   // about to send.
   //
-  // How far it backs off depends on whether the player is actually waiting.
-  // When it is the opponent's turn they are watching for a reply, and a move
-  // that takes a minute to appear is the difference between the page feeling
-  // live and feeling broken — so the interval is capped at ten seconds. When
-  // it is the player's own turn nothing can change until they act, so it backs
-  // off the whole way and costs almost nothing.
+  // Two speeds, chosen by whether the player is actually waiting. When it is
+  // the opponent's turn they are watching for a reply, and a move that takes
+  // half a minute to appear is the difference between the page feeling live
+  // and feeling broken. When it is the player's own turn nothing can change
+  // until they act, so asking often would be asking for nothing.
   const waitingForOpponent =
     (game.status === "active" || game.status === "setup") &&
     viewerSide !== null &&
@@ -291,7 +290,7 @@ export default function GameView({
         (game.status === "active" || game.status === "setup") &&
         !pending &&
         staged === null,
-      maxMs: waitingForOpponent ? 10000 : 60000,
+      everyMs: waitingForOpponent ? 5000 : 30000,
     },
   );
 
