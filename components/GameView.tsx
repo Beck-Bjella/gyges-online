@@ -15,6 +15,7 @@ import Link from "next/link";
 import Board from "./Board";
 import SetupPanel from "./SetupPanel";
 import { useBotTurn } from "./useBotTurn";
+import { useAutoRefresh } from "./useAutoRefresh";
 import {
   applyMove,
   applySetup,
@@ -261,60 +262,25 @@ export default function GameView({
   //
   // Polling, not a websocket: correspondence moves arrive minutes or days
   // apart, so holding a connection open per viewer would cost far more than it
-  // saves. The probe returns three numbers, and only a real change triggers a
-  // refresh.
+  // saves. The probe is about fifty bytes and only a real change refreshes.
   //
-  // This runs during setup as well as play — placing your pieces is a turn
-  // like any other, and waiting for an opponent to place is exactly when you
-  // want the page to update itself. Polling stops once the game is over, and
-  // pauses while the tab is hidden so a forgotten tab is not making requests
-  // all day.
-  useEffect(() => {
-    const inPlay = game.status === "active" || game.status === "setup";
-    if (!inPlay) return;
-
-    let stopped = false;
-
-    async function poll() {
-      if (stopped || document.hidden) return;
-      try {
-        const res = await fetch(`/api/games/${game.id}/version`, {
-          cache: "no-store",
-        });
-        if (!res.ok) return;
-        const v = (await res.json()) as {
-          ply: number;
-          status: string;
-          updated_at: number;
-        };
-        // Any of these moving means something happened. updated_at catches
-        // changes that leave the ply alone, such as a resignation.
-        const changed =
-          v.ply !== game.ply ||
-          v.status !== game.status ||
-          v.updated_at !== game.updatedAt;
-        // Never refresh while the player has an action in flight.
-        if (changed && !stopped && !pending) {
-          router.refresh();
-        }
-      } catch {
-        // A failed poll is not worth surfacing; the next one will retry.
-      }
-    }
-
-    const id = setInterval(poll, 5000);
-    // Check immediately when the tab is brought back to the foreground.
-    const onVisible = () => {
-      if (!document.hidden) poll();
-    };
-    document.addEventListener("visibilitychange", onVisible);
-
-    return () => {
-      stopped = true;
-      clearInterval(id);
-      document.removeEventListener("visibilitychange", onVisible);
-    };
-  }, [game.id, game.ply, game.status, game.updatedAt, pending, router]);
+  // The interval backs off while nothing happens and snaps back to five
+  // seconds when it does — see useAutoRefresh. Polling stops once the game is
+  // over, and while the tab is hidden.
+  //
+  // Deliberately paused while the player has a move staged or in flight: a
+  // refresh would replace the board under them, and discard the move they were
+  // about to send.
+  useAutoRefresh(
+    `/api/games/${game.id}/version`,
+    [game.ply, game.status, game.updatedAt].join(":"),
+    {
+      enabled:
+        (game.status === "active" || game.status === "setup") &&
+        !pending &&
+        staged === null,
+    },
+  );
 
   // Arrow keys step through history, as the desktop versions did.
   useEffect(() => {

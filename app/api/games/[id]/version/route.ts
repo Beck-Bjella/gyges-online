@@ -24,7 +24,11 @@ export async function GET(
   if (!version) {
     return NextResponse.json({ error: "Game not found." }, { status: 404 });
   }
-  return NextResponse.json(version, {
-    headers: { "Cache-Control": "no-store" },
-  });
+  // The same `{ v }` shape the site-wide probe uses, so one polling hook
+  // serves both. The parts are joined rather than sent as fields because the
+  // caller only ever compares them for equality.
+  return NextResponse.json(
+    { v: [version.ply, version.status, version.updated_at].join(":") },
+    { headers: { "Cache-Control": "no-store" } },
+  );
 }

@@ -6,11 +6,13 @@ import {
   listOpenGames,
   listRecentFinishedGames,
   settleExpiredGames,
+  siteVersion,
   type GameWithPlayers,
 } from "@/lib/db/queries";
 import { relativeTime, describeTimeControl, endingSuffix } from "@/lib/format";
 import NewGameForm from "@/components/NewGameForm";
 import NewBotGameForm from "@/components/NewBotGameForm";
+import AutoRefresh from "@/components/AutoRefresh";
 import JoinGameButton from "@/components/JoinGameButton";
 
 export const dynamic = "force-dynamic";
@@ -30,6 +32,9 @@ export default async function GamesPage() {
   const openGames = listOpenGames();
   const activeGames = listActiveGames();
   const recentGames = listRecentFinishedGames();
+  // Rendered with this version; the poll refreshes the page when it changes,
+  // so a game someone else creates or joins appears here on its own.
+  const version = siteVersion();
 
   // The engine's accounts, as choosable opponents. The work budget is pulled
   // out of the stored UGI options only so the form can estimate a wait; the
@@ -55,6 +60,7 @@ export default async function GamesPage() {
 
   return (
     <>
+      <AutoRefresh version={version} />
       <header className="page-head">
         <div>
           <h1>Games</h1>

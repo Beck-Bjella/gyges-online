@@ -7,9 +7,11 @@ import {
   timingStats,
   settleExpiredGames,
   sideOf,
+  siteVersion,
   type GameWithPlayers,
 } from "@/lib/db/queries";
 import { relativeTime, describeThinkTime, endingSuffix } from "@/lib/format";
+import AutoRefresh from "@/components/AutoRefresh";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Dashboard · Gygès" };
@@ -50,6 +52,8 @@ export default async function DashboardPage() {
 
   return (
     <>
+      {/* Your games change when an opponent acts, so this page watches too. */}
+      <AutoRefresh version={siteVersion()} />
       <header className="page-head">
         <div>
           <h1>{user.username}</h1>

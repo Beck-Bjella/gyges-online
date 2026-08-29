@@ -514,6 +514,40 @@ export function listRecentFinishedGames(limit = 10): GameWithPlayers[] {
 }
 
 /**
+ * A cheap "has anything changed on the site?" probe.
+ *
+ * The lobby and dashboard need to notice a game being created, joined, moved
+ * in or finished. Rather than re-render those pages on a timer, they poll this
+ * and refresh only when the answer differs from what they were rendered with.
+ *
+ * Counts by status catch a game appearing or changing phase; the newest
+ * updated_at catches everything else, including moves within a game already in
+ * the list. Together they are one row from one scan, and about fifty bytes on
+ * the wire.
+ */
+export function siteVersion(): string {
+  const row = getDb()
+    .prepare(
+      `SELECT
+         SUM(CASE WHEN status = 'open' THEN 1 ELSE 0 END) AS open,
+         SUM(CASE WHEN status IN ('setup', 'active') THEN 1 ELSE 0 END) AS playing,
+         SUM(CASE WHEN status = 'finished' THEN 1 ELSE 0 END) AS finished,
+         MAX(updated_at) AS latest
+       FROM games`,
+    )
+    .get() as {
+    open: number | null;
+    playing: number | null;
+    finished: number | null;
+    latest: number | null;
+  };
+  // One opaque string rather than an object: the page and the probe both call
+  // this, so they cannot disagree about formatting, and the caller compares it
+  // with a plain equality check rather than knowing what the parts mean.
+  return [row.open ?? 0, row.playing ?? 0, row.finished ?? 0, row.latest ?? 0].join(":");
+}
+
+/**
  * A cheap "has anything changed?" probe for a single game.
  *
  * Polled by the game page so a player sees their opponent's move without

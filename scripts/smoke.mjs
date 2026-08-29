@@ -263,8 +263,8 @@ check(
 const versionBefore = await api(`/api/games/${gameId}/version`);
 check(
   "the version probe works during setup",
-  versionBefore.status === 200 && versionBefore.body?.status === "setup",
-  `status ${versionBefore.status}`,
+  versionBefore.status === 200 && typeof versionBefore.body?.v === "string",
+  `status ${versionBefore.status} ${JSON.stringify(versionBefore.body)}`,
 );
 
 const setup1 = await api(`/api/games/${gameId}/setup`, {
@@ -278,8 +278,8 @@ check("still in setup after one placement", setup1.body?.game?.status === "setup
 const versionAfterP1 = await api(`/api/games/${gameId}/version`);
 check(
   "placing pieces changes the version probe",
-  versionAfterP1.body?.ply !== versionBefore.body?.ply,
-  `ply ${versionBefore.body?.ply} -> ${versionAfterP1.body?.ply}`,
+  versionAfterP1.body?.v !== versionBefore.body?.v,
+  `${versionBefore.body?.v} -> ${versionAfterP1.body?.v}`,
 );
 
 const setup2 = await api(`/api/games/${gameId}/setup`, {
@@ -294,10 +294,28 @@ check("player 1 moves first", setup2.body?.game?.turn === 1);
 const versionAfterP2 = await api(`/api/games/${gameId}/version`);
 check(
   "finishing setup changes the probe's status",
-  versionAfterP2.body?.status === "active" &&
-    versionAfterP1.body?.status === "setup",
-  `${versionAfterP1.body?.status} -> ${versionAfterP2.body?.status}`,
+  versionAfterP2.body?.v !== versionAfterP1.body?.v &&
+    versionAfterP2.body?.v.includes("active"),
+  `${versionAfterP1.body?.v} -> ${versionAfterP2.body?.v}`,
 );
+
+// The site-wide probe is what makes the lobby notice a game it is not in.
+{
+  const before = await api("/api/version");
+  check("the site probe answers", typeof before.body?.v === "string", JSON.stringify(before.body));
+
+  const made = await api("/api/games", {
+    method: "POST",
+    cookie: bobCookie,
+    body: { moveSeconds: 3600 },
+  });
+  const after = await api("/api/version");
+  check(
+    "a game created elsewhere changes the site probe",
+    made.status === 201 && after.body?.v !== before.body?.v,
+    `${before.body?.v} -> ${after.body?.v}`,
+  );
+}
 
 // --- turn order ------------------------------------------------------------
 
