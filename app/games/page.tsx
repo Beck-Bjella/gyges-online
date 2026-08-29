@@ -31,14 +31,16 @@ export default async function GamesPage() {
   const activeGames = listActiveGames();
   const recentGames = listRecentFinishedGames();
 
-  // The engine's accounts, as choosable opponents. maxNodes is pulled out of
-  // the stored UGI options only so the form can estimate a wait; the site does
-  // not otherwise interpret them.
+  // The engine's accounts, as choosable opponents. The work budget is pulled
+  // out of the stored UGI options only so the form can estimate a wait; the
+  // site does not otherwise interpret them.
   const botOptions = botLeaderboard().map((b) => {
     let maxNodes: number | null = null;
+    let maxPly: number | null = null;
     try {
       const parsed = JSON.parse(b.options ?? "{}") as Record<string, unknown>;
       if (typeof parsed.maxNodes === "number") maxNodes = parsed.maxNodes;
+      if (typeof parsed.maxPly === "number") maxPly = parsed.maxPly;
     } catch {
       /* a malformed row simply has no estimate */
     }
@@ -47,6 +49,7 @@ export default async function GamesPage() {
       username: b.username,
       description: b.description,
       maxNodes,
+      maxPly,
     };
   });
 

@@ -495,10 +495,18 @@ check(
       "the position is handed over as 38 digits",
       typeof plan.body?.board === "string" && /^[0-9]{38}$/.test(plan.body.board),
     );
+    // A bot must be bounded by work — nodes or depth — and never by time,
+    // which would make a faster device face a stronger opponent.
+    const budget = plan.body?.options ?? {};
     check(
-      "the engine's node budget travels with it",
-      typeof plan.body?.options?.maxNodes === "number",
-      JSON.stringify(plan.body?.options),
+      "the engine's work budget travels with it",
+      typeof budget.maxNodes === "number" || typeof budget.maxPly === "number",
+      JSON.stringify(budget),
+    );
+    check(
+      "the engine is not bounded by time",
+      budget.maxTime === undefined,
+      JSON.stringify(budget),
     );
 
     // The security property: the browser runs the engine, so it could claim

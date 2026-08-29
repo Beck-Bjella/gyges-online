@@ -75,11 +75,24 @@ const COMMON: Record<string, string | number | boolean> = {
  * times slower, so the wait scales but — because the budget is work rather than
  * time — the move does not change.
  *
+ *   maxPly 1      ~0.1s desktop   under a second anywhere
  *   20,000 nodes  ~0.8s desktop   ~3s phone
  *   60,000 nodes  ~2.3s desktop   ~9s phone
  *  200,000 nodes ~14.6s desktop  ~60s phone
  */
 export const BOTS: BotSpec[] = [
+  {
+    // The shallowest search the engine can do: it looks one ply ahead and
+    // stops, so it sees an immediate win or an immediate threat and nothing
+    // beyond that. Bounded by depth rather than nodes — equally reproducible,
+    // and it finishes in well under a second on any device.
+    username: "Helios-Glance",
+    strength: 5,
+    engineBuild: ENGINE_BUILD,
+    description:
+      "Looks one move ahead and no further. The gentlest introduction there is.",
+    options: { ...COMMON, maxPly: 1 },
+  },
   {
     username: "Helios-Casual",
     strength: 20,

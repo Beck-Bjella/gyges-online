@@ -1123,11 +1123,27 @@ export function createBot(spec: BotSpec): User {
   if (!Number.isInteger(strength) || strength < 0) {
     throw new GameError("A bot's strength must be a non-negative integer.");
   }
-  const maxNodes = options.maxNodes;
-  if (typeof maxNodes !== "number" || !Number.isInteger(maxNodes) || maxNodes <= 0) {
+  // A bot must be bounded by WORK, not by time.
+  //
+  // `maxNodes` (how much of the tree to visit) and `maxPly` (how deep to look)
+  // are both reproducible: a slow device takes longer but explores the same
+  // tree and returns the same move. `maxTime` is not — it would make a fast
+  // machine face a stronger opponent, so a bot's record would describe its
+  // opponents' hardware rather than the bot.
+  const bounded = ["maxNodes", "maxPly"].some((k) => {
+    const v = options[k];
+    return typeof v === "number" && Number.isInteger(v) && v > 0;
+  });
+  if (!bounded) {
     throw new GameError(
-      "A bot needs a positive integer maxNodes option: without a node budget " +
-        "its play is not reproducible across devices.",
+      "A bot needs a positive integer maxNodes or maxPly option: without a " +
+        "work budget its play is not reproducible across devices.",
+    );
+  }
+  if (options.maxTime !== undefined) {
+    throw new GameError(
+      "A bot cannot be bounded by maxTime: a faster device would face a " +
+        "stronger opponent, which makes its record meaningless.",
     );
   }
   if (!engineBuild || !engineBuild.trim()) {

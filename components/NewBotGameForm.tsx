@@ -9,8 +9,10 @@ export interface BotOption {
   id: string;
   username: string;
   description: string | null;
-  /** Node budget, which is what actually decides the wait. */
+  /** Node budget, when the bot is bounded that way. */
   maxNodes: number | null;
+  /** Depth limit, for bots bounded by how far they look rather than how much. */
+  maxPly: number | null;
 }
 
 /**
@@ -67,10 +69,10 @@ export default function NewBotGameForm({ bots }: { bots: BotOption[] }) {
         </button>
       </div>
 
-      {chosen?.maxNodes != null && (
+      {chosen && (
         <p className="hint" style={{ marginTop: 12 }}>
-          {describeWait(chosen.maxNodes)} The engine runs in this browser tab,
-          so a slower device waits longer — but plays the same opponent.
+          {describeWait(chosen)} The engine runs in this browser tab, so a
+          slower device waits longer — but plays the same opponent.
         </p>
       )}
 
@@ -80,14 +82,20 @@ export default function NewBotGameForm({ bots }: { bots: BotOption[] }) {
 }
 
 /**
- * A rough wait, from the node budget.
+ * A rough wait, from whichever work budget the bot uses.
  *
  * ~26,000 nodes a second on the desktop this was measured on. Deliberately
  * vague — the point is to set expectations, and quoting a precise number for
- * hardware we know nothing about would be false precision.
+ * hardware we know nothing about would be false precision. A depth-limited bot
+ * is quick enough that the depth itself is the honest answer.
  */
-function describeWait(maxNodes: number): string {
-  const seconds = maxNodes / 26000;
+function describeWait(bot: BotOption): string {
+  if (bot.maxNodes == null) {
+    return bot.maxPly != null
+      ? `Looks ${bot.maxPly === 1 ? "one move" : `${bot.maxPly} moves`} ahead, and answers almost at once.`
+      : "";
+  }
+  const seconds = bot.maxNodes / 26000;
   if (seconds < 2) return "Thinks for about a second per move.";
   if (seconds < 5) return "Thinks for a few seconds per move.";
   if (seconds < 20) return "Thinks for around ten seconds per move.";
