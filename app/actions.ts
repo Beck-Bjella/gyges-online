@@ -2,26 +2,71 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { currentUser, signIn, signOut } from "@/lib/auth";
+import { changePassword, currentUser, signIn, signOut, signUp } from "@/lib/auth";
 import { createGame, joinGame, renameUser, GameError } from "@/lib/db/queries";
 
 export interface ActionState {
   error?: string;
+  /** Set by actions that succeed without navigating, e.g. changing a password. */
+  message?: string;
 }
 
+/**
+ * Sign in, or create an account.
+ *
+ * One action behind one form, switched by which button was pressed, because
+ * the two forms want exactly the same two fields. The distinction that matters
+ * is in lib/auth.ts: signUp refuses a name that exists, signIn refuses one that
+ * does not. This only routes to the right one.
+ */
 export async function signInAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
   const username = String(formData.get("username") ?? "");
+  const password = String(formData.get("password") ?? "");
+  const intent = String(formData.get("intent") ?? "signin");
+
   if (!username.trim()) return { error: "Enter a username." };
+  if (!password) return { error: "Enter a password." };
+
   try {
-    await signIn(username);
+    if (intent === "signup") {
+      await signUp(username, password);
+    } else {
+      await signIn(username, password);
+    }
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Could not sign in." };
   }
-  revalidatePath("/");
-  return {};
+
+  // Sending the player straight to the dashboard, rather than re-rendering the
+  // landing page, is what makes a successful sign-in feel like it worked.
+  redirect("/dashboard");
+}
+
+export async function changePasswordAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const user = await currentUser();
+  if (!user) return { error: "Sign in first." };
+
+  const current = String(formData.get("current_password") ?? "");
+  const next = String(formData.get("new_password") ?? "");
+  const confirm = String(formData.get("confirm_password") ?? "");
+
+  if (next !== confirm) return { error: "The new passwords do not match." };
+
+  try {
+    await changePassword(user, current, next);
+  } catch (err) {
+    return {
+      error: err instanceof Error ? err.message : "Could not change your password.",
+    };
+  }
+
+  return { message: "Password changed. Other sessions have been signed out." };
 }
 
 export async function signOutAction(): Promise<void> {

@@ -48,6 +48,18 @@ const { P1_GOAL, P2_GOAL, replay, startingBoard, SETUP_PIECES, emptyBoard } =
 
 const STANDARD = [...SETUP_PIECES];
 
+/**
+ * A legal opening move for player 1 from the standard arrangement.
+ *
+ * The three-ring piece on square 0 travels exactly three squares: 0 -> 6 -> 12
+ * -> 13. Used throughout as "any legal move", so these tests stay about
+ * bookkeeping rather than about the rules.
+ */
+const P1_OPENING: number[] = [0, 13];
+
+/** A legal reply for player 2 after P1_OPENING: 30 -> 24 -> 18 -> 12. */
+const P2_REPLY: number[] = [30, 12];
+
 after(() => {
   try {
     getDb().close();
@@ -79,6 +91,41 @@ function gameInSetup(moveSeconds = 3600) {
   return { a, b, gameId: g.id };
 }
 
+/**
+ * A game already in play, from a chosen position.
+ *
+ * Moves are now checked against the rules, so a test that wants a specific
+ * outcome — a win, a game already over — has to reach it with a *legal* move.
+ * This builds a game from an arbitrary board and pushes it past setup so that
+ * such a move is available.
+ *
+ * The two setup plies are written directly rather than through submitSetup,
+ * because the point is to start from a position of the test's choosing rather
+ * than from two home rows.
+ */
+function gameFromPosition(board: number[], moveSeconds = 3600) {
+  const a = createUser(uniqueName("alice"));
+  const b = createUser(uniqueName("bob"));
+  const g = createGame(a.id, moveSeconds, board);
+  joinGame(g.id, b.id);
+
+  const encoded = board.join("");
+  const db = getDb();
+  // Skip setup: mark both placements done and the game active.
+  db.prepare(
+    `UPDATE games SET status = 'active', ply = 2, turn = 1, board = ?
+      WHERE id = ?`,
+  ).run(encoded, g.id);
+  for (const ply of [1, 2]) {
+    db.prepare(
+      `INSERT INTO moves (game_id, ply, player, kind, move, board_after, created_at)
+       VALUES (?, ?, ?, 'setup', '321123', ?, ?)`,
+    ).run(g.id, ply, ply === 1 ? 1 : -1, encoded, Date.now());
+  }
+
+  return { a, b, gameId: g.id };
+}
+
 // --- users -----------------------------------------------------------------
 
 test("usernames are unique regardless of case", () => {
@@ -102,7 +149,7 @@ test("renaming keeps every past game", () => {
   joinGame(g.id, b.id);
   submitSetup(g.id, a.id, STANDARD);
   submitSetup(g.id, b.id, STANDARD);
-  submitMove(g.id, a.id, [0, 6]);
+  submitMove(g.id, a.id, P1_OPENING);
 
   const newName = uniqueName("newname");
   const renamed = renameUser(a.id, newName);
@@ -207,7 +254,7 @@ test("joining begins the setup phase, not play", () => {
 
 test("no moves are accepted during setup", () => {
   const { a, gameId } = gameInSetup();
-  assert.throws(() => submitMove(gameId, a.id, [0, 6]), /place their pieces/i);
+  assert.throws(() => submitMove(gameId, a.id, P1_OPENING), /place their pieces/i);
 });
 
 test("players place in turn, then play begins", () => {
@@ -257,8 +304,8 @@ test("setup plies are recorded as history, marked as setup", () => {
 
 test("the whole game replays from the empty board", () => {
   const { a, b, gameId } = twoPlayerGame();
-  submitMove(gameId, a.id, [0, 6]);
-  submitMove(gameId, b.id, [35, 29]);
+  submitMove(gameId, a.id, P1_OPENING);
+  submitMove(gameId, b.id, P2_REPLY);
 
   const g = getGame(gameId)!;
   const rows = getMoves(gameId);
@@ -290,21 +337,21 @@ test("a placement cannot be submitted once play has begun", () => {
 test("only a participant may move", () => {
   const { gameId } = twoPlayerGame();
   const stranger = createUser(uniqueName("stranger"));
-  assert.throws(() => submitMove(gameId, stranger.id, [0, 6]), /not a player/i);
+  assert.throws(() => submitMove(gameId, stranger.id, P1_OPENING), /not a player/i);
 });
 
 test("players must alternate", () => {
   const { a, b, gameId } = twoPlayerGame();
-  assert.throws(() => submitMove(gameId, b.id, [35, 29]), /not your turn/i);
-  submitMove(gameId, a.id, [0, 6]);
+  assert.throws(() => submitMove(gameId, b.id, P2_REPLY), /not your turn/i);
+  submitMove(gameId, a.id, P1_OPENING);
   assert.throws(() => submitMove(gameId, a.id, [1, 7]), /not your turn/i);
-  submitMove(gameId, b.id, [35, 29]);
+  submitMove(gameId, b.id, P2_REPLY);
 });
 
 test("each move appends to the record and advances the ply", () => {
   const { a, b, gameId } = twoPlayerGame();
-  submitMove(gameId, a.id, [0, 6]);
-  submitMove(gameId, b.id, [35, 29]);
+  submitMove(gameId, a.id, P1_OPENING);
+  submitMove(gameId, b.id, P2_REPLY);
 
   const g = getGame(gameId)!;
   // Plies 1 and 2 are the two setups; play starts at ply 3.
@@ -325,7 +372,7 @@ test("each move appends to the record and advances the ply", () => {
     moves.map((m) => m.player),
     [1, -1, 1, -1],
   );
-  assert.equal(moves[2].move, "0|6");
+  assert.equal(moves[2].move, P1_OPENING.join("|"));
   // The cached position matches the last move's result.
   assert.equal(g.board, moves[3].board_after);
 });
@@ -342,10 +389,25 @@ test("structurally invalid moves are rejected", () => {
 
 // --- endings ---------------------------------------------------------------
 
+/**
+ * A position where player 1 can legally bear off.
+ *
+ * A single one-ring piece on row 4 (index 24). It can step to row 5 and, from
+ * the row beyond the opponent's home, into P2_GOAL. The lone piece at 35 gives
+ * player 2 something to move so the game is not degenerate.
+ */
+function winnableByP1(): number[] {
+  const b = emptyBoard();
+  // A two-ring piece at 24 (row 4) steps 24 -> 30 (the far row) and out into
+  // P2_GOAL. Bearing off requires the LAST step to leave the far row, so a
+  // one-ring piece here could reach row 5 but not the goal.
+  b[24] = 2;
+  return b;
+}
+
 test("reaching the opponent's goal wins", () => {
-  const { a, gameId } = twoPlayerGame();
-  // Player 1 reaches P2's goal. Legality is not checked, so this is allowed.
-  const g = submitMove(gameId, a.id, [30, P2_GOAL]);
+  const { a, gameId } = gameFromPosition(winnableByP1());
+  const g = submitMove(gameId, a.id, [24, P2_GOAL]);
   assert.equal(g.status, "finished");
   assert.equal(g.result, 1);
   assert.equal(g.result_reason, "goal");
@@ -354,15 +416,29 @@ test("reaching the opponent's goal wins", () => {
 });
 
 test("reaching your own goal credits the opponent", () => {
-  const { a, gameId } = twoPlayerGame();
-  const g = submitMove(gameId, a.id, [0, P1_GOAL]);
+  // The goals are named for the board's geography, not for who scores in them:
+  // P1_GOAL is the space beyond player 1's home row, so a piece arriving there
+  // means PLAYER 2 has crossed the board. This is the case goalFor() exists to
+  // stop people reasoning about by hand.
+  //
+  // Player 2 moves a piece on row 1 down into P1_GOAL and wins.
+  const board = emptyBoard();
+  // A one-ring piece at 6 is on row 1; player 2 steps it down to row 0 and out.
+  board[6] = 2;
+  const { b, gameId } = gameFromPosition(board);
+
+  // It is player 2's turn to move in this position.
+  getDb().prepare("UPDATE games SET turn = -1 WHERE id = ?").run(gameId);
+
+  const g = submitMove(gameId, b.id, [6, P1_GOAL]);
   assert.equal(g.result, -1, "a piece on P1_GOAL means player 2 got there");
+  assert.equal(g.result_reason, "goal");
 });
 
 test("no moves are accepted after a game ends", () => {
-  const { a, b, gameId } = twoPlayerGame();
-  submitMove(gameId, a.id, [30, P2_GOAL]);
-  assert.throws(() => submitMove(gameId, b.id, [35, 29]), /not in progress/i);
+  const { a, b, gameId } = gameFromPosition(winnableByP1());
+  submitMove(gameId, a.id, [24, P2_GOAL]);
+  assert.throws(() => submitMove(gameId, b.id, P2_REPLY), /not in progress/i);
 });
 
 test("resigning awards the opponent the win", () => {
@@ -383,7 +459,7 @@ test("a non-participant cannot resign", () => {
 
 test("a game past its deadline is forfeited by the player to move", () => {
   const { a, gameId } = twoPlayerGame();
-  submitMove(gameId, a.id, [0, 6]); // now player 2 is to move
+  submitMove(gameId, a.id, P1_OPENING); // now player 2 is to move
 
   // Reach past the deadline without waiting.
   getDb()
@@ -420,8 +496,8 @@ test("the starting position survives every move", () => {
   const start = getGame(gameId)!.start_board;
   assert.equal(start, emptyBoard().join(""));
 
-  submitMove(gameId, a.id, [0, 6]);
-  submitMove(gameId, b.id, [35, 29]);
+  submitMove(gameId, a.id, P1_OPENING);
+  submitMove(gameId, b.id, P2_REPLY);
 
   const g = getGame(gameId)!;
   assert.equal(g.start_board, start, "the start position never changes");
@@ -432,8 +508,8 @@ test("replaying the moves from the post-setup position reaches the current one",
   const { a, b, gameId } = twoPlayerGame();
   const afterSetup = getMoves(gameId).find((m) => m.ply === 2)!.board_after;
 
-  submitMove(gameId, a.id, [0, 6]);
-  submitMove(gameId, b.id, [35, 29]);
+  submitMove(gameId, a.id, P1_OPENING);
+  submitMove(gameId, b.id, P2_REPLY);
   submitMove(gameId, a.id, [1, 7]);
 
   const g = getGame(gameId)!;
@@ -476,9 +552,13 @@ test("a game records when it started and when it ended", () => {
 
   submitSetup(g.id, a.id, STANDARD);
   submitSetup(g.id, b.id, STANDARD);
-  const done = submitMove(g.id, a.id, [30, P2_GOAL]);
-  assert.ok(done.finished_at, "finishing records the end time");
-  assert.ok(done.finished_at! >= joined.started_at!);
+  // 0 -> 6 -> 12 -> 13: the three-ring piece's first legal move.
+  const done = submitMove(g.id, a.id, [0, 13]);
+  assert.ok(done.updated_at >= joined.started_at!);
+
+  const finished = resignGame(g.id, b.id);
+  assert.ok(finished.finished_at, "finishing records the end time");
+  assert.ok(finished.finished_at! >= joined.started_at!);
 });
 
 test("started_at is distinct from created_at", () => {
@@ -504,8 +584,8 @@ test("started_at is distinct from created_at", () => {
 
 test("each move records how long the player took", () => {
   const { a, b, gameId } = twoPlayerGame();
-  submitMove(gameId, a.id, [0, 6]);
-  submitMove(gameId, b.id, [35, 29]);
+  submitMove(gameId, a.id, P1_OPENING);
+  submitMove(gameId, b.id, P2_REPLY);
 
   const moves = getMoves(gameId);
   for (const m of moves) {
@@ -519,8 +599,8 @@ test("each move records how long the player took", () => {
 
 test("timing statistics are derivable from stored moves", () => {
   const { a, b, gameId } = twoPlayerGame();
-  submitMove(gameId, a.id, [0, 6]);
-  submitMove(gameId, b.id, [35, 29]);
+  submitMove(gameId, a.id, P1_OPENING);
+  submitMove(gameId, b.id, P2_REPLY);
   submitMove(gameId, a.id, [1, 7]);
 
   const stats = timingStats(a.id);
@@ -535,7 +615,7 @@ test("timing statistics are derivable from stored moves", () => {
 
 test("the same ply cannot be written twice", () => {
   const { a, gameId } = twoPlayerGame();
-  submitMove(gameId, a.id, [0, 6]);
+  submitMove(gameId, a.id, P1_OPENING);
 
   // Simulate a duplicate arriving for a ply that already exists. The primary
   // key on (game_id, ply) is the backstop if the turn check is ever bypassed.
@@ -553,7 +633,7 @@ test("the same ply cannot be written twice", () => {
 
 test("a second move at the same turn is refused", () => {
   const { a, gameId } = twoPlayerGame();
-  submitMove(gameId, a.id, [0, 6]);
+  submitMove(gameId, a.id, P1_OPENING);
   // Whatever else player 1 tries, the turn has already passed to player 2.
   assert.throws(() => submitMove(gameId, a.id, [1, 7]), /not your turn/i);
   assert.throws(() => submitMove(gameId, a.id, [2, 8]), /not your turn/i);
@@ -624,7 +704,8 @@ test("the leaderboard counts finished games", () => {
     joinGame(g.id, l.id);
     submitSetup(g.id, w.id, STANDARD);
     submitSetup(g.id, l.id, STANDARD);
-    submitMove(g.id, w.id, [30, P2_GOAL]);
+    // The loser resigns: a win for w, without needing a contrived position.
+    resignGame(g.id, l.id);
   }
 
   const row = leaderboard(100).find((r) => r.username === winnerName);

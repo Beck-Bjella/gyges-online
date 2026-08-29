@@ -23,6 +23,7 @@ import {
   type Move,
   type Player,
 } from "../game/board.ts";
+import { checkMoveLegality } from "../game/rules.ts";
 
 const SESSION_DAYS = 30;
 
@@ -51,6 +52,46 @@ export interface User {
   /** Set when the account is closed. Games survive; personal fields do not. */
   deleted_at: number | null;
   created_at: number;
+  /**
+   * Whether this account has a password.
+   *
+   * Note what is NOT here: the hash itself. `User` is handed to pages and, from
+   * there, to client components, so the hash must never be a field on it — the
+   * safest way to guarantee that is for no query building a `User` to select
+   * it. Only passwordHashFor() reads the hash, and only lib/auth.ts calls it.
+   *
+   * False only for bots, which have no password and cannot be signed in to.
+   */
+  has_password: boolean;
+  /**
+   * The engine strength this bot plays at, or null for a human.
+   *
+   * A bot is an ordinary account — this column is what distinguishes one, and
+   * it is deliberately the only thing that does. Profiles, game history and
+   * replay are shared code that never asks.
+   */
+  bot_strength: number | null;
+  /** How this bot plays, shown on its profile. Null for humans. */
+  bot_description: string | null;
+  /**
+   * The UGI options this bot plays with, applied verbatim before its search.
+   *
+   * Opaque to the site on purpose: these are `setoption` names and values, so
+   * a new engine option needs no migration here. The one the site cares about
+   * is `maxNodes` — bounding the search by WORK rather than time is what makes
+   * the same bot play the same move on every device. A slow phone waits longer
+   * than a desktop; it does not face a weaker opponent.
+   */
+  bot_options: Record<string, string | number | boolean> | null;
+  /**
+   * Which engine build this bot belongs to.
+   *
+   * The browser build fixes its transposition table size and evaluation network
+   * at compile time, so a bot is reproducible only *within* a build. Recording
+   * it keeps a future engine release from silently invalidating the record of
+   * games played against the old one.
+   */
+  bot_engine_build: string | null;
 }
 
 export interface Game {
@@ -110,24 +151,57 @@ function validateUsername(username: string): string {
   return trimmed;
 }
 
-export function createUser(username: string): User {
+/**
+ * Create an account.
+ *
+ * `passwordHash` is optional only so that bots — which have no password and
+ * cannot be signed in to — and test fixtures can be created. Every account made
+ * through the site has one.
+ *
+ * The INSERT is guarded by the UNIQUE index on username_key, not only by the
+ * SELECT above it. Two simultaneous sign-ups for the same free name would both
+ * pass the SELECT; the index is what actually stops the second one.
+ */
+export function createUser(username: string, passwordHash?: string): User {
   const trimmed = validateUsername(username);
 
   const db = getDb();
   const existing = db
     .prepare("SELECT id FROM users WHERE username_key = ?")
     .get(trimmed.toLowerCase());
-  if (existing) throw new Error("That username is taken.");
+  if (existing) throw new GameError("That username is taken.");
 
   const user: User = {
     id: newId(),
     username: trimmed,
     deleted_at: null,
     created_at: now(),
+    has_password: Boolean(passwordHash),
+    bot_strength: null,
+    bot_description: null,
+    bot_options: null,
+    bot_engine_build: null,
   };
-  db.prepare(
-    "INSERT INTO users (id, username, username_key, created_at) VALUES (?, ?, ?, ?)",
-  ).run(user.id, user.username, trimmed.toLowerCase(), user.created_at);
+  try {
+    db.prepare(
+      `INSERT INTO users (id, username, username_key, created_at, password_hash, password_set_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    ).run(
+      user.id,
+      user.username,
+      trimmed.toLowerCase(),
+      user.created_at,
+      passwordHash ?? null,
+      passwordHash ? user.created_at : null,
+    );
+  } catch (err) {
+    // The unique index fired: someone took this name between the check and the
+    // insert. Report it the same way as the check would have.
+    if (String(err).includes("UNIQUE")) {
+      throw new GameError("That username is taken.");
+    }
+    throw err;
+  }
   return user;
 }
 
@@ -166,23 +240,100 @@ export function renameUser(userId: string, newUsername: string): User {
   });
 }
 
+/**
+ * The columns every User-returning query selects.
+ *
+ * `password_hash IS NOT NULL` rather than the hash itself: callers learn
+ * whether a password exists, never what it is. SQLite yields 0/1 here and
+ * Postgres yields a real boolean, so both are normalised in toUser().
+ */
+const USER_COLUMNS = `
+  id, username, deleted_at, created_at,
+  bot_strength, bot_description, bot_options, bot_engine_build,
+  (password_hash IS NOT NULL) AS has_password
+`;
+
+/**
+ * Parse the stored UGI options.
+ *
+ * Returns null rather than throwing on malformed JSON: one bad row must not
+ * break the leaderboard for everyone. A bot with unreadable options simply has
+ * none, and the caller can refuse to run it.
+ */
+function parseBotOptions(
+  raw: string | null,
+): Record<string, string | number | boolean> | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+    return parsed as Record<string, string | number | boolean>;
+  } catch {
+    return null;
+  }
+}
+
+/** Normalise a users row into a User. */
+function toUser(row: Record<string, unknown> | undefined): User | null {
+  if (!row) return null;
+  return {
+    id: row.id as string,
+    username: row.username as string,
+    deleted_at: (row.deleted_at as number | null) ?? null,
+    created_at: row.created_at as number,
+    has_password: Boolean(row.has_password),
+    bot_strength: (row.bot_strength as number | null) ?? null,
+    bot_description: (row.bot_description as string | null) ?? null,
+    bot_options: parseBotOptions(row.bot_options as string | null),
+    bot_engine_build: (row.bot_engine_build as string | null) ?? null,
+  };
+}
+
 export function findUserByName(username: string): User | null {
-  return (
-    (getDb()
-      .prepare(
-        "SELECT id, username, deleted_at, created_at FROM users WHERE username_key = ?",
-      )
-      .get(username.trim().toLowerCase()) as User | undefined) ?? null
+  return toUser(
+    getDb()
+      .prepare(`SELECT ${USER_COLUMNS} FROM users WHERE username_key = ?`)
+      .get(username.trim().toLowerCase()) as Record<string, unknown> | undefined,
   );
 }
 
 export function getUser(id: string): User | null {
-  return (
-    (getDb()
-      .prepare("SELECT id, username, deleted_at, created_at FROM users WHERE id = ?")
-      .get(id) as User | undefined) ?? null
+  return toUser(
+    getDb()
+      .prepare(`SELECT ${USER_COLUMNS} FROM users WHERE id = ?`)
+      .get(id) as Record<string, unknown> | undefined,
   );
 }
+
+/**
+ * The stored password hash for an account, or null if it has none.
+ *
+ * Deliberately separate from every other user query, and deliberately not a
+ * field on `User`. This is the only function that reads the column, and
+ * lib/auth.ts is the only caller — which is what keeps a hash from ever
+ * reaching a page, a prop, or a JSON response by accident.
+ */
+export function passwordHashFor(userId: string): string | null {
+  const row = getDb()
+    .prepare("SELECT password_hash FROM users WHERE id = ?")
+    .get(userId) as { password_hash: string | null } | undefined;
+  return row?.password_hash ?? null;
+}
+
+/**
+ * Set or replace an account's password.
+ *
+ * Takes an already-computed hash: hashing is slow and async, and this layer is
+ * synchronous and runs inside transactions. Doing the work in lib/auth.ts and
+ * passing the result keeps a 120ms CPU burn out of a database transaction.
+ */
+export function setPasswordHash(userId: string, hash: string): void {
+  const result = getDb()
+    .prepare("UPDATE users SET password_hash = ?, password_set_at = ? WHERE id = ?")
+    .run(hash, now(), userId);
+  if (result.changes === 0) throw new GameError("No such account.", 404);
+}
+
 
 export function createSession(userId: string): string {
   const token = newToken();
@@ -196,17 +347,54 @@ export function userForSession(token: string | undefined): User | null {
   if (!token) return null;
   const row = getDb()
     .prepare(
-      `SELECT u.id, u.username, u.deleted_at, u.created_at
+      `SELECT u.id, u.username, u.deleted_at, u.created_at,
+              (u.password_hash IS NOT NULL) AS has_password
          FROM sessions s
          JOIN users u ON u.id = s.user_id
         WHERE s.token = ? AND s.expires_at > ? AND u.deleted_at IS NULL`,
     )
-    .get(token, now()) as User | undefined;
-  return row ?? null;
+    .get(token, now()) as Record<string, unknown> | undefined;
+  return toUser(row);
 }
 
 export function deleteSession(token: string): void {
   getDb().prepare("DELETE FROM sessions WHERE token = ?").run(token);
+}
+
+/**
+ * End every session for a user.
+ *
+ * Called when a password changes: someone changing their password because they
+ * think it was stolen expects that to log the thief out. Leaving old sessions
+ * valid would make the change nearly pointless.
+ *
+ * `except` keeps the current session alive so the person doing it is not
+ * logged out of their own browser.
+ */
+export function deleteSessionsForUser(userId: string, except?: string): number {
+  const db = getDb();
+  const result = except
+    ? db
+        .prepare("DELETE FROM sessions WHERE user_id = ? AND token <> ?")
+        .run(userId, except)
+    : db.prepare("DELETE FROM sessions WHERE user_id = ?").run(userId);
+  return result.changes;
+}
+
+/**
+ * Delete sessions that have expired.
+ *
+ * The roadmap listed this as "session hygiene to fix at the same time" as
+ * passwords: the index on sessions(expires_at) already existed, but nothing
+ * ever ran the delete, so the table grew without bound.
+ *
+ * Called opportunistically on sign-in rather than from a scheduled job, for the
+ * same reason settleExpiredGames() is — Vercel's free tier runs cron once a
+ * day. Sign-in is a good moment: it is not a hot path, and it already writes.
+ */
+export function purgeExpiredSessions(): number {
+  return getDb().prepare("DELETE FROM sessions WHERE expires_at <= ?").run(now())
+    .changes;
 }
 
 // ---------------------------------------------------------------------------
@@ -519,21 +707,19 @@ export function submitMove(gameId: string, userId: string, mv: Move): GameWithPl
     const structure = checkMoveStructure(board, mv);
     if (!structure.ok) throw new GameError(structure.reason ?? "Malformed move.");
 
-    // THE RULES CHECK GOES HERE.
+    // The rules check. Everything above establishes authority — the game
+    // exists, it is running, you are a player, it is your turn, and the move is
+    // structurally coherent. This is the part that asks whether the rules of
+    // Gygès actually allow it.
     //
-    // Everything above establishes authority: the game exists, it is running,
-    // you are a player, it is your turn, and the move is structurally coherent.
-    // What is missing is whether the move is *legal* under the rules of Gygès.
-    //
-    // When the engine service exists this becomes roughly:
-    //
-    //     const verdict = await validateMove(board, side, mv);
-    //     if (!verdict.legal) throw new GameError(verdict.reason ?? "Illegal move.");
-    //
-    // using lib/engine/client.ts. Note that submitMove would have to become
-    // async, since the engine is reached over the network. Nothing else about
-    // the flow changes, and stored games stay readable — see
-    // docs/ARCHITECTURE.md.
+    // It runs in-process rather than over HTTP to an engine service. Legality
+    // is a bounded search over 36 squares (lib/game/rules.ts); a network call
+    // would add a hosting bill, a hop per move, and a way for the site to break
+    // when the engine is down, in exchange for nothing. The engine remains the
+    // better authority for *search* — that is what bot play needs — and
+    // lib/engine/client.ts is unchanged for when it arrives.
+    const verdict = checkMoveLegality(board, side, mv);
+    if (!verdict.legal) throw new GameError(verdict.reason ?? "Illegal move.");
 
     const nextBoard = applyMove(board, mv);
     const encoded = encodeBoard(nextBoard);
@@ -789,6 +975,14 @@ export function timingStats(userId: string): TimingStats {
   };
 }
 
+/**
+ * The human leaderboard.
+ *
+ * Bots are excluded. They are real accounts with real records, but ranking a
+ * calibration point against people is a category error: a bot's score says
+ * what the engine was configured to do, not how well it played. They get their
+ * own board, ordered by strength rather than by wins — see botLeaderboard().
+ */
 export function leaderboard(limit = 25): LeaderboardRow[] {
   return getDb()
     .prepare(
@@ -802,12 +996,128 @@ export function leaderboard(limit = 25): LeaderboardRow[] {
          FROM users u
          JOIN games g
            ON (g.player1_id = u.id OR g.player2_id = u.id) AND g.status = 'finished'
-        WHERE u.deleted_at IS NULL
+        WHERE u.deleted_at IS NULL AND u.bot_strength IS NULL
         GROUP BY u.id, u.username
         ORDER BY wins DESC, played ASC, u.username ASC
         LIMIT ?`,
     )
     .all(limit) as LeaderboardRow[];
+}
+
+export interface BotRow extends LeaderboardRow {
+  strength: number;
+  description: string | null;
+  /** UGI options as stored, so the UI can show the node budget. */
+  options: string | null;
+  engine_build: string | null;
+}
+
+/**
+ * Every bot, with its record.
+ *
+ * A LEFT JOIN, unlike the human leaderboard's inner join: a bot that has not
+ * been beaten — or played — yet must still appear in the list, because this is
+ * also the menu of opponents to choose from. A board that hides the bots
+ * nobody has played is useless for picking one.
+ *
+ * Ordered by strength ascending, so the list reads as a difficulty ladder
+ * rather than a ranking.
+ */
+export function botLeaderboard(): BotRow[] {
+  return getDb()
+    .prepare(
+      `SELECT u.id, u.username,
+              u.bot_strength AS strength,
+              u.bot_description AS description,
+              u.bot_options AS options,
+              u.bot_engine_build AS engine_build,
+              COALESCE(SUM(CASE WHEN (g.player1_id = u.id AND g.result = 1)
+                         OR (g.player2_id = u.id AND g.result = -1) THEN 1 ELSE 0 END), 0) AS wins,
+              COALESCE(SUM(CASE WHEN (g.player1_id = u.id AND g.result = -1)
+                         OR (g.player2_id = u.id AND g.result = 1) THEN 1 ELSE 0 END), 0) AS losses,
+              COALESCE(SUM(CASE WHEN g.result = 0 THEN 1 ELSE 0 END), 0) AS draws,
+              COUNT(g.id) AS played
+         FROM users u
+         LEFT JOIN games g
+           ON (g.player1_id = u.id OR g.player2_id = u.id) AND g.status = 'finished'
+        WHERE u.deleted_at IS NULL AND u.bot_strength IS NOT NULL
+        GROUP BY u.id, u.username, u.bot_strength, u.bot_description,
+                 u.bot_options, u.bot_engine_build
+        ORDER BY u.bot_strength ASC, u.username ASC`,
+    )
+    .all() as BotRow[];
+}
+
+/** Whether an account is an engine rather than a person. */
+export function isBot(user: User): boolean {
+  return user.bot_strength !== null;
+}
+
+/**
+ * Create a bot account.
+ *
+ * Deliberately has no password: verifyPassword refuses a null hash, so a bot's
+ * account cannot be signed in to at all.
+ */
+export interface BotSpec {
+  username: string;
+  /** Engine skill setting. */
+  strength: number;
+  /**
+   * UGI options, applied verbatim before the search.
+   *
+   * Must include `maxNodes`: a node budget is what makes a bot play the same
+   * move on every device, which is what makes its record mean anything.
+   */
+  options: Record<string, string | number | boolean>;
+  /** Which engine build this bot plays with, e.g. "v2.0.0-wasm". */
+  engineBuild: string;
+  description?: string | null;
+}
+
+/**
+ * Create a bot account.
+ *
+ * The three numbers — strength, node budget, table size — are a complete spec:
+ * together they reproduce this bot's play exactly, on any device. Changing any
+ * of them makes it a different opponent, which is why they are stored per bot
+ * rather than chosen by whoever's browser happens to run the search.
+ *
+ * Deliberately has no password: verifyPassword refuses a null hash, so a bot's
+ * account cannot be signed in to at all.
+ */
+export function createBot(spec: BotSpec): User {
+  const { username, strength, options, engineBuild, description = null } = spec;
+  if (!Number.isInteger(strength) || strength < 0) {
+    throw new GameError("A bot's strength must be a non-negative integer.");
+  }
+  const maxNodes = options.maxNodes;
+  if (typeof maxNodes !== "number" || !Number.isInteger(maxNodes) || maxNodes <= 0) {
+    throw new GameError(
+      "A bot needs a positive integer maxNodes option: without a node budget " +
+        "its play is not reproducible across devices.",
+    );
+  }
+  if (!engineBuild || !engineBuild.trim()) {
+    throw new GameError("A bot must record which engine build it plays with.");
+  }
+
+  const user = createUser(username);
+  getDb()
+    .prepare(
+      `UPDATE users
+          SET bot_strength = ?, bot_description = ?, bot_options = ?, bot_engine_build = ?
+        WHERE id = ?`,
+    )
+    .run(strength, description, JSON.stringify(options), engineBuild.trim(), user.id);
+
+  return {
+    ...user,
+    bot_strength: strength,
+    bot_description: description,
+    bot_options: options,
+    bot_engine_build: engineBuild.trim(),
+  };
 }
 
 export { boardFromString, boardToString };

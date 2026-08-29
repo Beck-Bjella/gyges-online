@@ -22,17 +22,49 @@ function check(name, condition, detail = "") {
   }
 }
 
-/** Sign in via the server action endpoint, returning the session cookie. */
-async function signIn(username) {
+/**
+ * The password every account in this run uses.
+ *
+ * The smoke test creates throwaway accounts on a development server, so one
+ * shared value is fine and keeps the checks readable. Nothing here is a
+ * credential worth protecting.
+ */
+const PASSWORD = "smoke-test-password";
+
+/** Create an account via the API, returning the session cookie. */
+async function signUp(username, password = PASSWORD) {
   const res = await fetch(`${BASE}/api/auth/signin`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username }),
+    body: JSON.stringify({ username, password, signup: true }),
+  });
+  if (!res.ok) throw new Error(`sign-up failed for ${username}: ${res.status}`);
+  const cookie = res.headers.get("set-cookie");
+  if (!cookie) throw new Error("no session cookie returned");
+  return cookie.split(";")[0];
+}
+
+/** Sign in to an existing account, returning the session cookie. */
+async function signIn(username, password = PASSWORD) {
+  const res = await fetch(`${BASE}/api/auth/signin`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password }),
   });
   if (!res.ok) throw new Error(`sign-in failed for ${username}: ${res.status}`);
   const cookie = res.headers.get("set-cookie");
   if (!cookie) throw new Error("no session cookie returned");
   return cookie.split(";")[0];
+}
+
+/** Attempt a sign-in and report the status, without throwing. */
+async function trySignIn(username, password) {
+  const res = await fetch(`${BASE}/api/auth/signin`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password }),
+  });
+  return { ok: res.ok, status: res.status };
 }
 
 async function api(path, { method = "GET", cookie, body } = {}) {
@@ -60,9 +92,50 @@ const bob = `bob${suffix}`;
 
 console.log("\nGygès smoke test\n");
 
-const aliceCookie = await signIn(alice);
-const bobCookie = await signIn(bob);
-check("both players can sign in", Boolean(aliceCookie && bobCookie));
+const aliceCookie = await signUp(alice);
+const bobCookie = await signUp(bob);
+check("both players can create an account", Boolean(aliceCookie && bobCookie));
+
+// --- passwords ------------------------------------------------------------
+//
+// The point of the whole exercise: knowing a username is no longer enough.
+{
+  const wrong = await trySignIn(alice, "not the right password");
+  check("a wrong password is refused", !wrong.ok, `status ${wrong.status}`);
+
+  const empty = await trySignIn(alice, "");
+  check("an empty password is refused", !empty.ok, `status ${empty.status}`);
+
+  const right = await trySignIn(alice, PASSWORD);
+  check("the right password is accepted", right.ok, `status ${right.status}`);
+
+  const ghost = await trySignIn(`nobody${suffix}`, PASSWORD);
+  check("an unknown username is refused", !ghost.ok, `status ${ghost.status}`);
+
+  // Signing up for a name that exists must fail rather than silently signing in.
+  const dupe = await fetch(`${BASE}/api/auth/signin`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username: alice, password: PASSWORD, signup: true }),
+  });
+  check("signing up with a taken username is refused", !dupe.ok, `status ${dupe.status}`);
+
+  // Too short: the one content rule there is.
+  const weak = await fetch(`${BASE}/api/auth/signin`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username: `weak${suffix}`, password: "short", signup: true }),
+  });
+  check("a too-short password is refused at sign-up", !weak.ok, `status ${weak.status}`);
+
+  // A sign-in with no password field at all is malformed, not a sign-in.
+  const missing = await fetch(`${BASE}/api/auth/signin`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username: alice }),
+  });
+  check("a request with no password is rejected", !missing.ok, `status ${missing.status}`);
+}
 
 // A Secure cookie is only returned over HTTPS. Setting it while serving plain
 // http means the browser accepts the session and never sends it back, so every
@@ -71,7 +144,11 @@ check("both players can sign in", Boolean(aliceCookie && bobCookie));
   const res = await fetch(`${BASE}/api/auth/signin`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username: `cookie${suffix}` }),
+    body: JSON.stringify({
+      username: `cookie${suffix}`,
+      password: PASSWORD,
+      signup: true,
+    }),
   });
   const header = res.headers.get("set-cookie") ?? "";
   const isHttps = BASE.startsWith("https://");
@@ -134,10 +211,23 @@ check("joining begins setup", joined.body?.game?.status === "setup");
 
 const STANDARD = [3, 2, 1, 1, 2, 3];
 
+// A complete legal game, verified against lib/game/rules.ts (which is itself
+// verified against the Rust engine's move generator). Moves here must be LEGAL,
+// not merely well-formed: the server enforces the rules of Gygès.
+//
+//   P1 0|18   the three-ring piece on 0 travels exactly three squares
+//   P2 30|19  likewise for player 2
+//   P1 2|1|0  a displacement: land on 1, push its occupant to the vacated 0
+//   P2 31|36  into player 1's goal, which player 2 wins by reaching
+const P1_FIRST = [0, 18];
+const P2_FIRST = [30, 19];
+const P1_DISPLACE = [2, 1, 0];
+const P2_WINNING = [31, 36];
+
 const earlyMove = await api(`/api/games/${gameId}/move`, {
   method: "POST",
   cookie: aliceCookie,
-  body: { move: [0, 6] },
+  body: { move: P1_FIRST },
 });
 check(
   "no moves are accepted before both players have placed",
@@ -214,7 +304,7 @@ check(
 const wrongTurn = await api(`/api/games/${gameId}/move`, {
   method: "POST",
   cookie: bobCookie,
-  body: { move: [35, 29] },
+  body: { move: P2_FIRST },
 });
 check(
   "player 2 cannot move first",
@@ -225,7 +315,7 @@ check(
 const stranger = await api(`/api/games/${gameId}/move`, {
   method: "POST",
   cookie: undefined,
-  body: { move: [0, 6] },
+  body: { move: P1_FIRST },
 });
 check(
   "a signed-out visitor cannot move",
@@ -236,7 +326,7 @@ check(
 const firstMove = await api(`/api/games/${gameId}/move`, {
   method: "POST",
   cookie: aliceCookie,
-  body: { move: [0, 6] },
+  body: { move: P1_FIRST },
 });
 check("player 1 can move", firstMove.status === 200, `status ${firstMove.status}`);
 check("the move advances the ply", firstMove.body?.game?.ply === 3);
@@ -245,7 +335,7 @@ check("the turn passes to player 2", firstMove.body?.game?.turn === -1);
 const twice = await api(`/api/games/${gameId}/move`, {
   method: "POST",
   cookie: aliceCookie,
-  body: { move: [1, 7] },
+  body: { move: [1, 13] },
 });
 check(
   "player 1 cannot move twice in a row",
@@ -256,7 +346,7 @@ check(
 const secondMove = await api(`/api/games/${gameId}/move`, {
   method: "POST",
   cookie: bobCookie,
-  body: { move: [35, 29] },
+  body: { move: P2_FIRST },
 });
 check("player 2 can reply", secondMove.status === 200, `status ${secondMove.status}`);
 check("the ply advances again", secondMove.body?.game?.ply === 4);
@@ -301,7 +391,7 @@ check(
 const displace = await api(`/api/games/${gameId}/move`, {
   method: "POST",
   cookie: aliceCookie,
-  body: { move: [1, 2, 12] },
+  body: { move: P1_DISPLACE },
 });
 check(
   "a displacement is accepted",
@@ -309,11 +399,12 @@ check(
   `status ${displace.status} ${displace.body?.error ?? ""}`,
 );
 
-// Player 2 moves a back-row piece into player 1's goal, ending the game.
+// Player 2 moves into player 1's goal — the space beyond player 1's home row,
+// which is what player 2 wins by reaching — ending the game.
 const winning = await api(`/api/games/${gameId}/move`, {
   method: "POST",
   cookie: bobCookie,
-  body: { move: [30, 36] },
+  body: { move: P2_WINNING },
 });
 check("a move into the goal is accepted", winning.status === 200);
 check("the game is finished", winning.body?.game?.status === "finished");
@@ -392,7 +483,7 @@ check(
 }
 
 // A finished game must be readable by someone who was not in it.
-const outsider = await signIn(`nosy${suffix}`);
+const outsider = await signUp(`nosy${suffix}`);
 const spectate = await fetch(`${BASE}/game/${gameId}`, {
   headers: { Cookie: outsider },
 });

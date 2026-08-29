@@ -56,7 +56,11 @@ that the server enforces turn order and participation.
 
 ## What works today
 
-- **Accounts** — claim a username; sessions in an httpOnly cookie.
+- **Accounts** — username and password, hashed with scrypt; sessions in an
+  httpOnly cookie.
+- **Move legality** — the server enforces the rules of Gygès and rejects
+  anything they do not allow. The browser marks legal destinations while you
+  drag, from the same shared module.
 - **Games** — create an open game with a time control, join someone else's.
 - **Play** — drag pieces on an SVG board; displacement moves supported.
 - **Server authority** — the server owns turn order, the move record, and game
@@ -69,16 +73,14 @@ that the server enforces turn order and participation.
 
 ## What is deliberately missing
 
-- **Move legality is not enforced.** The board accepts any structurally valid
-  move; nothing checks the rules of Gygès. This is a documented choice — see
-  [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Rules arrive with the engine
-  service, and ranked play should wait for them.
-- **No passwords.** Anyone who knows a username can sign in as them. Fine
-  locally; must be replaced before the site is public.
 - **No notifications.** Correspondence play needs "it's your turn" email; not
   built yet.
 - **No bot.** Playing the [Gygès engine](https://github.com/Beck-Bjella/Gyges)
-  is a later feature.
+  is a later feature. Unlike move legality, a search genuinely needs a CPU core
+  and a persistent process, so it belongs on its own machine — see
+  [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+- **No ratings.** The leaderboard counts wins. Glicko-2 is planned; see
+  [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## How it is put together
 
@@ -86,17 +88,21 @@ that the server enforces turn order and participation.
 app/          Next.js routes — pages and API endpoints
 components/   React components, including the SVG board
 lib/
-  game/       board encoding, geometry, move format — pure, no I/O
+  game/       pure, no I/O
+    board.ts    encoding, geometry, move format
+    rules.ts    move legality — the rules of Gygès
   db/         schema and queries; the server-side rules of engagement
-  auth.ts     sessions
+  auth.ts     sessions and sign-in
+  password.ts scrypt hashing
 tests/        unit tests
 scripts/      smoke test and database reset
 docs/         architecture and board reference
 ```
 
 `lib/game/` imports nothing from the framework or the database, so the same code
-runs in the browser and on the server. That boundary is what will let the
-engine's move validation slot in later without a rewrite.
+runs in the browser and on the server. That boundary is what lets one
+implementation of the rules serve as both the server's authority and the
+browser's move highlighting, with no duplication and no network round trip.
 
 Games are stored as an **ordered list of moves**, not as board snapshots. The
 current position is derived by replaying them, which is what makes replay,

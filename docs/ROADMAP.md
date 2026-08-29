@@ -20,25 +20,35 @@ Cheap fixes found this way beat expensive features built on assumption.
 
 ---
 
-## 1. Real accounts
+## 1. Real accounts — **DONE**
 
-**Blocks: everything public.** Today any username signs you in as that person.
+Passwords, chosen over magic links and OAuth for the reason this section
+originally gave: the fewest dependencies. Magic links would have meant building
+email (step 4) first, and OAuth would have tied sign-in to a Google or GitHub
+account.
 
-What it needs:
+What was built:
 
-- A `password_hash` column on `users`, and a real check in `lib/auth.ts`.
-  Passwords are never stored — only a slow one-way hash (argon2id or bcrypt),
-  so a stolen database still cannot reveal them.
-- Sign-up separated from sign-in. Right now they are the same action.
-- Sessions already work and do not change.
+- `users.password_hash`, set by `migrations/0002_add_passwords.sql`, and a real
+  check in `lib/auth.ts`.
+- Hashing with **scrypt** (`lib/password.ts`) rather than argon2id or bcrypt.
+  Same family — slow and memory-hard — but built into Node, so there is no
+  native addon to compile on the host. On a serverless deployment that
+  difference matters. Cost parameters are stored inside each hash, so they can
+  be raised later without invalidating anyone's password.
+- Sign-up separated from sign-in. `signUp` refuses a name that exists; `signIn`
+  refuses one that does not.
+- Expired sessions are now purged, opportunistically on sign-in.
+- Changing a password ends every *other* session.
 
-Open question: passwords, magic links (no password to store, but needs email
-working first), or OAuth through Google/GitHub (no password handling at all,
-but depends on those accounts). Passwords are the most work and the fewest
-dependencies; magic links are the least work *if* email is already solved.
+**Accounts created before this keep their games.** `password_hash` is nullable;
+the first sign-in to such an account sets its password and claims it. See the
+note in the migration for why that is not a regression.
 
-**Session hygiene to fix at the same time:** expired sessions are never purged.
-The index exists; the delete does not.
+Still open, and deliberately not built: **password reset.** It needs email, so
+it belongs with step 4. Until then a forgotten password means a lost account —
+acceptable while the players are people you know, not acceptable once the site
+is public.
 
 ---
 
@@ -173,17 +183,22 @@ Independent of the engine. The site is a real site without it.
 
 The one genuinely unbuilt piece. See `ARCHITECTURE.md` for the design.
 
-**6a. Move legality.** Add `legalmoves` and `validate` commands to the engine's
-UGI interface, make them self-contained (`legalmoves <board> <player>` rather
-than relying on a prior `setpos`), and add a `--rules-only` startup mode that
-skips the 400 MB transposition table and the neural network — neither is used
-by move generation, and skipping them is what makes a fast instance cheap.
+**6a. Move legality — DONE, but not this way.**
 
-Then the web app asks before accepting a move. `lib/engine/client.ts` already
-has the shape; the slot in `submitMove` is marked.
+Implemented in TypeScript (`lib/game/rules.ts`) and called directly from
+`submitMove`, rather than over a bridge to the engine. The reasoning is in
+ARCHITECTURE.md under "Where the game rules live"; briefly, legality is a walk
+over 36 squares, and a network service for it would have cost a hosting bill, a
+hop per move, and an outage mode, for nothing.
 
-Unlocks: ranked play against strangers, and legal-move highlighting while
-dragging.
+Both things this was meant to unlock are done: illegal moves are rejected, and
+the browser highlights legal destinations while dragging — the latter for free,
+because the rules module is pure and runs on both sides.
+
+The divergence risk this created (two rule implementations, once the engine
+arrives) is acknowledged in ARCHITECTURE.md, along with what makes it
+manageable: the engine's moves will be validated by the same checker, so a
+disagreement shows up as a rejected bot move rather than a corrupt game.
 
 **6b. Bot play.** A search takes seconds and wants a CPU core, so it runs as a
 queued job on a second engine instance, not inline with a request. The bot is a

@@ -41,10 +41,14 @@ export default function RulesPage() {
 
         <h2>On this site</h2>
         <p>
-          Move legality is <strong>not enforced yet</strong>. The board accepts
-          any structurally valid move, so please follow the rules yourself.
-          Enforcement arrives when the Gygès engine is connected — the same
-          engine will later play as an opponent.
+          The rules above are <strong>enforced</strong>. The server checks every
+          move and rejects anything the rules do not allow, so you cannot make
+          an illegal move by accident — and neither can your opponent.
+        </p>
+        <p>
+          While you drag a piece, the squares it can legally reach are marked.
+          That is a convenience; the server checks the move again when you let
+          go, and it is the server that decides.
         </p>
       </div>
     </>

@@ -308,6 +308,11 @@ export default function GameView({
             flipped={flipped}
             onMove={submit}
             highlight={highlight}
+            // Marks legal destinations while dragging. A convenience only —
+            // the server validates every move regardless. Passing undefined
+            // rather than null when there is no viewer keeps the hint off for
+            // spectators, who have no side to move for.
+            player={viewerSide ?? undefined}
           />
           {reviewing && (
             <div className="review-banner">

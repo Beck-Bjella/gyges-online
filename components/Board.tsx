@@ -7,9 +7,17 @@
  * scaled responsively. Drag a piece to an empty square to move it; drop it on
  * an occupied square to displace, then click to place the displaced piece.
  *
- * This component performs NO rules checking. It only enforces the structural
- * shape of a move (something to move, somewhere to put it). Legality belongs
- * to the server, and eventually to the engine.
+ * ## Rules here are a convenience, never a guarantee
+ *
+ * When `player` is given, the squares a picked-up piece can legally reach are
+ * marked, using lib/game/rules.ts — the same module the server validates with.
+ * That sharing is only possible because the rules are pure TypeScript with no
+ * I/O; it costs no network round trip.
+ *
+ * This is a HINT. A player can edit their own JavaScript, so the server checks
+ * every move again regardless. Nothing here is load-bearing: with `player`
+ * omitted the board behaves exactly as it did before, and the server is still
+ * the authority either way.
  */
 
 import { useCallback, useMemo, useRef, useState } from "react";
@@ -27,7 +35,9 @@ import {
   pieceAt,
   type BoardState,
   type Move,
+  type Player,
 } from "@/lib/game/board";
+import { canMoveFrom, reachableFrom } from "@/lib/game/rules";
 
 interface Props {
   board: BoardState;
@@ -38,6 +48,13 @@ interface Props {
   onMove?: (mv: Move) => void;
   /** Indices to highlight, e.g. the most recent move. */
   highlight?: number[];
+  /**
+   * Which side the viewer is playing.
+   *
+   * Supplied only to mark legal destinations. Omit it and no rule hints are
+   * shown; the board still works, and the server is unaffected either way.
+   */
+  player?: Player;
 }
 
 type Drag =
@@ -51,6 +68,7 @@ export default function Board({
   flipped = false,
   onMove,
   highlight = [],
+  player,
 }: Props) {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const [drag, setDrag] = useState<Drag>({ kind: "none" });
@@ -193,6 +211,34 @@ export default function Board({
     return null;
   })();
 
+  /**
+   * The squares the piece in hand can legally finish on, in view space.
+   *
+   * Computed from the unflipped board, because the rules are stated in board
+   * space; the resulting indices are mapped back through flipMove for drawing.
+   *
+   * Empty unless a piece is actually being dragged, so nothing is shown until
+   * the player picks something up.
+   */
+  const legalTargets = useMemo(() => {
+    if (!interactive || player === undefined) return new Set<number>();
+    if (drag.kind !== "piece") return new Set<number>();
+
+    // drag.from is a view-space index; map it back to board space to ask.
+    const fromBoard = flipped ? flipMove([drag.from])[0] : drag.from;
+    if (!canMoveFrom(board, player, fromBoard)) return new Set<number>();
+
+    const ends = [...reachableFrom(board, player, fromBoard)];
+    return new Set(flipped ? flipMove(ends) : ends);
+  }, [interactive, player, drag, board, flipped]);
+
+  /** Whether the piece in hand is one this player is allowed to move at all. */
+  const holdingIllegally =
+    interactive &&
+    player !== undefined &&
+    drag.kind === "piece" &&
+    !canMoveFrom(board, player, flipped ? flipMove([drag.from])[0] : drag.from);
+
   const gridIndices = Array.from({ length: GRID_SIZE }, (_, i) => i);
 
   return (
@@ -279,6 +325,41 @@ export default function Board({
           />
         );
       })}
+
+      {/* Where the piece in hand may legally land. A hint, not a constraint —
+          the server checks every move regardless. Drawn before the last-move
+          and snap rings so those stay legible on top. */}
+      {[...legalTargets].map((i) => {
+        const { cx, cy } = idxToCenter(i);
+        return (
+          <circle
+            key={`legal${i}`}
+            cx={cx}
+            cy={cy}
+            r={view[i] === 0 ? 13 : 34}
+            fill={view[i] === 0 ? "var(--accent-mint)" : "none"}
+            stroke={view[i] === 0 ? "none" : "var(--accent-mint)"}
+            strokeWidth="3"
+            opacity={view[i] === 0 ? 0.4 : 0.65}
+            pointerEvents="none"
+          />
+        );
+      })}
+
+      {/* Holding a piece that cannot be moved at all — the wrong row. Marked on
+          the piece's own square so the reason is where the player is looking. */}
+      {holdingIllegally && (
+        <circle
+          cx={idxToCenter(drag.kind === "piece" ? drag.from : 0).cx}
+          cy={idxToCenter(drag.kind === "piece" ? drag.from : 0).cy}
+          r="36"
+          fill="none"
+          stroke="var(--accent-red)"
+          strokeWidth="2.5"
+          opacity="0.7"
+          pointerEvents="none"
+        />
+      )}
 
       {viewHighlight.map((i) => {
         const { cx, cy } = idxToCenter(i);

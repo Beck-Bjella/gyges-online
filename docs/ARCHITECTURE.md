@@ -7,18 +7,21 @@ things get built and assumptions get tested.
 
 ## Status
 
-**Built and working locally** (see the README to run it): accounts and sessions,
-creating and joining games, an interactive SVG board with displacement moves,
-per-move history with review, resignation, forfeit on time, and a leaderboard.
-The server enforces participation and turn order. 47 unit tests and 31
-end-to-end checks pass.
+**Built and working locally** (see the README to run it): accounts with
+passwords, sessions, creating and joining games, an interactive SVG board with
+displacement moves, per-move history with review, resignation, forfeit on time,
+and a leaderboard. The server enforces participation, turn order, **and the
+rules of Gygès**. 133 unit tests and 63 end-to-end checks pass.
 
 **Local stack differs from the target in one place:** development uses SQLite
 rather than Postgres, on a schema deliberately restricted to the portable
 subset. Everything else below describes the intended production shape.
 
-**Not built yet:** move legality (waiting on the engine service), passwords,
-email notifications, and bot play.
+**Not built yet:** email notifications, bot play, and ratings.
+
+**Reversed decision — move legality is no longer waiting on the engine.** It is
+implemented in `lib/game/rules.ts`, in TypeScript, in-process. See "Where the
+game rules live" below for why the original plan was changed.
 
 ---
 
@@ -124,23 +127,63 @@ cached current position.
 
 ## Where the game rules live
 
-**In code — specifically, in the existing Rust.** Not in the database, and not
-duplicated in TypeScript.
+**In code, in TypeScript: `lib/game/rules.ts`.** Not in the database, and — for
+now — not in the Rust.
 
-The `gyges` Rust crate already contains a real legal-move generator
-(`gyges/src/moves/movegen.rs`). `MoveGen::gen::<GenMoves, _>()` walks the active
-line, handles piece-chaining traversal with backtracking and banned positions,
-and produces a `RawMoveList` that decodes to a `Vec<Move>`.
+> **This reverses an earlier decision.** This document previously argued the
+> rules must live only in the Rust crate and be reached over a bridge. The
+> argument below is what changed, and the objection that argument raised is
+> real and is addressed rather than dismissed.
 
-### Why the rules must not be reimplemented in TypeScript
+### Why it moved
 
-The engine needs legal move generation in order to search. So the same code that
-will one day choose the bot's move is the code that can validate a human's move.
-Writing a second implementation in TypeScript would guarantee the two eventually
-disagree — and a bot playing by different rules than the validator enforces is a
-serious defect.
+Two things were being conflated: *legality* and *search*. They share code inside
+the engine, but as services to a website they have nothing in common.
 
-**One rules implementation. Two uses: validation now, bot search later.**
+| | Move legality | Bot move |
+|---|---|---|
+| Question | "is this legal?" | "what is best?" |
+| Cost | a bounded walk over 36 squares; microseconds | seconds, a full core, 400 MB of tables |
+| Called | every move, and continuously while dragging | only in bot games |
+| Fits in a web request? | yes, trivially | no — needs a queued job |
+
+Legality is small. The entire implementation is one file of pure functions with
+no I/O. Reaching for a network service to answer it would have added a hosting
+bill, a network hop on every move, and a new failure mode — engine unreachable
+means *nobody can play* — in exchange for nothing.
+
+It also buys something a service could not. Because `lib/game/` is pure and
+framework-free, the identical code runs in the browser, so the board highlights
+legal destinations while dragging with **no round trip**. Over HTTP that is a
+request per hover.
+
+### The objection, which was correct
+
+The earlier argument was that two implementations *will* eventually disagree,
+and that a bot playing by different rules than the validator enforces is a
+serious defect. That risk is real and is not waved away.
+
+What makes it tolerable:
+
+- **The bot is not built, and is optional.** Today there is exactly one
+  implementation in use. The divergence risk begins when the engine arrives.
+- **Disagreement is testable, not hypothetical.** `lib/engine/client.ts` is
+  unchanged. When the engine is reachable, the two can be run against the same
+  positions and compared; any disagreement is a bug with a reproducing case.
+- **The bot's move goes through the same validation as a human's** — as it
+  already must, for the reason Lichess does it. So the validator stays the
+  authority even in bot games, and a divergence surfaces as a rejected bot move
+  rather than as an illegal position on the board.
+
+If the engine and this module ever disagree, the engine is probably right — it
+is the battle-tested one — and this module gets fixed.
+
+### What the engine is still for
+
+Search. That is the part that genuinely needs a persistent process, a CPU core,
+and a large transposition table, and it is why bot play is a queued job on a
+separate machine rather than anything Vercel could host. Nothing about that
+changed.
 
 ### What the database does NOT do
 

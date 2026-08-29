@@ -360,6 +360,7 @@ h2 {
 }
 
 input[type="text"],
+input[type="password"],
 select {
   background: var(--bg-darkest);
   border: 1px solid var(--border-strong);
@@ -371,6 +372,7 @@ select {
   transition: border-color 120ms ease, box-shadow 120ms ease;
 }
 input[type="text"]:focus,
+input[type="password"]:focus,
 select:focus {
   border-color: var(--accent-mint);
   box-shadow: 0 0 0 3px rgba(111, 216, 180, 0.16);
@@ -390,6 +392,52 @@ input::placeholder {
   color: var(--accent-red);
   font-size: 13.5px;
   margin: 10px 0 0;
+}
+
+.notice {
+  color: var(--accent-mint);
+  font-size: 13.5px;
+  margin: 10px 0 0;
+}
+
+/* A labelled form field: label above, control filling the width. */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 12px;
+}
+.field label {
+  font-size: 12.5px;
+  font-weight: 560;
+  color: var(--text-dim);
+  letter-spacing: 0.01em;
+}
+.field input {
+  width: 100%;
+}
+
+.hint {
+  color: var(--text-dim);
+  font-size: 12.5px;
+  margin: 2px 0 0;
+  line-height: 1.45;
+}
+
+/* A button that reads as a link — for toggling a form's mode, where a real
+   link would imply navigation that does not happen. */
+.linklike {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: var(--accent-mint);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.linklike:hover {
+  color: var(--text-primary);
 }
 
 .muted {
