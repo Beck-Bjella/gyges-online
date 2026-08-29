@@ -53,7 +53,7 @@ export default async function DashboardPage() {
   return (
     <>
       {/* Your games change when an opponent acts, so this page watches too. */}
-      <AutoRefresh version={siteVersion()} everyMs={15000} />
+      <AutoRefresh version={siteVersion()} />
       <header className="page-head">
         <div>
           <h1>{user.username}</h1>

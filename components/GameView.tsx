@@ -264,25 +264,12 @@ export default function GameView({
   // apart, so holding a connection open per viewer would cost far more than it
   // saves. The probe is about fifty bytes and only a real change refreshes.
   //
-  // The interval backs off while nothing happens and snaps back to five
-  // seconds when it does — see useAutoRefresh. Polling stops once the game is
-  // over, and while the tab is hidden.
+  // Every five seconds while the tab is being looked at; nothing while it is
+  // hidden, and nothing once the game is over.
   //
   // Deliberately paused while the player has a move staged or in flight: a
   // refresh would replace the board under them, and discard the move they were
   // about to send.
-  //
-  // Two speeds, chosen by whether anything can actually arrive. While someone
-  // else is to move — an opponent, or either player if you are spectating — a
-  // move that takes half a minute to appear is the difference between the page
-  // feeling live and feeling broken. While it is the viewer's own turn nothing
-  // can change until they act, so asking often would be asking for nothing.
-  // True whenever the side to move is not the viewer — which includes a
-  // spectator, for whom it is never their turn and so always someone else's.
-  const waitingForSomeoneElse =
-    (game.status === "active" || game.status === "setup") &&
-    game.turn !== viewerSide;
-
   useAutoRefresh(
     `/api/games/${game.id}/version`,
     [game.ply, game.status, game.updatedAt].join(":"),
@@ -291,7 +278,6 @@ export default function GameView({
         (game.status === "active" || game.status === "setup") &&
         !pending &&
         staged === null,
-      everyMs: waitingForSomeoneElse ? 5000 : 30000,
     },
   );
 

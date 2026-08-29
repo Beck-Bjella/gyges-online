@@ -17,12 +17,10 @@ import { useAutoRefresh } from "./useAutoRefresh";
 export default function AutoRefresh({
   url = "/api/version",
   version,
-  everyMs,
 }: {
   url?: string;
   version: string;
-  everyMs?: number;
 }) {
-  useAutoRefresh(url, version, { everyMs });
+  useAutoRefresh(url, version);
   return null;
 }
