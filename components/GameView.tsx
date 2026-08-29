@@ -272,14 +272,15 @@ export default function GameView({
   // refresh would replace the board under them, and discard the move they were
   // about to send.
   //
-  // Two speeds, chosen by whether the player is actually waiting. When it is
-  // the opponent's turn they are watching for a reply, and a move that takes
-  // half a minute to appear is the difference between the page feeling live
-  // and feeling broken. When it is the player's own turn nothing can change
-  // until they act, so asking often would be asking for nothing.
-  const waitingForOpponent =
+  // Two speeds, chosen by whether anything can actually arrive. While someone
+  // else is to move — an opponent, or either player if you are spectating — a
+  // move that takes half a minute to appear is the difference between the page
+  // feeling live and feeling broken. While it is the viewer's own turn nothing
+  // can change until they act, so asking often would be asking for nothing.
+  // True whenever the side to move is not the viewer — which includes a
+  // spectator, for whom it is never their turn and so always someone else's.
+  const waitingForSomeoneElse =
     (game.status === "active" || game.status === "setup") &&
-    viewerSide !== null &&
     game.turn !== viewerSide;
 
   useAutoRefresh(
@@ -290,7 +291,7 @@ export default function GameView({
         (game.status === "active" || game.status === "setup") &&
         !pending &&
         staged === null,
-      everyMs: waitingForOpponent ? 5000 : 30000,
+      everyMs: waitingForSomeoneElse ? 5000 : 30000,
     },
   );
 
