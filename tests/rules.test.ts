@@ -23,6 +23,7 @@ import assert from "node:assert/strict";
 const {
   activeLine,
   canMoveFrom,
+  dropSquares,
   reachableFrom,
   checkMoveLegality,
   legalMoves,
@@ -324,5 +325,48 @@ test("generation never produces a move into the wrong goal", () => {
     assert.notEqual(mv[1], P1_GOAL, "player 1 must not move into their own goal");
     assert.notEqual(mv[2], P1_GOAL, "and must not displace into it");
     assert.notEqual(mv[2], P2_GOAL, "nor displace into the far goal");
+  }
+});
+
+// --- where a displaced piece may go --------------------------------------
+//
+// This now drives the board's drop markers as well as move generation, so a
+// mistake here shows up as the UI offering a square the server then refuses.
+
+test("a displaced piece may take the square the mover vacated", () => {
+  // The mover leaves `from`, so by the time the displaced piece lands it is
+  // empty — even though the pre-move board still shows a piece there.
+  const board = boardWith({ 14: 1, 15: 2, 30: 1 });
+  assert.ok(dropSquares(board, 1, 14).includes(14));
+});
+
+test("a displaced piece may not go on an occupied square", () => {
+  const board = boardWith({ 14: 1, 15: 2, 30: 1 });
+  const drops = dropSquares(board, 1, 14);
+  assert.ok(!drops.includes(15), "15 holds the piece being displaced");
+  assert.ok(!drops.includes(30), "30 holds another piece");
+});
+
+test("a displaced piece may not be dropped behind the opponent's line", () => {
+  // Player 2's nearest pieces are on row 3, so rows 4 and 5 are their back zone.
+  const board = boardWith({ 0: 1, 1: 2, 18: 1, 19: 1 });
+  const drops = dropSquares(board, 1, 0);
+
+  assert.ok(drops.length > 0, "there is still somewhere to put it");
+  for (const i of drops) {
+    assert.ok(
+      Math.floor(i / 6) <= 3,
+      `${i} is behind player 2's active line and should not be offered`,
+    );
+  }
+});
+
+test("every drop the board offers is one the rules accept", () => {
+  // The contract the UI relies on: anything marked is a move the server takes.
+  const board = boardWith({ 14: 1, 15: 2, 30: 3, 31: 1 });
+  for (const target of dropSquares(board, 1, 14)) {
+    if (target === 15) continue; // the landing square itself
+    const verdict = checkMoveLegality(board, 1, [14, 15, target]);
+    assert.ok(verdict.legal, `drop on ${target} refused: ${verdict.reason}`);
   }
 });

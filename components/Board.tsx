@@ -37,7 +37,7 @@ import {
   type Move,
   type Player,
 } from "@/lib/game/board";
-import { canMoveFrom, reachableFrom } from "@/lib/game/rules";
+import { canMoveFrom, dropSquares, reachableFrom } from "@/lib/game/rules";
 
 interface Props {
   board: BoardState;
@@ -212,32 +212,85 @@ export default function Board({
   })();
 
   /**
-   * The squares the piece in hand can legally finish on, in view space.
+   * View-space helper: the rules work in board space, the board draws in view
+   * space, and flipMove maps between them (it is its own inverse).
+   */
+  const toView = useCallback(
+    (indices: number[]) => (flipped ? flipMove(indices) : indices),
+    [flipped],
+  );
+  const toBoard = useCallback(
+    (i: number) => (flipped ? flipMove([i])[0] : i),
+    [flipped],
+  );
+
+  /**
+   * Pieces this player may pick up: their active line, before anything is held.
+   *
+   * Shown at rest rather than only while dragging, because "which pieces are
+   * even mine to move" is the first question in Gygès and the least obvious —
+   * nobody owns the pieces, so it cannot be answered by colour.
+   */
+  const pickupTargets = useMemo(() => {
+    if (!interactive || player === undefined) return new Set<number>();
+    if (drag.kind !== "none") return new Set<number>();
+
+    const movable: number[] = [];
+    for (let i = 0; i < GRID_SIZE; i++) {
+      if (board[i] !== 0 && canMoveFrom(board, player, i)) movable.push(i);
+    }
+    return new Set(toView(movable));
+  }, [interactive, player, drag.kind, board, toView]);
+
+  /**
+   * Where the piece in hand can finish.
    *
    * Computed from the unflipped board, because the rules are stated in board
-   * space; the resulting indices are mapped back through flipMove for drawing.
-   *
-   * Empty unless a piece is actually being dragged, so nothing is shown until
-   * the player picks something up.
+   * space; the resulting indices are mapped back for drawing.
    */
   const legalTargets = useMemo(() => {
     if (!interactive || player === undefined) return new Set<number>();
     if (drag.kind !== "piece") return new Set<number>();
 
-    // drag.from is a view-space index; map it back to board space to ask.
-    const fromBoard = flipped ? flipMove([drag.from])[0] : drag.from;
+    const fromBoard = toBoard(drag.from);
     if (!canMoveFrom(board, player, fromBoard)) return new Set<number>();
 
-    const ends = [...reachableFrom(board, player, fromBoard)];
-    return new Set(flipped ? flipMove(ends) : ends);
-  }, [interactive, player, drag, board, flipped]);
+    return new Set(toView([...reachableFrom(board, player, fromBoard)]));
+  }, [interactive, player, drag, board, toView, toBoard]);
+
+  /**
+   * Where a displaced piece may be put down.
+   *
+   * Not simply "anywhere empty": a displaced piece may not be dropped behind
+   * the opponent's active line, and the square the mover vacated IS available.
+   * dropSquares knows both rules, so this shows the real answer rather than an
+   * approximation the server would then reject.
+   */
+  const dropTargets = useMemo(() => {
+    if (!interactive || player === undefined) return new Set<number>();
+    if (drag.kind !== "displaced") return new Set<number>();
+
+    const fromBoard = toBoard(drag.from);
+    const landedBoard = toBoard(drag.landedOn);
+    const squares = dropSquares(board, player, fromBoard).filter(
+      (i) => i !== landedBoard,
+    );
+    return new Set(toView(squares));
+  }, [interactive, player, drag, board, toView, toBoard]);
+
+  /** Every square to mark right now, whichever phase the drag is in. */
+  const marked = drag.kind === "displaced" ? dropTargets : drag.kind === "piece" ? legalTargets : pickupTargets;
+
+  /** Split by what is there: a bare square gets a dot, a piece gets one on top. */
+  const markedEmpty = [...marked].filter((i) => view[i] === 0);
+  const markedPieces = [...marked].filter((i) => view[i] !== 0);
 
   /** Whether the piece in hand is one this player is allowed to move at all. */
   const holdingIllegally =
     interactive &&
     player !== undefined &&
     drag.kind === "piece" &&
-    !canMoveFrom(board, player, flipped ? flipMove([drag.from])[0] : drag.from);
+    !canMoveFrom(board, player, toBoard(drag.from));
 
   const gridIndices = Array.from({ length: GRID_SIZE }, (_, i) => i);
 
@@ -326,21 +379,20 @@ export default function Board({
         );
       })}
 
-      {/* Where the piece in hand may legally land. A hint, not a constraint —
-          the server checks every move regardless. Drawn before the last-move
-          and snap rings so those stay legible on top. */}
-      {[...legalTargets].map((i) => {
+      {/* Where the player may act, as a dot on the square.
+          A hint only — the server validates every move regardless. Drawn before
+          the pieces so a dot never sits on top of one; the dots that belong ON
+          a piece are drawn after them instead. */}
+      {markedEmpty.map((i) => {
         const { cx, cy } = idxToCenter(i);
         return (
           <circle
-            key={`legal${i}`}
+            key={`dot${i}`}
             cx={cx}
             cy={cy}
-            r={view[i] === 0 ? 13 : 34}
-            fill={view[i] === 0 ? "var(--accent-mint)" : "none"}
-            stroke={view[i] === 0 ? "none" : "var(--accent-mint)"}
-            strokeWidth="3"
-            opacity={view[i] === 0 ? 0.4 : 0.65}
+            r="13"
+            fill="var(--accent-mint)"
+            opacity="0.45"
             pointerEvents="none"
           />
         );
@@ -411,6 +463,27 @@ export default function Board({
           )}
         </g>
       ))}
+      {/* Dots that belong on a piece — one you may pick up, or one you may land
+          on and displace. Drawn after the pieces so they are not hidden beneath
+          them, and ringed in the board's dark tone so a mint dot stays legible
+          against the pale piece. */}
+      {markedPieces.map((i) => {
+        const { cx, cy } = idxToCenter(i);
+        return (
+          <circle
+            key={`pdot${i}`}
+            cx={cx}
+            cy={cy}
+            r="9"
+            fill="var(--accent-mint)"
+            stroke="var(--piece-ring)"
+            strokeWidth="1.5"
+            opacity="0.9"
+            pointerEvents="none"
+          />
+        );
+      })}
+
     </svg>
   );
 }
