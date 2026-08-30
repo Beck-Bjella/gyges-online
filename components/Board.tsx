@@ -371,7 +371,7 @@ export default function Board({
           markerHeight="5"
           orient="auto-start-reverse"
         >
-          <path d="M 0 1 L 9 5 L 0 9 z" fill="var(--accent-blue)" />
+          <path d="M 0 1 L 9 5 L 0 9 z" fill="var(--accent-amber)" />
         </marker>
 
         <filter id="lifted-shadow" x="-60%" y="-60%" width="220%" height="220%">
@@ -532,33 +532,42 @@ export default function Board({
 
       {/* The last move, drawn as arrows so it reads as an action rather than a
           scattering of circles. A solid arrow is the piece travelling; a dashed
-          one is the piece it displaced being pushed aside. */}
+          one is the piece it displaced being pushed aside.
+
+          Each is drawn twice: a dark casing first, then the bright line over it.
+          The board is warm brown and the pieces are pale, so a single-colour
+          line washes out against one or the other wherever it happens to pass. */}
       {viewLastMove.length >= 2 &&
         (() => {
           const travel = arrow(viewLastMove[0], viewLastMove[1]);
           const push =
             viewLastMove.length === 3 ? arrow(viewLastMove[1], viewLastMove[2]) : null;
           return (
-            <g opacity="0.75" pointerEvents="none">
+            <g pointerEvents="none">
               {travel && (
-                <line
-                  {...travel}
-                  stroke="var(--accent-blue)"
-                  strokeWidth="4"
-                  strokeLinecap="round"
-                  markerEnd="url(#arrowhead)"
-                />
+                <>
+                  <line {...travel} stroke="#1a1108" strokeWidth="9" strokeLinecap="round" opacity="0.55" />
+                  <line
+                    {...travel}
+                    stroke="var(--accent-amber)"
+                    strokeWidth="5.5"
+                    strokeLinecap="round"
+                    markerEnd="url(#arrowhead)"
+                  />
+                </>
               )}
               {push && (
-                <line
-                  {...push}
-                  stroke="var(--accent-blue)"
-                  strokeWidth="3"
-                  strokeLinecap="round"
-                  strokeDasharray="7 7"
-                  opacity="0.8"
-                  markerEnd="url(#arrowhead)"
-                />
+                <>
+                  <line {...push} stroke="#1a1108" strokeWidth="8" strokeLinecap="round" opacity="0.55" />
+                  <line
+                    {...push}
+                    stroke="var(--accent-amber)"
+                    strokeWidth="4.5"
+                    strokeLinecap="round"
+                    strokeDasharray="9 8"
+                    markerEnd="url(#arrowhead)"
+                  />
+                </>
               )}
             </g>
           );

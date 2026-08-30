@@ -88,6 +88,11 @@ export default function GameView({
   // so the confirmation step is worth the extra click — it also matches how
   // placing pieces already works.
   const [staged, setStaged] = useState<Move | null>(null);
+  // The move just sent, held until the server's version of the board arrives.
+  // Without it the board shows the new position while the arrow still points at
+  // the *previous* move — which, in a bot game, is the engine's. That flash of a
+  // wrong arrow is worse than none.
+  const [justPlayed, setJustPlayed] = useState<Move | null>(null);
   // You sit at the bottom by default; the flip control lets you look from the
   // other side, which also moves the player bars to match.
   const [flipped, setFlipped] = useState(viewerSide === -1);
@@ -103,6 +108,7 @@ export default function GameView({
   useEffect(() => {
     setOptimistic(null);
     setStaged(null);
+    setJustPlayed(null);
   }, [boardKey]);
 
   const liveBoard = optimistic ?? board;
@@ -182,9 +188,13 @@ export default function GameView({
       ? staged
       : reviewing
         ? (reviewed && reviewed.kind === "move" ? reviewed.move : [])
-        : lastPlayed && lastPlayed.kind === "move"
-          ? lastPlayed.move
-          : [];
+        : // A move of our own that the server has not confirmed yet. The board
+          // is already showing its result, so the arrow must match it.
+          justPlayed && viewingPly === null
+          ? justPlayed
+          : lastPlayed && lastPlayed.kind === "move"
+            ? lastPlayed.move
+            : [];
 
   /** Choose a move without sending it. Replaces any move already staged. */
   const stage = useCallback((mv: Move) => {
@@ -203,6 +213,7 @@ export default function GameView({
       setError(null);
       setPending(true);
       setStaged(null);
+      setJustPlayed(mv);
       setOptimistic(applyMove(liveBoard, mv));
       try {
         const res = await fetch(`/api/games/${game.id}/move`, {

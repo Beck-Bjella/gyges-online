@@ -918,3 +918,42 @@ td.num {
 .staged-move {
   border-color: var(--accent-mint);
 }
+
+/* The two dials that define a bot: how hard it looks, and how well it chooses.
+   Side by side because the pair is the point — either alone says little. */
+.botdials {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.botdial {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg-darkest);
+}
+
+.botdial-label {
+  font-size: 11px;
+  font-weight: 620;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.botdial-value {
+  font-size: 15px;
+  font-weight: 620;
+  color: var(--accent-mint);
+}
+
+.botdial-detail {
+  font-size: 12px;
+  color: var(--text-dim);
+  line-height: 1.4;
+}

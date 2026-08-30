@@ -65,54 +65,65 @@ const COMMON: Record<string, string | number | boolean> = {
 /**
  * The bots, weakest first.
  *
- * `maxNodes` is the strength-and-patience dial in one: it decides both how well
- * the bot plays and how long a player waits. An interrupted search is discarded
- * rather than resumed, so a budget nobody can afford to sit through is a bot
- * nobody can play.
+ * Each is a pair of dials, because neither alone makes a good opponent:
  *
- * The times below were measured against this build searching the opening
- * position: roughly 26,000 nodes a second on a desktop. A phone is two to four
- * times slower, so the wait scales but — because the budget is work rather than
- * time — the move does not change.
+ * - **`maxNodes`** is how hard it looks. It sets both how deep a trap has to be
+ *   to beat it and how long the player waits, and it is the honest way to bound
+ *   the search: a *depth* limit can take wildly different times in different
+ *   positions, so the same bot would sometimes answer at once and sometimes
+ *   sit there.
+ * - **`skill`** is how well it chooses among what it found — the percentage of
+ *   turns it plays the best move it saw, taking one of the next few otherwise.
  *
- *   maxPly 1      ~0.1s desktop   under a second anywhere
- *   20,000 nodes  ~0.8s desktop   ~3s phone
- *   60,000 nodes  ~2.3s desktop   ~9s phone
- *  200,000 nodes ~14.6s desktop  ~60s phone
+ * Turning only the first gives a bot that never errs, just misses deep ideas;
+ * turning only the second gives one that sees everything and then fumbles at
+ * random. The ladder moves both together, which is what makes the rungs feel
+ * like different players rather than the same player handicapped.
+ *
+ * Times measured against this build on a desktop: 10k about half a second, 20k
+ * 0.7s, 50k 1.7s, 100k 5.4s, 200k 14.7s. Note that is not a straight line — a
+ * deeper search is slower per node, so doubling the budget more than doubles
+ * the wait at the top of the ladder.
+ *
+ * A phone is two to four times slower again. Because the budget is work rather
+ * than time, only the waiting changes, never the move.
  */
 export const BOTS: BotSpec[] = [
   {
-    // The shallowest search the engine can do: it looks one ply ahead and
-    // stops, so it sees an immediate win or an immediate threat and nothing
-    // beyond that. Bounded by depth rather than nodes — equally reproducible,
-    // and it finishes in well under a second on any device.
-    username: "Helios-Glance",
-    strength: 5,
+    username: "Helios-Novice",
+    strength: 10,
     engineBuild: ENGINE_BUILD,
     description:
-      "Looks one move ahead and no further. The gentlest introduction there is.",
-    options: { ...COMMON, maxPly: 1 },
+      "Barely looks ahead and often picks a worse move than it found. Where to start.",
+    options: { ...COMMON, maxNodes: 10_000, skill: 25 },
   },
   {
     username: "Helios-Casual",
-    strength: 20,
+    strength: 30,
     engineBuild: ENGINE_BUILD,
-    description: "Plays quickly and makes real mistakes. A good first opponent.",
-    options: { ...COMMON, maxNodes: 20_000 },
+    description: "Quick, and makes real mistakes you can punish.",
+    options: { ...COMMON, maxNodes: 20_000, skill: 50 },
   },
   {
     username: "Helios-Club",
-    strength: 55,
+    strength: 60,
     engineBuild: ENGINE_BUILD,
-    description: "Solid. Punishes anything obvious.",
-    options: { ...COMMON, maxNodes: 60_000 },
+    description: "Solid. Takes most of its chances, and punishes anything obvious.",
+    options: { ...COMMON, maxNodes: 50_000, skill: 75 },
+  },
+  {
+    username: "Helios-Sharp",
+    strength: 85,
+    engineBuild: ENGINE_BUILD,
+    description: "Thinks properly and rarely slips. You will need a real idea.",
+    options: { ...COMMON, maxNodes: 100_000, skill: 90 },
   },
   {
     username: "Helios-Full",
     strength: 100,
     engineBuild: ENGINE_BUILD,
-    description: "The deepest search on offer. Expect a long wait on a phone.",
-    options: { ...COMMON, maxNodes: 200_000 },
+    description: "No handicap at all. Expect a long wait, and a hard game.",
+    options: { ...COMMON, maxNodes: 200_000, skill: 100 },
   },
 ];
 

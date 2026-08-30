@@ -11,8 +11,8 @@ export interface BotOption {
   description: string | null;
   /** Node budget, when the bot is bounded that way. */
   maxNodes: number | null;
-  /** Depth limit, for bots bounded by how far they look rather than how much. */
-  maxPly: number | null;
+  /** How well it chooses among what it found, 0-100. */
+  skill: number | null;
 }
 
 /**
@@ -69,6 +69,23 @@ export default function NewBotGameForm({ bots }: { bots: BotOption[] }) {
         </button>
       </div>
 
+      {/* Both dials, shown rather than hidden behind a name: how hard it
+          looks, and how well it chooses among what it found. */}
+      {chosen && (
+        <div className="botdials">
+          <Dial
+            label="Thinking"
+            value={describeThinking(chosen.maxNodes)}
+            detail={chosen.maxNodes ? `${chosen.maxNodes.toLocaleString()} positions` : ""}
+          />
+          <Dial
+            label="Skill"
+            value={chosen.skill == null ? "—" : `${chosen.skill}%`}
+            detail={describeSkill(chosen.skill)}
+          />
+        </div>
+      )}
+
       {chosen && (
         <p className="hint" style={{ marginTop: 12 }}>
           {describeWait(chosen)} The engine runs in this browser tab, so a
@@ -82,22 +99,85 @@ export default function NewBotGameForm({ bots }: { bots: BotOption[] }) {
 }
 
 /**
- * A rough wait, from whichever work budget the bot uses.
+ * A rough wait, from the node budget.
  *
- * ~26,000 nodes a second on the desktop this was measured on. Deliberately
- * vague — the point is to set expectations, and quoting a precise number for
- * hardware we know nothing about would be false precision. A depth-limited bot
- * is quick enough that the depth itself is the honest answer.
+ * Interpolated from times measured against this build rather than a flat
+ * nodes-per-second rate: a deeper search is slower *per node*, so a rate fitted
+ * to small budgets badly underestimates large ones. 200,000 nodes takes about
+ * fifteen seconds, not the eight a linear model predicts.
+ *
+ * Deliberately vague in the wording — this is a desktop figure, and quoting a
+ * precise number for hardware we know nothing about would be false precision.
  */
-function describeWait(bot: BotOption): string {
-  if (bot.maxNodes == null) {
-    return bot.maxPly != null
-      ? `Looks ${bot.maxPly === 1 ? "one move" : `${bot.maxPly} moves`} ahead, and answers almost at once.`
-      : "";
+const OBSERVED: [nodes: number, seconds: number][] = [
+  [10_000, 0.5],
+  [20_000, 0.7],
+  [50_000, 1.7],
+  [100_000, 5.4],
+  [200_000, 14.7],
+];
+
+function estimateSeconds(maxNodes: number): number {
+  const first = OBSERVED[0];
+  const last = OBSERVED[OBSERVED.length - 1];
+  if (maxNodes <= first[0]) return (maxNodes / first[0]) * first[1];
+  for (let i = 1; i < OBSERVED.length; i++) {
+    const [n0, t0] = OBSERVED[i - 1];
+    const [n1, t1] = OBSERVED[i];
+    if (maxNodes <= n1) {
+      return t0 + ((maxNodes - n0) / (n1 - n0)) * (t1 - t0);
+    }
   }
-  const seconds = bot.maxNodes / 26000;
-  if (seconds < 2) return "Thinks for about a second per move.";
-  if (seconds < 5) return "Thinks for a few seconds per move.";
-  if (seconds < 20) return "Thinks for around ten seconds per move.";
-  return "Thinks for up to a minute per move.";
+  // Past the last measurement, carry on at its local rate.
+  return (maxNodes / last[0]) * last[1];
+}
+
+function describeWait(bot: BotOption): string {
+  if (bot.maxNodes == null) return "";
+  const seconds = estimateSeconds(bot.maxNodes);
+  if (seconds < 1) return "Answers in about a second.";
+  if (seconds < 3) return "Thinks for a couple of seconds a move.";
+  if (seconds < 8) return "Thinks for several seconds a move.";
+  if (seconds < 20) return "Thinks for around fifteen seconds a move.";
+  return "Thinks for the best part of a minute a move.";
+}
+
+/** One labelled dial in the pair above. */
+function Dial({
+  label,
+  value,
+  detail,
+}: {
+  label: string;
+  value: string;
+  detail: string;
+}) {
+  return (
+    <div className="botdial">
+      <span className="botdial-label">{label}</span>
+      <strong className="botdial-value">{value}</strong>
+      <span className="botdial-detail">{detail}</span>
+    </div>
+  );
+}
+
+/** How hard it looks, in words. The number is shown alongside. */
+function describeThinking(maxNodes: number | null): string {
+  if (maxNodes == null) return "—";
+  if (maxNodes <= 15_000) return "Glance";
+  if (maxNodes <= 30_000) return "Quick";
+  if (maxNodes <= 70_000) return "Steady";
+  if (maxNodes <= 120_000) return "Deep";
+  return "Exhaustive";
+}
+
+/**
+ * What a skill number means, in play.
+ *
+ * It is the percentage of turns the engine takes the best move it found; the
+ * rest of the time it plays one of the next few instead.
+ */
+function describeSkill(skill: number | null): string {
+  if (skill == null || skill >= 100) return "always its best move";
+  return `best move ${skill}% of turns`;
 }

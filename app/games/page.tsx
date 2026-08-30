@@ -41,20 +41,20 @@ export default async function GamesPage() {
   // site does not otherwise interpret them.
   const botOptions = botLeaderboard().map((b) => {
     let maxNodes: number | null = null;
-    let maxPly: number | null = null;
+    let skill: number | null = null;
     try {
       const parsed = JSON.parse(b.options ?? "{}") as Record<string, unknown>;
       if (typeof parsed.maxNodes === "number") maxNodes = parsed.maxNodes;
-      if (typeof parsed.maxPly === "number") maxPly = parsed.maxPly;
+      if (typeof parsed.skill === "number") skill = parsed.skill;
     } catch {
-      /* a malformed row simply has no estimate */
+      /* a malformed row simply shows no dials */
     }
     return {
       id: b.id,
       username: b.username,
       description: b.description,
       maxNodes,
-      maxPly,
+      skill,
     };
   });
 
