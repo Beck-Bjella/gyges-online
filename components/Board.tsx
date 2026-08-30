@@ -225,24 +225,6 @@ export default function Board({
   );
 
   /**
-   * Pieces this player may pick up: their active line, before anything is held.
-   *
-   * Shown at rest rather than only while dragging, because "which pieces are
-   * even mine to move" is the first question in Gygès and the least obvious —
-   * nobody owns the pieces, so it cannot be answered by colour.
-   */
-  const pickupTargets = useMemo(() => {
-    if (!interactive || player === undefined) return new Set<number>();
-    if (drag.kind !== "none") return new Set<number>();
-
-    const movable: number[] = [];
-    for (let i = 0; i < GRID_SIZE; i++) {
-      if (board[i] !== 0 && canMoveFrom(board, player, i)) movable.push(i);
-    }
-    return new Set(toView(movable));
-  }, [interactive, player, drag.kind, board, toView]);
-
-  /**
    * Where the piece in hand can finish.
    *
    * Computed from the unflipped board, because the rules are stated in board
@@ -278,8 +260,16 @@ export default function Board({
     return new Set(toView(squares));
   }, [interactive, player, drag, board, toView, toBoard]);
 
-  /** Every square to mark right now, whichever phase the drag is in. */
-  const marked = drag.kind === "displaced" ? dropTargets : drag.kind === "piece" ? legalTargets : pickupTargets;
+  /**
+   * Every square to mark right now.
+   *
+   * Only while something is in hand: at rest the board stays clean. Marking the
+   * movable pieces before a player has touched anything was tried and read as
+   * clutter — the question "where can this go" is worth answering, "which
+   * pieces are mine" is one the player should be reading off the board.
+   */
+  const marked =
+    drag.kind === "displaced" ? dropTargets : drag.kind === "piece" ? legalTargets : new Set<number>();
 
   /** Split by what is there: a bare square gets a dot, a piece gets one on top. */
   const markedEmpty = [...marked].filter((i) => view[i] === 0);
@@ -463,9 +453,9 @@ export default function Board({
           )}
         </g>
       ))}
-      {/* Dots that belong on a piece — one you may pick up, or one you may land
-          on and displace. Drawn after the pieces so they are not hidden beneath
-          them, and ringed in the board's dark tone so a mint dot stays legible
+      {/* Dots that belong on a piece — one the piece in hand may land on and
+          displace. Drawn after the pieces so they are not hidden beneath them,
+          and ringed in the board's dark tone so a mint dot stays legible
           against the pale piece. */}
       {markedPieces.map((i) => {
         const { cx, cy } = idxToCenter(i);
