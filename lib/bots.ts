@@ -20,10 +20,10 @@
  * play differently on different hardware — and a bot's win/loss record would
  * be a fact about its opponents' devices rather than about the bot.
  *
- * The fix is `maxNodes`: bound the search by WORK, not time. A phone and a
- * desktop then play the identical game, the phone just waits longer. This is
- * why `options` must always carry a node budget, and why a time limit would be
- * wrong here even though the engine supports one.
+ * The fix is to bound the search by WORK, not time — `maxPly` or `maxNodes`. A
+ * phone and a desktop then play the identical game, the phone just waits
+ * longer. This is why `options` must always carry one of those bounds, and why
+ * a time limit would be wrong here even though the engine supports one.
  *
  * `engineBuild` records which build the bot belongs to, because the browser
  * build fixes its transposition table and evaluation network at compile time.
@@ -64,12 +64,18 @@ const COMMON: Record<string, string | number | boolean> = {
 /**
  * The bots, weakest first.
  *
- * **Every one thinks exactly as hard.** Scaling `maxNodes` up the ladder was
- * tried and dropped: search depth is not the lever it looks like, because even
- * a shallow search is far past a human, so the rungs mostly differed in how
- * long the player waited. Holding the budget at 50,000 — about two seconds on a
- * desktop — makes the ladder a ladder of *judgement*, and makes the wait the
- * same whichever opponent is chosen.
+ * **Every one looks exactly three ply ahead.** A node budget was tried first,
+ * at 50,000 for all of them, and the problem showed up in endgames: 50,000
+ * nodes reaches five to seven ply, which is enough to see the whole position,
+ * so when only one move avoided losing the engine always found it. Capping
+ * depth instead makes the horizon short on purpose. Three ply is one move each
+ * and one more — enough to answer an immediate threat, not enough to see a
+ * trap being set.
+ *
+ * Bounding by depth was avoided earlier because a low ply can take unpredictable
+ * time in a tactical position. Measured across a real game at ply 3: median
+ * 0.17s a move, worst case 2.4s. That concern is real further up and does not
+ * bite here.
  *
  * Two things move together up the ladder: how often it plays the best move, and
  * how bad the move is when it does not. Accuracy alone was not enough — with an
@@ -96,14 +102,14 @@ const COMMON: Record<string, string | number | boolean> = {
  * two prunes, so the node budget gets spent on refuted lines — measured as the
  * same move with a different evaluation in about one position in six.
  *
- * A phone is two to four times slower than the two seconds above. Because the
- * budget is work rather than time, only the waiting changes, never the move.
+ * A phone is two to four times slower. Because the bound is depth rather than
+ * seconds, only the waiting changes, never the move.
  */
-const NODES = 50_000;
+const MAX_PLY = 3;
 
 /** Settings shared by every handicapped bot. */
 const HANDICAP = {
-  maxNodes: NODES,
+  maxPly: MAX_PLY,
 };
 
 export const BOTS: BotSpec[] = [
@@ -165,7 +171,7 @@ export const BOTS: BotSpec[] = [
     strength: 100,
     engineBuild: ENGINE_BUILD,
     description: "No handicap at all. Always its best move.",
-    options: { ...COMMON, maxNodes: NODES, "skill-accuracy": 100 },
+    options: { ...COMMON, maxPly: MAX_PLY, "skill-accuracy": 100 },
   },
 ];
 

@@ -11,6 +11,8 @@ export interface BotOption {
   description: string | null;
   /** Node budget, when the bot is bounded that way. */
   maxNodes: number | null;
+  /** Depth cap, when the bot is bounded that way instead. */
+  maxPly: number | null;
   /** Percentage of turns it plays the best move it found. */
   accuracy: number | null;
   /** Which slice of the ranked list a slip lands in, as percentages. */
@@ -80,8 +82,14 @@ export default function NewBotGameForm({ bots }: { bots: BotOption[] }) {
         <div className="botdials">
           <Dial
             label="Thinking"
-            value={describeThinking(chosen.maxNodes)}
-            detail={chosen.maxNodes ? `${chosen.maxNodes.toLocaleString()} positions` : ""}
+            value={describeThinking(chosen)}
+            detail={
+              chosen.maxPly
+                ? `${chosen.maxPly} ply — it cannot see past that`
+                : chosen.maxNodes
+                  ? `${chosen.maxNodes.toLocaleString()} positions`
+                  : ""
+            }
           />
           <Dial
             label="Accuracy"
@@ -138,6 +146,8 @@ function estimateSeconds(maxNodes: number): number {
 }
 
 function describeWait(bot: BotOption): string {
+  // Measured across a real game at ply 3: median 0.17s a move, worst case 2.4s.
+  if (bot.maxPly != null) return "Answers almost at once.";
   if (bot.maxNodes == null) return "";
   const seconds = estimateSeconds(bot.maxNodes);
   if (seconds < 1) return "Answers in about a second.";
@@ -167,7 +177,11 @@ function Dial({
 }
 
 /** How hard it looks, in words. The number is shown alongside. */
-function describeThinking(maxNodes: number | null): string {
+function describeThinking(bot: BotOption): string {
+  // A depth cap is the tighter bound when both are present: the search stops at
+  // that ply whether or not a node budget is spent.
+  if (bot.maxPly != null) return `${bot.maxPly} ply`;
+  const maxNodes = bot.maxNodes;
   if (maxNodes == null) return "—";
   if (maxNodes <= 15_000) return "Glance";
   if (maxNodes <= 30_000) return "Quick";
