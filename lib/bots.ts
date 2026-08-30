@@ -64,11 +64,20 @@ const COMMON: Record<string, string | number | boolean> = {
 /**
  * The bots, weakest first.
  *
- * **Depth is capped, not nodes.** A 50,000-node budget was tried first and the
- * problem showed up in endgames: it reaches five to seven ply, enough to see
- * the whole position, so when only one move avoided losing the engine always
- * found it. Capping depth makes the horizon short on purpose. One ply sees only
- * what is already on the board; three ply is one move each and one more.
+ * **Depth is capped, not nodes, and only 1 and 3 are usable.**
+ *
+ * A node budget cannot bound depth: the same 20,000 nodes reaches about three
+ * ply in a crowded opening and thirteen in a sparse endgame, so a node-bounded
+ * bot gets *stronger as the game simplifies* — exactly when a player is trying
+ * to convert. That is what made the 50,000-node ladder unbeatable in endgames.
+ *
+ * Iterative deepening runs odd plies only (1, 3, 5, 7), so `maxPly: 2` behaves
+ * identically to 1. Of what remains, 1 is pinnable, 3 already forces you to
+ * plan, and 5 is both near-impossible and slow in some positions. One usable
+ * step.
+ *
+ * So depth is not the ladder — it picks the class, and the ladder lives inside
+ * it. Three rungs at one ply, where a game is winnable, and two at three ply.
  *
  * Bounding by depth was avoided earlier because a low ply can take unpredictable
  * time in a tactical position. Measured across a real game at ply 3: median
@@ -114,7 +123,7 @@ export const BOTS: BotSpec[] = [
     options: {
       ...COMMON,
       maxPly: 1,
-      "skill-accuracy": 30,
+      "skill-accuracy": 25,
       "skill-poolDepth": 100,
       "skill-allowLosing": true,
     },
@@ -127,8 +136,8 @@ export const BOTS: BotSpec[] = [
     options: {
       ...COMMON,
       maxPly: 1,
-      "skill-accuracy": 50,
-      "skill-poolDepth": 80,
+      "skill-accuracy": 55,
+      "skill-poolDepth": 70,
       "skill-allowLosing": true,
     },
   },
@@ -140,9 +149,8 @@ export const BOTS: BotSpec[] = [
     options: {
       ...COMMON,
       maxPly: 3,
-      "skill-accuracy": 70,
-      "skill-poolDepth": 55,
-      "skill-allowLosing": true,
+      "skill-accuracy": 65,
+      "skill-poolDepth": 40,
     },
   },
   {
