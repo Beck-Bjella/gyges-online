@@ -38,6 +38,14 @@ export interface SetupSlots {
    * freely right up until it is confirmed.
    */
   dropAt: (i: number, piece: number) => void;
+  /**
+   * Move a piece already on the row.
+   *
+   * `to` null sends it back to the tray. Onto an occupied square the two swap,
+   * rather than one of them being lost — with only six pieces and six squares,
+   * swapping is almost always what was meant.
+   */
+  moveSlot: (from: number, to: number | null) => void;
   clear: () => void;
   /** Replace the whole row, for the named openings. */
   choose: (slots: number[]) => void;
@@ -100,10 +108,25 @@ export function useSetupSlots(
     [slots, remaining, update],
   );
 
+  const moveSlot = useCallback(
+    (from: number, to: number | null) => {
+      const next = [...slots];
+      if (to === null) {
+        next[from] = null;
+      } else {
+        [next[from], next[to]] = [next[to], next[from]];
+      }
+      setHeld(null);
+      update(next);
+    },
+    [slots, update],
+  );
+
   return {
     slots,
     remaining,
     dropAt,
+    moveSlot,
     held,
     hold: useCallback(
       (piece: number | null) => setHeld((h) => (h === piece ? null : piece)),

@@ -390,6 +390,7 @@ export default function GameView({
             onSetupSquare={setup.placeAt}
             setupRemaining={setup.remaining}
             onSetupDrop={setup.dropAt}
+            onSetupMove={setup.moveSlot}
           />
           {reviewing && (
             <div className="review-banner">

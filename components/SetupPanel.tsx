@@ -150,7 +150,7 @@ function MiniLine({ slots }: { slots: number[] | null }) {
         return (
           <g key={i}>
             <circle cx={cx} cy={12} r={9.5} fill="var(--piece-mid)" stroke="#3a2818" />
-            {Array.from({ length: kind }, (_, i) => ((9.5 - 0.8) * (kind - i)) / kind).map((r) => (
+            {Array.from({ length: kind }, (_, i) => ((9.5 - 0.8) * (3 - i)) / 3).map((r) => (
               <circle
                 key={r}
                 cx={cx}

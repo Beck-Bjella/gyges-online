@@ -79,14 +79,25 @@ interface Props {
   setupRemaining?: number[];
   /** A tray piece dropped onto home-row position `slot`. */
   onSetupDrop?: (slot: number, piece: number) => void;
+  /** A placed piece moved to another square, or off the row when null. */
+  onSetupMove?: (fromSlot: number, toSlot: number | null) => void;
 }
 
 type Drag =
   | { kind: "none" }
   | { kind: "piece"; from: number; x: number; y: number }
   | { kind: "displaced"; from: number; landedOn: number; x: number; y: number }
-  // A piece carried from the setup tray, before it has a square.
-  | { kind: "tray"; piece: number; slot: number; x: number; y: number };
+  // A piece in hand during setup, from the tray or lifted off the row.
+  | {
+      kind: "tray";
+      piece: number;
+      /** Tray position it came from, so it can be hidden there. */
+      slot: number | null;
+      /** Home-row position it came from, if it was already placed. */
+      fromSlot: number | null;
+      x: number;
+      y: number;
+    };
 
 /**
  * Where the setup tray sits, in view space.
@@ -100,21 +111,24 @@ const TRAY_CY = 828;
 const TRAY_PITCH = 76;
 const trayCx = (i: number) => VIEWBOX / 2 + (i - 2.5) * TRAY_PITCH;
 
+/** The most rings any piece carries, which fixes where every ring sits. */
+const MAX_RINGS = 3;
+
 /**
  * Where a piece's rings sit, outermost first.
  *
- * A one-ring piece is a single ring at the piece's own edge, and the rest
- * follow the same rule: n rings, evenly spaced, the first always on the outside.
- * The old radii were fixed at 26/19/12 inside a 32-wide piece, so every piece
- * had a bare margin and a one showed a ring floating in the middle of a disc
- * rather than outlining it — the count was there but the shape did not read.
+ * The step is the same on every piece — a third of the radius — so a two's
+ * inner ring lands exactly where a three's middle ring does. Dividing by the
+ * piece's own count instead put them at different radii, which made the pieces
+ * read as different sizes of thing rather than as one, two and three of the
+ * same thing.
  *
- * Inset by the stroke's own half-width so the outer ring sits fully on the
- * piece instead of straddling its border.
+ * The outermost is always on the edge, inset by the stroke's half-width so it
+ * sits on the piece rather than straddling its border.
  */
 function ringRadii(kind: number, radius: number): number[] {
   const outer = radius - 1.6;
-  return Array.from({ length: kind }, (_, i) => (outer * (kind - i)) / kind);
+  return Array.from({ length: kind }, (_, i) => (outer * (MAX_RINGS - i)) / MAX_RINGS);
 }
 
 export default function Board({
@@ -129,6 +143,7 @@ export default function Board({
   onSetupSquare,
   setupRemaining = [],
   onSetupDrop,
+  onSetupMove,
 }: Props) {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const [drag, setDrag] = useState<Drag>({ kind: "none" });
@@ -257,6 +272,7 @@ export default function Board({
             kind: "tray",
             piece: setupRemaining[trayIdx],
             slot: trayIdx,
+            fromSlot: null,
             x: p.x,
             y: p.y,
           });
@@ -265,7 +281,17 @@ export default function Board({
         const target = nearestIndex(p.x, p.y, view, true);
         if (target === null) return;
         const slot = homeRow(setupSide).indexOf(toBoard(target));
-        if (slot >= 0) onSetupSquare(slot);
+        if (slot < 0) return;
+
+        // A piece already on the row is lifted off, so it can be moved to
+        // another square or carried back to the tray.
+        const placed = board[homeRow(setupSide)[slot]];
+        if (placed !== 0) {
+          e.currentTarget.setPointerCapture(e.pointerId);
+          setDrag({ kind: "tray", piece: placed, slot: null, fromSlot: slot, x: p.x, y: p.y });
+          return;
+        }
+        onSetupSquare(slot);
         return;
       }
 
@@ -318,11 +344,17 @@ export default function Board({
     (e: React.PointerEvent<SVGSVGElement>) => {
       if (drag.kind === "tray") {
         const p = toBoardSpace(e);
-        if (p && setupSide !== undefined && onSetupDrop) {
+        if (p && setupSide !== undefined) {
           const target = nearestIndex(p.x, p.y, view, true);
           const slot = target === null ? -1 : homeRow(setupSide).indexOf(toBoard(target));
-          // Dropped anywhere else, it simply goes back to the tray.
-          if (slot >= 0) onSetupDrop(slot, drag.piece);
+          if (drag.fromSlot !== null) {
+            // Onto another square it swaps; anywhere off the row it goes back
+            // to the tray; onto its own square nothing happens, so picking a
+            // piece up and thinking better of it costs nothing.
+            if (slot !== drag.fromSlot) onSetupMove?.(drag.fromSlot, slot >= 0 ? slot : null);
+          } else if (slot >= 0) {
+            onSetupDrop?.(slot, drag.piece);
+          }
         }
         setDrag({ kind: "none" });
         return;
@@ -360,7 +392,17 @@ export default function Board({
       }
       setDrag({ kind: "none" });
     },
-    [drag, toBoardSpace, view, emit, legalTargets, setupSide, onSetupDrop, toBoard],
+    [
+      drag,
+      toBoardSpace,
+      view,
+      emit,
+      legalTargets,
+      setupSide,
+      onSetupDrop,
+      onSetupMove,
+      toBoard,
+    ],
   );
 
   // ---- what to draw -------------------------------------------------------
@@ -374,6 +416,14 @@ export default function Board({
     // The piece being dragged, and a displaced piece in hand, follow the cursor.
     if (drag.kind === "piece" && i === drag.from) continue;
     if (drag.kind === "displaced" && (i === drag.from || i === drag.landedOn)) continue;
+    if (
+      drag.kind === "tray" &&
+      drag.fromSlot !== null &&
+      setupSide !== undefined &&
+      i === toView([homeRow(setupSide)[drag.fromSlot]])[0]
+    ) {
+      continue;
+    }
     const { cx, cy } = idxToCenter(i);
     pieces.push({ key: `p${i}`, idx: i, kind, cx, cy, lifted: false });
   }
