@@ -115,10 +115,11 @@ const trayCx = (i: number) => VIEWBOX / 2 + (i - 2.5) * TRAY_PITCH;
 const MAX_RINGS = 3;
 
 /** How thick each ring is drawn. */
-const RING_WIDTH = 7.5;
+const RING_WIDTH = 6;
 
 /** Clear space between one ring and the next, edge to edge. */
 const RING_GAP = 3.8;
+
 
 /**
  * Where a piece's rings sit, outermost first.
@@ -666,9 +667,9 @@ export default function Board({
             key={`dot${i}`}
             cx={cx}
             cy={cy}
-            r="13"
+            r="8"
             fill="var(--accent-mint)"
-            opacity="0.45"
+            opacity="0.38"
             pointerEvents="none"
           />
         );
@@ -760,11 +761,11 @@ export default function Board({
             key={`pdot${i}`}
             cx={cx}
             cy={cy}
-            r="9"
+            r="6"
             fill="var(--accent-mint)"
             stroke="var(--piece-ring)"
-            strokeWidth="1.5"
-            opacity="0.9"
+            strokeWidth="1.2"
+            opacity="0.8"
             pointerEvents="none"
           />
         );

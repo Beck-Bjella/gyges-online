@@ -151,10 +151,10 @@ function MiniLine({ slots }: { slots: number[] | null }) {
           <g key={i}>
             {/* The board's geometry at a third the size: fixed step, so the
                 gaps do not close as the rings thicken. See ringRadii there. */}
-            {Array.from({ length: kind }, (_, i) => 9.5 - 1.1 - i * 3.35).map(
+            {Array.from({ length: kind }, (_, i) => 9.5 - 0.9 - i * 2.9).map(
               (r, i) =>
                 i === 2 ? (
-                  <circle key={r} cx={cx} cy={12} r={r + 1.1} fill="var(--piece-mid)" />
+                  <circle key={r} cx={cx} cy={12} r={r + 0.9} fill="var(--piece-mid)" />
                 ) : (
                   <circle
                     key={r}
@@ -163,7 +163,7 @@ function MiniLine({ slots }: { slots: number[] | null }) {
                     r={r}
                     fill="none"
                     stroke="var(--piece-mid)"
-                    strokeWidth="2.2"
+                    strokeWidth="1.8"
                   />
                 ),
             )}
