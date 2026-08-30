@@ -158,7 +158,7 @@ function MiniLine({ slots }: { slots: number[] | null }) {
                 r={r}
                 fill="none"
                 stroke="var(--piece-ring)"
-                strokeWidth="1.4"
+                strokeWidth="1.8"
               />
             ))}
           </g>

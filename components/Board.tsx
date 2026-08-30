@@ -278,7 +278,9 @@ export default function Board({
           });
           return;
         }
-        const target = nearestIndex(p.x, p.y, view, true);
+        // Occupied squares included, or a piece already placed could never be
+        // picked up again.
+        const target = nearestIndex(p.x, p.y, view, false);
         if (target === null) return;
         const slot = homeRow(setupSide).indexOf(toBoard(target));
         if (slot < 0) return;
@@ -299,7 +301,10 @@ export default function Board({
 
       // Placing a displaced piece takes priority over starting a new drag.
       if (drag.kind === "displaced") {
-        const target = nearestIndex(p.x, p.y, view, true);
+        // onlyEmpty must stay false: the square the mover came from still holds
+        // it in `view`, so skipping occupied squares would hide the one target
+        // that most needs to be reachable. dropTargets is what decides validity.
+        const target = nearestIndex(p.x, p.y, view, false);
         // The square the mover came from is a legal home for the displaced
         // piece — it is empty by the time the move resolves, and dropTargets
         // already marks it. Excluding it here made clicking a highlighted
@@ -345,7 +350,8 @@ export default function Board({
       if (drag.kind === "tray") {
         const p = toBoardSpace(e);
         if (p && setupSide !== undefined) {
-          const target = nearestIndex(p.x, p.y, view, true);
+          // Occupied included: dropping onto a filled square is a swap.
+          const target = nearestIndex(p.x, p.y, view, false);
           const slot = target === null ? -1 : homeRow(setupSide).indexOf(toBoard(target));
           if (drag.fromSlot !== null) {
             // Onto another square it swaps; anywhere off the row it goes back
@@ -698,7 +704,7 @@ export default function Board({
               r={r}
               fill="none"
               stroke="var(--piece-ring)"
-              strokeWidth="2.5"
+              strokeWidth="3.2"
             />
           ))}
         </g>
