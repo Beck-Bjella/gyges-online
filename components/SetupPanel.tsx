@@ -11,16 +11,16 @@
  * six are down, so a half-finished row never reaches the server.
  */
 
-import { useCallback, useMemo, useState } from "react";
 import { SETUP_PIECES, type Player } from "@/lib/game/board";
+import type { SetupSlots } from "./useSetupSlots";
 
 interface Props {
   side: Player;
   pending: boolean;
   error: string | null;
+  /** The row being built, shared with the board so both can edit it. */
+  setup: SetupSlots;
   onSubmit: (arrangement: number[]) => void;
-  /** Shown live on the board as the player arranges. */
-  onPreview: (arrangement: (number | null)[]) => void;
 }
 
 /**
@@ -59,62 +59,18 @@ export default function SetupPanel({
   side,
   pending,
   error,
+  setup,
   onSubmit,
-  onPreview,
 }: Props) {
-  // slots[i] is the piece placed in home-row position i, or null.
-  const [slots, setSlots] = useState<(number | null)[]>(Array(6).fill(null));
-
-  const remaining = useMemo(() => {
-    const left = [...SETUP_PIECES];
-    for (const s of slots) {
-      if (s === null) continue;
-      const at = left.indexOf(s);
-      if (at >= 0) left.splice(at, 1);
-    }
-    return left;
-  }, [slots]);
-
-  const update = useCallback(
-    (next: (number | null)[]) => {
-      setSlots(next);
-      onPreview(next);
-    },
-    [onPreview],
-  );
-
-  const place = useCallback(
-    (piece: number) => {
-      const at = slots.indexOf(null);
-      if (at === -1) return;
-      const next = [...slots];
-      next[at] = piece;
-      update(next);
-    },
-    [slots, update],
-  );
-
-  const removeAt = useCallback(
-    (i: number) => {
-      const next = [...slots];
-      next[i] = null;
-      update(next);
-    },
-    [slots, update],
-  );
-
-  const reset = useCallback(() => update(Array(6).fill(null)), [update]);
-
-  const choose = useCallback((slots: number[]) => update([...slots]), [update]);
-
-  const complete = slots.every((s) => s !== null);
+  const { slots, remaining, held, hold, placeAt, clear, choose, complete } = setup;
 
   return (
     <div className="panel">
       <h2>Place your pieces</h2>
       <p className="muted" style={{ margin: "0 0 14px", lineHeight: 1.6 }}>
-        Arrange your six pieces along your home row, left to right. You are
-        player {side === 1 ? "1" : "2"}.
+        Click a square on your highlighted home row to place a piece, or pick
+        one up here first to choose which. You are player{" "}
+        {side === 1 ? "1" : "2"}.
       </p>
 
       <div className="setup-slots">
@@ -122,9 +78,15 @@ export default function SetupPanel({
           <button
             key={i}
             className={piece === null ? "setup-slot" : "setup-slot filled"}
-            onClick={() => piece !== null && removeAt(i)}
+            onClick={() => placeAt(i)}
             disabled={pending}
-            title={piece === null ? "empty" : `${RING_LABEL[piece]} — click to remove`}
+            title={
+              piece === null
+                ? held
+                  ? `Place the ${RING_LABEL[held]} piece here`
+                  : "Empty — click to place the next piece"
+                : `${RING_LABEL[piece]} — click to take back`
+            }
           >
             {piece === null ? (
               <span className="setup-empty">{i + 1}</span>
@@ -143,10 +105,10 @@ export default function SetupPanel({
         {remaining.map((piece, i) => (
           <button
             key={`${piece}-${i}`}
-            className="setup-slot filled"
-            onClick={() => place(piece)}
+            className={held === piece ? "setup-slot filled held" : "setup-slot filled"}
+            onClick={() => hold(piece)}
             disabled={pending}
-            title={`Place a ${RING_LABEL[piece]} piece`}
+            title={`Pick up a ${RING_LABEL[piece]} piece, then click a square`}
           >
             <PieceGlyph kind={piece} />
           </button>
@@ -163,7 +125,7 @@ export default function SetupPanel({
         </button>
         <button
           className="btn"
-          onClick={reset}
+          onClick={clear}
           disabled={pending || slots.every((s) => s === null)}
         >
           Clear
@@ -177,21 +139,23 @@ export default function SetupPanel({
         {OPENINGS.map((o) => (
           <button
             key={o.name}
-            className="btn btn-small"
+            className="opening-choice"
             onClick={() => choose(o.slots)}
             disabled={pending}
-            title={o.slots.join(" ")}
+            title={`Place ${o.name}`}
           >
-            {o.name}
+            <MiniLine slots={o.slots} />
+            <span>{o.name}</span>
           </button>
         ))}
         <button
-          className="btn btn-small"
+          className="opening-choice"
           onClick={() => choose(randomOpening())}
           disabled={pending}
           title="Any legal ordering, at random"
         >
-          Random
+          <MiniLine slots={null} />
+          <span>Random</span>
         </button>
       </div>
 
@@ -234,6 +198,53 @@ function PieceGlyph({ kind }: { kind: number }) {
       {kind >= 3 && (
         <circle r="12" fill="none" stroke="var(--piece-ring)" strokeWidth="2.5" />
       )}
+    </svg>
+  );
+}
+
+/**
+ * An opening drawn as the row it produces.
+ *
+ * A name says nothing about the shape, and the shape is the entire difference
+ * between one opening and another — so the button shows the line itself and
+ * uses the name only as a label. Sized to read at a glance rather than to be
+ * studied; the real board is right there for that.
+ *
+ * `null` slots means "not decided yet", drawn as outlines, which is what the
+ * Random button offers.
+ */
+function MiniLine({ slots }: { slots: number[] | null }) {
+  const cells = slots ?? [0, 0, 0, 0, 0, 0];
+  return (
+    <svg viewBox="0 0 132 24" className="mini-line" aria-hidden>
+      {cells.map((kind, i) => {
+        const cx = 12 + i * 22;
+        if (kind === 0) {
+          return (
+            <circle
+              key={i}
+              cx={cx}
+              cy={12}
+              r={9}
+              fill="none"
+              stroke="var(--border-subtle)"
+              strokeDasharray="3 3"
+            />
+          );
+        }
+        return (
+          <g key={i}>
+            <circle cx={cx} cy={12} r={9.5} fill="var(--piece-mid)" stroke="#3a2818" />
+            <circle cx={cx} cy={12} r={7} fill="none" stroke="var(--piece-ring)" strokeWidth="1.4" />
+            {kind >= 2 && (
+              <circle cx={cx} cy={12} r={4.6} fill="none" stroke="var(--piece-ring)" strokeWidth="1.4" />
+            )}
+            {kind >= 3 && (
+              <circle cx={cx} cy={12} r={2.2} fill="none" stroke="var(--piece-ring)" strokeWidth="1.4" />
+            )}
+          </g>
+        );
+      })}
     </svg>
   );
 }

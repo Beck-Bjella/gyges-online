@@ -839,9 +839,44 @@ td.num {
  * narrow on a phone.
  */
 .setup-openings {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
   gap: 8px;
-  flex-wrap: wrap;
+}
+
+/*
+ * An opening, shown as the row it produces with the name underneath. The line
+ * is the point: the names distinguish shapes nobody can guess from a word.
+ */
+.opening-choice {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 6px 6px;
+  background: var(--bg-panel-active);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.opening-choice:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+}
+
+.opening-choice:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.mini-line {
+  width: 100%;
+  max-width: 132px;
+  height: auto;
+  display: block;
 }
 
 .btn-small {
@@ -854,6 +889,12 @@ td.num {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+/* The tray piece currently picked up, waiting for a square. */
+.setup-slot.held {
+  outline: 2px solid var(--accent-mint);
+  outline-offset: 2px;
 }
 
 .setup-slot {

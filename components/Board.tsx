@@ -30,6 +30,7 @@ import {
   VIEWBOX,
   flipBoard,
   flipMove,
+  homeRow,
   idxToCenter,
   nearestIndex,
   pieceAt,
@@ -63,6 +64,17 @@ interface Props {
    * shown; the board still works, and the server is unaffected either way.
    */
   player?: Player;
+  /**
+   * The side arranging its home row, while setup is in progress.
+   *
+   * Set only for the player actually placing. It turns the board into the
+   * placement surface — clicking a home-row square is how a piece goes down —
+   * which is more direct than reading a row of numbered slots in a panel and
+   * mapping them onto the board yourself.
+   */
+  setupSide?: Player;
+  /** Home-row position clicked, 0-5 from that player's own left. */
+  onSetupSquare?: (slot: number) => void;
 }
 
 type Drag =
@@ -78,6 +90,8 @@ export default function Board({
   highlight = [],
   lastMove = [],
   player,
+  setupSide,
+  onSetupSquare,
 }: Props) {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const [drag, setDrag] = useState<Drag>({ kind: "none" });
@@ -190,9 +204,20 @@ export default function Board({
 
   const onPointerDown = useCallback(
     (e: React.PointerEvent<SVGSVGElement>) => {
-      if (!interactive) return;
       const p = toBoardSpace(e);
       if (!p) return;
+
+      // Placing during setup, which happens before the board is interactive in
+      // the ordinary sense — there is no move to make yet.
+      if (setupSide !== undefined && onSetupSquare) {
+        const target = nearestIndex(p.x, p.y, view, true);
+        if (target === null) return;
+        const slot = homeRow(setupSide).indexOf(toBoard(target));
+        if (slot >= 0) onSetupSquare(slot);
+        return;
+      }
+
+      if (!interactive) return;
 
       // Placing a displaced piece takes priority over starting a new drag.
       if (drag.kind === "displaced") {
@@ -213,7 +238,7 @@ export default function Board({
       e.currentTarget.setPointerCapture(e.pointerId);
       setDrag({ kind: "piece", from, x: p.x, y: p.y });
     },
-    [interactive, toBoardSpace, drag, view, emit, dropTargets],
+    [interactive, toBoardSpace, drag, view, emit, dropTargets, setupSide, onSetupSquare, toBoard],
   );
 
   const onPointerMove = useCallback(

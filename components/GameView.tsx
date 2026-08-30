@@ -14,6 +14,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Board from "./Board";
 import SetupPanel from "./SetupPanel";
+import { useSetupSlots } from "./useSetupSlots";
 import { useBotTurn } from "./useBotTurn";
 import { useAutoRefresh } from "./useAutoRefresh";
 import {
@@ -171,6 +172,11 @@ export default function GameView({
   // row before play begins.
   const inSetup = game.status === "setup";
   const yourPlacement = inSetup && viewerSide !== null && viewerSide === game.turn;
+
+  // The home row being built. Held here rather than inside SetupPanel because
+  // the arrangement is made in two places — the panel's tray and the board —
+  // and both need the same six slots.
+  const setup = useSetupSlots(setSetupPreview);
 
   // Two different things, drawn two different ways.
   //
@@ -380,6 +386,8 @@ export default function GameView({
             // rather than null when there is no viewer keeps the hint off for
             // spectators, who have no side to move for.
             player={viewerSide ?? undefined}
+            setupSide={yourPlacement ? viewerSide! : undefined}
+            onSetupSquare={setup.placeAt}
           />
           {reviewing && (
             <div className="review-banner">
@@ -456,8 +464,8 @@ export default function GameView({
             side={viewerSide!}
             pending={pending}
             error={error}
+            setup={setup}
             onSubmit={submitSetupArrangement}
-            onPreview={setSetupPreview}
           />
         )}
 
