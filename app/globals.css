@@ -796,9 +796,12 @@ td.num {
 
 /* While reviewing, the board is a record, not a place to act. Desaturating it
    and blocking pointer events makes that unmistakable — a player should never
-   drag a piece and wonder why nothing happened. */
+   drag a piece and wonder why nothing happened.
+
+   Light enough to read the position through, though: the point is to say "not
+   now", not to hide what is being reviewed. */
 .board-wrap.reviewing .board {
-  filter: saturate(0.4) brightness(0.66);
+  filter: saturate(0.6) brightness(0.84);
   cursor: default;
   pointer-events: none;
 }
