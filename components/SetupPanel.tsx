@@ -191,13 +191,9 @@ function PieceGlyph({ kind }: { kind: number }) {
         stroke="#3a2818"
         strokeWidth="1"
       />
-      <circle r="26" fill="none" stroke="var(--piece-ring)" strokeWidth="2.5" />
-      {kind >= 2 && (
-        <circle r="19" fill="none" stroke="var(--piece-ring)" strokeWidth="2.5" />
-      )}
-      {kind >= 3 && (
-        <circle r="12" fill="none" stroke="var(--piece-ring)" strokeWidth="2.5" />
-      )}
+      {Array.from({ length: kind }, (_, i) => ((32 - 1.6) * (kind - i)) / kind).map((r) => (
+        <circle key={r} r={r} fill="none" stroke="var(--piece-ring)" strokeWidth="2.5" />
+      ))}
     </svg>
   );
 }
@@ -235,13 +231,17 @@ function MiniLine({ slots }: { slots: number[] | null }) {
         return (
           <g key={i}>
             <circle cx={cx} cy={12} r={9.5} fill="var(--piece-mid)" stroke="#3a2818" />
-            <circle cx={cx} cy={12} r={7} fill="none" stroke="var(--piece-ring)" strokeWidth="1.4" />
-            {kind >= 2 && (
-              <circle cx={cx} cy={12} r={4.6} fill="none" stroke="var(--piece-ring)" strokeWidth="1.4" />
-            )}
-            {kind >= 3 && (
-              <circle cx={cx} cy={12} r={2.2} fill="none" stroke="var(--piece-ring)" strokeWidth="1.4" />
-            )}
+            {Array.from({ length: kind }, (_, i) => ((9.5 - 0.8) * (kind - i)) / kind).map((r) => (
+              <circle
+                key={r}
+                cx={cx}
+                cy={12}
+                r={r}
+                fill="none"
+                stroke="var(--piece-ring)"
+                strokeWidth="1.4"
+              />
+            ))}
           </g>
         );
       })}

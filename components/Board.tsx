@@ -82,6 +82,23 @@ type Drag =
   | { kind: "piece"; from: number; x: number; y: number }
   | { kind: "displaced"; from: number; landedOn: number; x: number; y: number };
 
+/**
+ * Where a piece's rings sit, outermost first.
+ *
+ * A one-ring piece is a single ring at the piece's own edge, and the rest
+ * follow the same rule: n rings, evenly spaced, the first always on the outside.
+ * The old radii were fixed at 26/19/12 inside a 32-wide piece, so every piece
+ * had a bare margin and a one showed a ring floating in the middle of a disc
+ * rather than outlining it — the count was there but the shape did not read.
+ *
+ * Inset by the stroke's own half-width so the outer ring sits fully on the
+ * piece instead of straddling its border.
+ */
+function ringRadii(kind: number, radius: number): number[] {
+  const outer = radius - 1.6;
+  return Array.from({ length: kind }, (_, i) => (outer * (kind - i)) / kind);
+}
+
 export default function Board({
   board,
   interactive = false,
@@ -257,7 +274,21 @@ export default function Board({
       const p = toBoardSpace(e);
       if (p) {
         const target = nearestIndex(p.x, p.y, view, false);
-        if (target !== null && target !== drag.from) {
+        if (target !== null) {
+          // Back where it started. A piece may travel its full count and end on
+          // its own square, so this is a move rather than a cancelled drag —
+          // but only where the path actually allows it, which legalTargets
+          // knows. Where it does not, dropping a piece back is how a player
+          // changes their mind, and that still works.
+          //
+          // Checked before the emptiness test below, because the square is not
+          // empty in `view`: the piece is still recorded there, so it would
+          // otherwise read as a displacement onto itself.
+          if (target === drag.from) {
+            if (legalTargets.has(target)) emit([drag.from, target]);
+            setDrag({ kind: "none" });
+            return;
+          }
           if (view[target] === 0) {
             emit([drag.from, target]);
             setDrag({ kind: "none" });
@@ -272,7 +303,7 @@ export default function Board({
       }
       setDrag({ kind: "none" });
     },
-    [drag, toBoardSpace, view, emit],
+    [drag, toBoardSpace, view, emit, legalTargets],
   );
 
   // ---- what to draw -------------------------------------------------------
@@ -529,13 +560,15 @@ export default function Board({
             stroke="#3a2818"
             strokeWidth="1"
           />
-          <circle r="26" fill="none" stroke="var(--piece-ring)" strokeWidth="2.5" />
-          {p.kind >= 2 && (
-            <circle r="19" fill="none" stroke="var(--piece-ring)" strokeWidth="2.5" />
-          )}
-          {p.kind >= 3 && (
-            <circle r="12" fill="none" stroke="var(--piece-ring)" strokeWidth="2.5" />
-          )}
+          {ringRadii(p.kind, p.lifted ? PIECE_RADIUS * 1.08 : PIECE_RADIUS).map((r) => (
+            <circle
+              key={r}
+              r={r}
+              fill="none"
+              stroke="var(--piece-ring)"
+              strokeWidth="2.5"
+            />
+          ))}
         </g>
       ))}
       {/* Dots that belong on a piece — one the piece in hand may land on and

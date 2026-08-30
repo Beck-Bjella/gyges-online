@@ -161,7 +161,7 @@ export default function GameView({
     router.refresh();
   }, [router]);
 
-  const bot = useBotTurn(game.id, isBotTurn, onBotMoved);
+  const bot = useBotTurn(game.id, isBotTurn, game.ply, onBotMoved);
   // For the status panel, "your turn" covers placing as well as moving.
   const yourTurnOrPlacement =
     viewerSide !== null &&

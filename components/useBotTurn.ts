@@ -36,6 +36,16 @@ export function useBotTurn(
   gameId: string,
   /** True when the game is in progress and the engine is the side to move. */
   isBotTurn: boolean,
+  /**
+   * Changes on every ply. Without it the engine can miss its own turn.
+   *
+   * `isBotTurn` alone is not enough, because it can stay true across a turn
+   * boundary: the bot places its home row, which completes setup, and the
+   * server decides the first mover in that same write. If the toss gives the
+   * bot the move, the flag goes from true to true, the effect never re-runs,
+   * and the engine sits there until the page is reloaded.
+   */
+  turnKey: number,
   onMovePlayed: () => void,
 ): BotTurnState {
   const [thinking, setThinking] = useState(false);
@@ -133,7 +143,7 @@ export function useBotTurn(
   // Start a search whenever it becomes the engine's turn.
   useEffect(() => {
     if (isBotTurn) void run();
-  }, [isBotTurn, run]);
+  }, [isBotTurn, turnKey, run]);
 
   // A visible clock while it thinks. The worker is busy, not the page, so this
   // keeps ticking — which is the point: a frozen number looks like a hang.
