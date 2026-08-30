@@ -13,8 +13,8 @@ export interface BotOption {
   maxNodes: number | null;
   /** Depth cap, when the bot is bounded that way instead. */
   maxPly: number | null;
-  /** Percentage of turns it plays the best move it found. */
-  accuracy: number | null;
+  /** How much of the gap to the best move is forgiven, 0-100. */
+  weakness: number | null;
   /** How far down the ranked list a slip may reach, as a percentage. */
   poolDepth: number | null;
   /** Whether those alternatives include moves that lose outright. */
@@ -92,7 +92,7 @@ export default function NewBotGameForm({ bots }: { bots: BotOption[] }) {
           />
           <Dial
             label="Accuracy"
-            value={chosen.accuracy == null ? "—" : `${chosen.accuracy}%`}
+            value={chosen.weakness == null ? "100%" : `${100 - chosen.weakness}%`}
             detail={describeAccuracy(chosen)}
           />
         </div>
@@ -190,7 +190,7 @@ function describeThinking(bot: BotOption): string {
 }
 
 /**
- * What the accuracy dial means, in play.
+ * What the weakness setting means, in play.
  *
  * Worth spelling out rather than showing the percentage alone, because the
  * number on its own does not say how bad the other turns are — and whether a
@@ -198,7 +198,7 @@ function describeThinking(bot: BotOption): string {
  * errs 20% of the time or 50%.
  */
 function describeAccuracy(bot: BotOption): string {
-  if (bot.accuracy == null || bot.accuracy >= 100) return "always its best move";
+  if (bot.weakness == null || bot.weakness <= 0) return "always its best move";
   const depth = bot.poolDepth ?? 100;
   const otherwise =
     depth >= 80
@@ -206,7 +206,9 @@ function describeAccuracy(bot: BotOption): string {
       : depth >= 50
         ? "otherwise something well down its list"
         : "otherwise one of the next few";
+  const wander =
+    bot.weakness >= 80 ? "picks almost freely" : bot.weakness >= 50 ? "wanders a good deal" : "wanders a little";
   return bot.allowLosing
-    ? `best move ${bot.accuracy}% of turns, ${otherwise} — losing moves included`
-    : `best move ${bot.accuracy}% of turns, ${otherwise}, but never a losing one`;
+    ? `${wander} among its options, ${otherwise} — losing moves included`
+    : `${wander} among its options, ${otherwise}, but never a losing one`;
 }

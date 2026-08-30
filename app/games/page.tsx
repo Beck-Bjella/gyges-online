@@ -42,14 +42,14 @@ export default async function GamesPage() {
   const botOptions = botLeaderboard().map((b) => {
     let maxNodes: number | null = null;
     let maxPly: number | null = null;
-    let accuracy: number | null = null;
+    let weakness: number | null = null;
     let poolDepth: number | null = null;
     let allowLosing = false;
     try {
       const parsed = JSON.parse(b.options ?? "{}") as Record<string, unknown>;
       if (typeof parsed.maxNodes === "number") maxNodes = parsed.maxNodes;
       if (typeof parsed.maxPly === "number") maxPly = parsed.maxPly;
-      if (typeof parsed["skill-accuracy"] === "number") accuracy = parsed["skill-accuracy"];
+      if (typeof parsed["skill-weakness"] === "number") weakness = parsed["skill-weakness"];
       if (typeof parsed["skill-poolDepth"] === "number") poolDepth = parsed["skill-poolDepth"];
       allowLosing = parsed["skill-allowLosing"] === true;
     } catch {
@@ -61,7 +61,7 @@ export default async function GamesPage() {
       description: b.description,
       maxNodes,
       maxPly,
-      accuracy,
+      weakness,
       poolDepth,
       allowLosing,
     };

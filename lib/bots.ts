@@ -84,18 +84,23 @@ const COMMON: Record<string, string | number | boolean> = {
  * 0.17s a move, worst case 2.4s. That concern is real further up and does not
  * bite here.
  *
- * Two things move together up the ladder: how often it plays the best move, and
- * how far down it can reach when it does not.
+ * - **`skill-weakness`** — how much of the gap between a move and the best one
+ *   is forgiven, 0-100. At 0 it always plays the best move; at 100 everything
+ *   it considers is roughly level and the choice is near random.
  *
- * - **`skill-poolDepth`** — how far down the ranked list a slip may reach, as a
- *   percent of however many moves the position offers. A share rather than a
- *   fixed rank, so it means the same whether there are six replies or eighteen.
+ *   This is Stockfish's rule, and it replaced a "plays the best move N% of the
+ *   time, otherwise a random one from a band" scheme that was bimodal by
+ *   construction: the bot played either the single best move or something
+ *   definitely poor, never anything in between. Forgiving part of the gap is
+ *   smooth instead — a slightly worse move is easy to land on, a much worse one
+ *   is not — and because it reads the *scores* rather than the ranking, one
+ *   setting wanders freely in a quiet position and stays honest in a sharp one,
+ *   which a rank-based rule cannot do.
  *
- *   There is deliberately no floor. An earlier version had one, and it made
- *   every bot bimodal: it played either the single best move or something
- *   definitely poor, with nothing in between, because a slip was *required* to
- *   land some distance down. Without a floor a slip may be second-best or may
- *   be dreadful, which is how a person's mistakes actually vary.
+ * - **`skill-poolDepth`** — how far down the ranked list is considered at all,
+ *   as a percent of however many moves the position offers. Stockfish's
+ *   MultiPV, in effect: a bound on how bad the worst candidate can be, with
+ *   weakness deciding among them.
  * - **`skill-allowLosing`** — whether moves the search sees as a forced loss
  *   stay choosable. Losing moves sort to the *bottom* of the list, so this and
  *   the window together are a gradient rather than a switch: with it on, a low
@@ -123,7 +128,7 @@ export const BOTS: BotSpec[] = [
     options: {
       ...COMMON,
       maxPly: 1,
-      "skill-accuracy": 25,
+      "skill-weakness": 90,
       "skill-poolDepth": 100,
       "skill-allowLosing": true,
     },
@@ -136,7 +141,7 @@ export const BOTS: BotSpec[] = [
     options: {
       ...COMMON,
       maxPly: 1,
-      "skill-accuracy": 55,
+      "skill-weakness": 75,
       "skill-poolDepth": 70,
       "skill-allowLosing": true,
     },
@@ -149,8 +154,8 @@ export const BOTS: BotSpec[] = [
     options: {
       ...COMMON,
       maxPly: 1,
-      "skill-accuracy": 85,
-      "skill-poolDepth": 35,
+      "skill-weakness": 45,
+      "skill-poolDepth": 40,
     },
   },
   {
@@ -161,7 +166,7 @@ export const BOTS: BotSpec[] = [
     options: {
       ...COMMON,
       maxPly: 3,
-      "skill-accuracy": 65,
+      "skill-weakness": 30,
       "skill-poolDepth": 40,
     },
   },
@@ -170,7 +175,7 @@ export const BOTS: BotSpec[] = [
     strength: 100,
     engineBuild: ENGINE_BUILD,
     description: "No handicap at all. Always its best move.",
-    options: { ...COMMON, maxPly: 3, "skill-accuracy": 100 },
+    options: { ...COMMON, maxPly: 3 },
   },
 ];
 
