@@ -64,13 +64,11 @@ const COMMON: Record<string, string | number | boolean> = {
 /**
  * The bots, weakest first.
  *
- * **Every one looks exactly three ply ahead.** A node budget was tried first,
- * at 50,000 for all of them, and the problem showed up in endgames: 50,000
- * nodes reaches five to seven ply, which is enough to see the whole position,
- * so when only one move avoided losing the engine always found it. Capping
- * depth instead makes the horizon short on purpose. Three ply is one move each
- * and one more — enough to answer an immediate threat, not enough to see a
- * trap being set.
+ * **Depth is capped, not nodes.** A 50,000-node budget was tried first and the
+ * problem showed up in endgames: it reaches five to seven ply, enough to see
+ * the whole position, so when only one move avoided losing the engine always
+ * found it. Capping depth makes the horizon short on purpose. One ply sees only
+ * what is already on the board; three ply is one move each and one more.
  *
  * Bounding by depth was avoided earlier because a low ply can take unpredictable
  * time in a tactical position. Measured across a real game at ply 3: median
@@ -87,30 +85,22 @@ const COMMON: Record<string, string | number | boolean> = {
  *   share rather than fixed ranks, so "middling move" means the same thing
  *   whether there are six replies or eighteen. Never includes the best move,
  *   so accuracy alone decides whether that gets played.
- * **None of them can throw a game.** `skill-allowLosing` is left off, so moves
- * the search sees as a forced loss are never choosable. Every bot here is safe
- * within its horizon: it will not hand you the game, and beating it means
- * outplaying it or finding something deeper than 50,000 nodes sees.
+ * - **`skill-allowLosing`** — whether moves the search sees as a forced loss
+ *   stay choosable. Losing moves sort to the *bottom* of the list, so this and
+ *   the window together are a gradient rather than a switch: with it on, a low
+ *   window rarely reaches a losing move and a high one lands on them often.
  *
- * That was tried the other way first, and the reason it works now is the window.
- * With `allowLosing` off and a pool of the top few, every alternative was
- * another good move and the weakest bot was still hard — threaten it and it
- * answers every time. The window reaches genuinely bad moves without needing
- * losing ones, which is what makes "worse, but never suicidal" expressible.
- *
- * Leaving it off also means the search prunes normally. Turning it on disables
- * two prunes, so the node budget gets spent on refuted lines — measured as the
- * same move with a different evaluation in about one position in six.
+ * Turning it off entirely was tried and made the bottom of the ladder *harder*.
+ * A bot that never throws a game answers every threat inside its horizon, so
+ * beating it means genuinely breaking through — which is not what the easiest
+ * opponent should ask of anyone. The bottom three keep it on; Sharp and Full do
+ * not, which is what separates "makes real mistakes" from "only misses deep
+ * ideas".
  *
  * A phone is two to four times slower. Because the bound is depth rather than
  * seconds, only the waiting changes, never the move.
  */
-const MAX_PLY = 3;
 
-/** Settings shared by every handicapped bot. */
-const HANDICAP = {
-  maxPly: MAX_PLY,
-};
 
 export const BOTS: BotSpec[] = [
   {
@@ -121,10 +111,11 @@ export const BOTS: BotSpec[] = [
       "Never plays the best move it found, and usually one of its worst. Where to start.",
     options: {
       ...COMMON,
-      ...HANDICAP,
+      maxPly: 1,
       "skill-accuracy": 0,
       "skill-poolFrom": 50,
       "skill-poolTo": 100,
+      "skill-allowLosing": true,
     },
   },
   {
@@ -134,10 +125,11 @@ export const BOTS: BotSpec[] = [
     description: "Finds the right move about a fifth of the time. Very punishable.",
     options: {
       ...COMMON,
-      ...HANDICAP,
+      maxPly: 1,
       "skill-accuracy": 20,
       "skill-poolFrom": 35,
       "skill-poolTo": 80,
+      "skill-allowLosing": true,
     },
   },
   {
@@ -147,10 +139,11 @@ export const BOTS: BotSpec[] = [
     description: "Right about half the time, and the rest are visibly worse.",
     options: {
       ...COMMON,
-      ...HANDICAP,
+      maxPly: 3,
       "skill-accuracy": 45,
       "skill-poolFrom": 20,
       "skill-poolTo": 60,
+      "skill-allowLosing": true,
     },
   },
   {
@@ -160,7 +153,7 @@ export const BOTS: BotSpec[] = [
     description: "Slips about one turn in three, but only slightly. You will need a real idea.",
     options: {
       ...COMMON,
-      ...HANDICAP,
+      maxPly: 3,
       "skill-accuracy": 70,
       "skill-poolFrom": 5,
       "skill-poolTo": 30,
@@ -171,7 +164,7 @@ export const BOTS: BotSpec[] = [
     strength: 100,
     engineBuild: ENGINE_BUILD,
     description: "No handicap at all. Always its best move.",
-    options: { ...COMMON, maxPly: MAX_PLY, "skill-accuracy": 100 },
+    options: { ...COMMON, maxPly: 3, "skill-accuracy": 100 },
   },
 ];
 
