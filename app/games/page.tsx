@@ -41,11 +41,15 @@ export default async function GamesPage() {
   // site does not otherwise interpret them.
   const botOptions = botLeaderboard().map((b) => {
     let maxNodes: number | null = null;
-    let skill: number | null = null;
+    let accuracy: number | null = null;
+    let movePool: number | null = null;
+    let allowLosing = false;
     try {
       const parsed = JSON.parse(b.options ?? "{}") as Record<string, unknown>;
       if (typeof parsed.maxNodes === "number") maxNodes = parsed.maxNodes;
-      if (typeof parsed.skill === "number") skill = parsed.skill;
+      if (typeof parsed["skill-accuracy"] === "number") accuracy = parsed["skill-accuracy"];
+      if (typeof parsed["skill-movePool"] === "number") movePool = parsed["skill-movePool"];
+      allowLosing = parsed["skill-allowLosing"] === true;
     } catch {
       /* a malformed row simply shows no dials */
     }
@@ -54,7 +58,9 @@ export default async function GamesPage() {
       username: b.username,
       description: b.description,
       maxNodes,
-      skill,
+      accuracy,
+      movePool,
+      allowLosing,
     };
   });
 

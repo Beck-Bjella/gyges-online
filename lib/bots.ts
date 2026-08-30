@@ -48,7 +48,7 @@ import { createBot, type BotSpec } from "./db/queries.ts";
  * evaluation network, a different table size, changed search behaviour. Games
  * played against an earlier build keep that build recorded against them.
  */
-export const ENGINE_BUILD = "v2.0.0-wasm-skill";
+export const ENGINE_BUILD = "v3.0.0-wasm-skill-options";
 
 /**
  * Options every bot shares.
@@ -65,28 +65,31 @@ const COMMON: Record<string, string | number | boolean> = {
 /**
  * The bots, weakest first.
  *
- * Each is a pair of dials, because neither alone makes a good opponent:
+ * Four independent settings, not one strength number. There is no honest scale
+ * running from "beginner" to "engine" — the search is far past a human even at
+ * three ply — so rather than invent one, each bot is a hand-picked combination
+ * and the settings say plainly what it does.
  *
- * - **`maxNodes`** is how hard it looks. It sets both how deep a trap has to be
- *   to beat it and how long the player waits, and it is the honest way to bound
- *   the search: a *depth* limit can take wildly different times in different
- *   positions, so the same bot would sometimes answer at once and sometimes
- *   sit there.
- * - **`skill`** is how well it chooses among what it found — the percentage of
- *   turns it plays the best move it saw, taking one of the next few otherwise.
- *
- * Turning only the first gives a bot that never errs, just misses deep ideas;
- * turning only the second gives one that sees everything and then fumbles at
- * random. The ladder moves both together, which is what makes the rungs feel
- * like different players rather than the same player handicapped.
+ * - **`maxNodes`** — how hard it looks. Also what the player waits for, and the
+ *   honest way to bound a search: a *depth* limit takes wildly different times
+ *   in different positions, so the same bot would sometimes answer at once and
+ *   sometimes sit there.
+ * - **`skill-accuracy`** — the percentage of turns it plays the best move it
+ *   found.
+ * - **`skill-movePool`** — how many alternatives it chooses among on the other
+ *   turns. Counted *below* the best move, so accuracy alone decides whether the
+ *   best move gets played and the two settings stay independent.
+ * - **`skill-allowLosing`** — whether moves that lose outright are among those
+ *   alternatives. This is the one that decides whether a bot can be beaten by a
+ *   threat it can see. Without it a bot errs constantly and still never hangs a
+ *   game: every one of its alternatives is another sound reply, so a player can
+ *   threaten repeatedly and watch all of them get answered.
  *
  * Times measured against this build on a desktop: 10k about half a second, 20k
- * 0.7s, 50k 1.7s, 100k 5.4s, 200k 14.7s. Note that is not a straight line — a
- * deeper search is slower per node, so doubling the budget more than doubles
- * the wait at the top of the ladder.
- *
- * A phone is two to four times slower again. Because the budget is work rather
- * than time, only the waiting changes, never the move.
+ * 0.7s, 50k 1.7s, 100k 5.4s, 200k 14.7s. Not a straight line — a deeper search
+ * is slower per node, so doubling the budget more than doubles the wait at the
+ * top. A phone is two to four times slower again; because the budget is work
+ * rather than time, only the waiting changes, never the move.
  */
 export const BOTS: BotSpec[] = [
   {
@@ -94,67 +97,63 @@ export const BOTS: BotSpec[] = [
     strength: 10,
     engineBuild: ENGINE_BUILD,
     description:
-      "Barely looks ahead and often picks a worse move than it found. Where to start.",
-    options: { ...COMMON, maxNodes: 10_000, skill: 25 },
+      "Never plays the best move it found, and will walk into a threat. Where to start.",
+    options: {
+      ...COMMON,
+      maxNodes: 10_000,
+      "skill-accuracy": 0,
+      "skill-movePool": 5,
+      "skill-allowLosing": true,
+    },
   },
   {
     username: "Helios-Casual",
     strength: 30,
     engineBuild: ENGINE_BUILD,
-    description: "Quick, and makes real mistakes you can punish.",
-    options: { ...COMMON, maxNodes: 20_000, skill: 50 },
+    description: "Quick, loose, and can still lose a game outright. Punishable.",
+    options: {
+      ...COMMON,
+      maxNodes: 20_000,
+      "skill-accuracy": 25,
+      "skill-movePool": 4,
+      "skill-allowLosing": true,
+    },
   },
   {
     username: "Helios-Club",
     strength: 60,
     engineBuild: ENGINE_BUILD,
-    description: "Solid. Takes most of its chances, and punishes anything obvious.",
-    options: { ...COMMON, maxNodes: 50_000, skill: 75 },
+    description: "Finds the right move half the time, and blunders the rest.",
+    options: {
+      ...COMMON,
+      maxNodes: 50_000,
+      "skill-accuracy": 50,
+      "skill-movePool": 3,
+      "skill-allowLosing": true,
+    },
   },
   {
     username: "Helios-Sharp",
     strength: 85,
     engineBuild: ENGINE_BUILD,
-    description: "Thinks properly and rarely slips. You will need a real idea.",
-    options: { ...COMMON, maxNodes: 100_000, skill: 90 },
+    description:
+      "Slips now and then, but never into a losing move. You will need a real idea.",
+    options: {
+      ...COMMON,
+      maxNodes: 100_000,
+      "skill-accuracy": 80,
+      "skill-movePool": 3,
+      "skill-allowLosing": false,
+    },
   },
   {
     username: "Helios-Full",
     strength: 100,
     engineBuild: ENGINE_BUILD,
     description: "No handicap at all. Expect a long wait, and a hard game.",
-    options: { ...COMMON, maxNodes: 200_000, skill: 100 },
+    options: { ...COMMON, maxNodes: 200_000, "skill-accuracy": 100 },
   },
 ];
-
-/**
- * A controlled set for judging the skill dial on its own.
- *
- * Every one thinks exactly as hard — 50,000 nodes, about two seconds — so the
- * only thing that differs between them is how often they take the best move
- * they found. Playing two of these back to back isolates skill in a way the
- * ladder above cannot, because there both dials move at once.
- *
- * These are for testing. Delete the block and they stop being offered, though
- * the accounts and any games played against them stay — syncBots never removes
- * anything, on the grounds that deleting an account would blank out its
- * opponents' history.
- */
-const SKILL_TEST_NODES = 50_000;
-
-const SKILL_TESTS: BotSpec[] = [0, 25, 50, 75, 100].map((skill) => ({
-  username: `Skill-${String(skill).padStart(3, "0")}`,
-  // Ordered after the ladder so the two sets do not interleave in the list.
-  strength: 100 + skill,
-  engineBuild: ENGINE_BUILD,
-  description:
-    skill === 100
-      ? "Test bot. Always its best move, at a fixed two seconds of thinking."
-      : `Test bot. Best move ${skill}% of turns, at a fixed two seconds of thinking.`,
-  options: { ...COMMON, maxNodes: SKILL_TEST_NODES, skill },
-}));
-
-BOTS.push(...SKILL_TESTS);
 
 export interface SyncResult {
   created: string[];

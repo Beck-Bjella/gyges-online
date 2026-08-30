@@ -11,8 +11,12 @@ export interface BotOption {
   description: string | null;
   /** Node budget, when the bot is bounded that way. */
   maxNodes: number | null;
-  /** How well it chooses among what it found, 0-100. */
-  skill: number | null;
+  /** Percentage of turns it plays the best move it found. */
+  accuracy: number | null;
+  /** How many alternatives it chooses among on the other turns. */
+  movePool: number | null;
+  /** Whether those alternatives include moves that lose outright. */
+  allowLosing: boolean;
 }
 
 /**
@@ -79,9 +83,9 @@ export default function NewBotGameForm({ bots }: { bots: BotOption[] }) {
             detail={chosen.maxNodes ? `${chosen.maxNodes.toLocaleString()} positions` : ""}
           />
           <Dial
-            label="Skill"
-            value={chosen.skill == null ? "—" : `${chosen.skill}%`}
-            detail={describeSkill(chosen.skill)}
+            label="Accuracy"
+            value={chosen.accuracy == null ? "—" : `${chosen.accuracy}%`}
+            detail={describeAccuracy(chosen)}
           />
         </div>
       )}
@@ -172,12 +176,18 @@ function describeThinking(maxNodes: number | null): string {
 }
 
 /**
- * What a skill number means, in play.
+ * What the accuracy dial means, in play.
  *
- * It is the percentage of turns the engine takes the best move it found; the
- * rest of the time it plays one of the next few instead.
+ * Worth spelling out rather than showing the percentage alone, because the
+ * number on its own does not say how bad the other turns are — and whether a
+ * bot can hang a game outright matters far more to a player than whether it
+ * errs 20% of the time or 50%.
  */
-function describeSkill(skill: number | null): string {
-  if (skill == null || skill >= 100) return "always its best move";
-  return `best move ${skill}% of turns`;
+function describeAccuracy(bot: BotOption): string {
+  if (bot.accuracy == null || bot.accuracy >= 100) return "always its best move";
+  const pool = bot.movePool ?? 3;
+  const otherwise = `otherwise one of the next ${pool}`;
+  return bot.allowLosing
+    ? `best move ${bot.accuracy}% of turns, ${otherwise} — losing moves included`
+    : `best move ${bot.accuracy}% of turns, ${otherwise}, but never a losing one`;
 }
