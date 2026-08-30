@@ -76,15 +76,17 @@ const COMMON: Record<string, string | number | boolean> = {
  * bite here.
  *
  * Two things move together up the ladder: how often it plays the best move, and
- * how bad the move is when it does not. Accuracy alone was not enough — with an
- * accurate evaluation the 4th-best move is still a good move, so a bot that
- * never played its best move was still hard to beat.
+ * how far down it can reach when it does not.
  *
- * - **`skill-poolFrom` / `skill-poolTo`** — which slice of the ranked list a
- *   slip lands in, as a percent of however many moves the position offers. A
- *   share rather than fixed ranks, so "middling move" means the same thing
- *   whether there are six replies or eighteen. Never includes the best move,
- *   so accuracy alone decides whether that gets played.
+ * - **`skill-poolDepth`** — how far down the ranked list a slip may reach, as a
+ *   percent of however many moves the position offers. A share rather than a
+ *   fixed rank, so it means the same whether there are six replies or eighteen.
+ *
+ *   There is deliberately no floor. An earlier version had one, and it made
+ *   every bot bimodal: it played either the single best move or something
+ *   definitely poor, with nothing in between, because a slip was *required* to
+ *   land some distance down. Without a floor a slip may be second-best or may
+ *   be dreadful, which is how a person's mistakes actually vary.
  * - **`skill-allowLosing`** — whether moves the search sees as a forced loss
  *   stay choosable. Losing moves sort to the *bottom* of the list, so this and
  *   the window together are a gradient rather than a switch: with it on, a low
@@ -112,9 +114,8 @@ export const BOTS: BotSpec[] = [
     options: {
       ...COMMON,
       maxPly: 1,
-      "skill-accuracy": 0,
-      "skill-poolFrom": 50,
-      "skill-poolTo": 100,
+      "skill-accuracy": 30,
+      "skill-poolDepth": 100,
       "skill-allowLosing": true,
     },
   },
@@ -126,9 +127,8 @@ export const BOTS: BotSpec[] = [
     options: {
       ...COMMON,
       maxPly: 1,
-      "skill-accuracy": 20,
-      "skill-poolFrom": 35,
-      "skill-poolTo": 80,
+      "skill-accuracy": 50,
+      "skill-poolDepth": 80,
       "skill-allowLosing": true,
     },
   },
@@ -140,9 +140,8 @@ export const BOTS: BotSpec[] = [
     options: {
       ...COMMON,
       maxPly: 3,
-      "skill-accuracy": 45,
-      "skill-poolFrom": 20,
-      "skill-poolTo": 60,
+      "skill-accuracy": 70,
+      "skill-poolDepth": 55,
       "skill-allowLosing": true,
     },
   },
@@ -154,9 +153,8 @@ export const BOTS: BotSpec[] = [
     options: {
       ...COMMON,
       maxPly: 3,
-      "skill-accuracy": 70,
-      "skill-poolFrom": 5,
-      "skill-poolTo": 30,
+      "skill-accuracy": 85,
+      "skill-poolDepth": 30,
     },
   },
   {

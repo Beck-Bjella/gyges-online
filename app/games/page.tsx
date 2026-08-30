@@ -43,16 +43,14 @@ export default async function GamesPage() {
     let maxNodes: number | null = null;
     let maxPly: number | null = null;
     let accuracy: number | null = null;
-    let poolFrom: number | null = null;
-    let poolTo: number | null = null;
+    let poolDepth: number | null = null;
     let allowLosing = false;
     try {
       const parsed = JSON.parse(b.options ?? "{}") as Record<string, unknown>;
       if (typeof parsed.maxNodes === "number") maxNodes = parsed.maxNodes;
       if (typeof parsed.maxPly === "number") maxPly = parsed.maxPly;
       if (typeof parsed["skill-accuracy"] === "number") accuracy = parsed["skill-accuracy"];
-      if (typeof parsed["skill-poolFrom"] === "number") poolFrom = parsed["skill-poolFrom"];
-      if (typeof parsed["skill-poolTo"] === "number") poolTo = parsed["skill-poolTo"];
+      if (typeof parsed["skill-poolDepth"] === "number") poolDepth = parsed["skill-poolDepth"];
       allowLosing = parsed["skill-allowLosing"] === true;
     } catch {
       /* a malformed row simply shows no dials */
@@ -64,8 +62,7 @@ export default async function GamesPage() {
       maxNodes,
       maxPly,
       accuracy,
-      poolFrom,
-      poolTo,
+      poolDepth,
       allowLosing,
     };
   });
