@@ -72,14 +72,16 @@ const COMMON: Record<string, string | number | boolean> = {
  * desktop — makes the ladder a ladder of *judgement*, and makes the wait the
  * same whichever opponent is chosen.
  *
- * So the only thing that changes between these five is `skill-accuracy`: the
- * percentage of turns the engine plays the best move it found. The other two
- * settings are deliberately held constant, because a rung that moved three
- * dials at once would tell you nothing about which one you were feeling.
+ * Two things move together up the ladder: how often it plays the best move, and
+ * how bad the move is when it does not. Accuracy alone was not enough — with an
+ * accurate evaluation the 4th-best move is still a good move, so a bot that
+ * never played its best move was still hard to beat.
  *
- * - **`skill-movePool: 4`** — how many alternatives it chooses among on the
- *   turns it does not play the best move. Counted *below* the best move, so
- *   accuracy alone decides whether the best move gets played.
+ * - **`skill-poolFrom` / `skill-poolTo`** — which slice of the ranked list a
+ *   slip lands in, as a percent of however many moves the position offers. A
+ *   share rather than fixed ranks, so "middling move" means the same thing
+ *   whether there are six replies or eighteen. Never includes the best move,
+ *   so accuracy alone decides whether that gets played.
  * - **`skill-allowLosing: true`** — those alternatives include moves that lose
  *   outright. This is what makes a bot beatable by a threat it can see. Without
  *   it a bot errs constantly and still never hangs a game, because every
@@ -96,10 +98,9 @@ const COMMON: Record<string, string | number | boolean> = {
  */
 const NODES = 50_000;
 
-/** Settings shared by every handicapped bot, so only accuracy varies. */
+/** Settings shared by every handicapped bot. */
 const HANDICAP = {
   maxNodes: NODES,
-  "skill-movePool": 4,
   "skill-allowLosing": true,
 };
 
@@ -110,28 +111,52 @@ export const BOTS: BotSpec[] = [
     engineBuild: ENGINE_BUILD,
     description:
       "Never plays the best move it found. Walks into threats. Where to start.",
-    options: { ...COMMON, ...HANDICAP, "skill-accuracy": 0 },
+    options: {
+      ...COMMON,
+      ...HANDICAP,
+      "skill-accuracy": 0,
+      "skill-poolFrom": 40,
+      "skill-poolTo": 90,
+    },
   },
   {
     username: "Helios-Casual",
     strength: 40,
     engineBuild: ENGINE_BUILD,
     description: "Finds the right move about a quarter of the time. Very punishable.",
-    options: { ...COMMON, ...HANDICAP, "skill-accuracy": 25 },
+    options: {
+      ...COMMON,
+      ...HANDICAP,
+      "skill-accuracy": 25,
+      "skill-poolFrom": 25,
+      "skill-poolTo": 65,
+    },
   },
   {
     username: "Helios-Club",
     strength: 60,
     engineBuild: ENGINE_BUILD,
     description: "Right half the time, and can still lose a game outright.",
-    options: { ...COMMON, ...HANDICAP, "skill-accuracy": 50 },
+    options: {
+      ...COMMON,
+      ...HANDICAP,
+      "skill-accuracy": 50,
+      "skill-poolFrom": 10,
+      "skill-poolTo": 45,
+    },
   },
   {
     username: "Helios-Sharp",
     strength: 80,
     engineBuild: ENGINE_BUILD,
     description: "Slips about one turn in four. You will need a real idea.",
-    options: { ...COMMON, ...HANDICAP, "skill-accuracy": 75 },
+    options: {
+      ...COMMON,
+      ...HANDICAP,
+      "skill-accuracy": 75,
+      "skill-poolFrom": 0,
+      "skill-poolTo": 25,
+    },
   },
   {
     username: "Helios-Full",

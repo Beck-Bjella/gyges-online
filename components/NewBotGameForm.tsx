@@ -13,8 +13,9 @@ export interface BotOption {
   maxNodes: number | null;
   /** Percentage of turns it plays the best move it found. */
   accuracy: number | null;
-  /** How many alternatives it chooses among on the other turns. */
-  movePool: number | null;
+  /** Which slice of the ranked list a slip lands in, as percentages. */
+  poolFrom: number | null;
+  poolTo: number | null;
   /** Whether those alternatives include moves that lose outright. */
   allowLosing: boolean;
 }
@@ -185,8 +186,13 @@ function describeThinking(maxNodes: number | null): string {
  */
 function describeAccuracy(bot: BotOption): string {
   if (bot.accuracy == null || bot.accuracy >= 100) return "always its best move";
-  const pool = bot.movePool ?? 3;
-  const otherwise = `otherwise one of the next ${pool}`;
+  const from = bot.poolFrom ?? 0;
+  const otherwise =
+    from >= 50
+      ? "otherwise one of its worst"
+      : from >= 20
+        ? "otherwise a middling one"
+        : "otherwise one of the next few";
   return bot.allowLosing
     ? `best move ${bot.accuracy}% of turns, ${otherwise} — losing moves included`
     : `best move ${bot.accuracy}% of turns, ${otherwise}, but never a losing one`;
