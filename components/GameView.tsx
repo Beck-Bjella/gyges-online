@@ -223,13 +223,20 @@ export default function GameView({
         });
         if (!res.ok) {
           const body = (await res.json().catch(() => ({}))) as { error?: string };
+          // Both of these have to go back, not just the board. `justPlayed`
+          // draws the arrows, and it is otherwise cleared only when a new
+          // server position arrives — which a refused move never produces, so
+          // the arrows for a move that never happened stayed on screen until
+          // the page was reloaded.
           setOptimistic(null);
+          setJustPlayed(null);
           setError(body.error ?? "The server rejected that move.");
         } else {
           router.refresh();
         }
       } catch {
         setOptimistic(null);
+        setJustPlayed(null);
         setError("Could not reach the server.");
       } finally {
         setPending(false);

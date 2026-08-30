@@ -139,6 +139,55 @@ export default function Board({
     [onMove, flipped],
   );
 
+  /**
+   * View-space helper: the rules work in board space, the board draws in view
+   * space, and flipMove maps between them (it is its own inverse).
+   */
+  const toView = useCallback(
+    (indices: number[]) => (flipped ? flipMove(indices) : indices),
+    [flipped],
+  );
+  const toBoard = useCallback(
+    (i: number) => (flipped ? flipMove([i])[0] : i),
+    [flipped],
+  );
+
+  /**
+   * Where the piece in hand can finish.
+   *
+   * Computed from the unflipped board, because the rules are stated in board
+   * space; the resulting indices are mapped back for drawing.
+   */
+  const legalTargets = useMemo(() => {
+    if (!interactive || player === undefined) return new Set<number>();
+    if (drag.kind !== "piece") return new Set<number>();
+
+    const fromBoard = toBoard(drag.from);
+    if (!canMoveFrom(board, player, fromBoard)) return new Set<number>();
+
+    return new Set(toView([...reachableFrom(board, player, fromBoard)]));
+  }, [interactive, player, drag, board, toView, toBoard]);
+
+  /**
+   * Where a displaced piece may be put down.
+   *
+   * Not simply "anywhere empty": a displaced piece may not be dropped behind
+   * the opponent's active line, and the square the mover vacated IS available.
+   * dropSquares knows both rules, so this shows the real answer rather than an
+   * approximation the server would then reject.
+   */
+  const dropTargets = useMemo(() => {
+    if (!interactive || player === undefined) return new Set<number>();
+    if (drag.kind !== "displaced") return new Set<number>();
+
+    const fromBoard = toBoard(drag.from);
+    const landedBoard = toBoard(drag.landedOn);
+    const squares = dropSquares(board, player, fromBoard).filter(
+      (i) => i !== landedBoard,
+    );
+    return new Set(toView(squares));
+  }, [interactive, player, drag, board, toView, toBoard]);
+
   const onPointerDown = useCallback(
     (e: React.PointerEvent<SVGSVGElement>) => {
       if (!interactive) return;
@@ -148,7 +197,11 @@ export default function Board({
       // Placing a displaced piece takes priority over starting a new drag.
       if (drag.kind === "displaced") {
         const target = nearestIndex(p.x, p.y, view, true);
-        if (target !== null && target !== drag.from) {
+        // The square the mover came from is a legal home for the displaced
+        // piece — it is empty by the time the move resolves, and dropTargets
+        // already marks it. Excluding it here made clicking a highlighted
+        // square silently cancel the move instead.
+        if (target !== null && dropTargets.has(target)) {
           emit([drag.from, drag.landedOn, target]);
         }
         setDrag({ kind: "none" });
@@ -160,7 +213,7 @@ export default function Board({
       e.currentTarget.setPointerCapture(e.pointerId);
       setDrag({ kind: "piece", from, x: p.x, y: p.y });
     },
-    [interactive, toBoardSpace, drag, view, emit],
+    [interactive, toBoardSpace, drag, view, emit, dropTargets],
   );
 
   const onPointerMove = useCallback(
@@ -250,55 +303,6 @@ export default function Board({
     if (drag.kind === "displaced") return nearestIndex(drag.x, drag.y, view, true);
     return null;
   })();
-
-  /**
-   * View-space helper: the rules work in board space, the board draws in view
-   * space, and flipMove maps between them (it is its own inverse).
-   */
-  const toView = useCallback(
-    (indices: number[]) => (flipped ? flipMove(indices) : indices),
-    [flipped],
-  );
-  const toBoard = useCallback(
-    (i: number) => (flipped ? flipMove([i])[0] : i),
-    [flipped],
-  );
-
-  /**
-   * Where the piece in hand can finish.
-   *
-   * Computed from the unflipped board, because the rules are stated in board
-   * space; the resulting indices are mapped back for drawing.
-   */
-  const legalTargets = useMemo(() => {
-    if (!interactive || player === undefined) return new Set<number>();
-    if (drag.kind !== "piece") return new Set<number>();
-
-    const fromBoard = toBoard(drag.from);
-    if (!canMoveFrom(board, player, fromBoard)) return new Set<number>();
-
-    return new Set(toView([...reachableFrom(board, player, fromBoard)]));
-  }, [interactive, player, drag, board, toView, toBoard]);
-
-  /**
-   * Where a displaced piece may be put down.
-   *
-   * Not simply "anywhere empty": a displaced piece may not be dropped behind
-   * the opponent's active line, and the square the mover vacated IS available.
-   * dropSquares knows both rules, so this shows the real answer rather than an
-   * approximation the server would then reject.
-   */
-  const dropTargets = useMemo(() => {
-    if (!interactive || player === undefined) return new Set<number>();
-    if (drag.kind !== "displaced") return new Set<number>();
-
-    const fromBoard = toBoard(drag.from);
-    const landedBoard = toBoard(drag.landedOn);
-    const squares = dropSquares(board, player, fromBoard).filter(
-      (i) => i !== landedBoard,
-    );
-    return new Set(toView(squares));
-  }, [interactive, player, drag, board, toView, toBoard]);
 
   /**
    * Every square to mark right now.
