@@ -114,6 +114,9 @@ const trayCx = (i: number) => VIEWBOX / 2 + (i - 2.5) * TRAY_PITCH;
 /** The most rings any piece carries, which fixes where every ring sits. */
 const MAX_RINGS = 3;
 
+/** How thick each ring is drawn. */
+const RING_WIDTH = 6;
+
 /**
  * Where a piece's rings sit, outermost first.
  *
@@ -127,7 +130,7 @@ const MAX_RINGS = 3;
  * sits on the piece rather than straddling its border.
  */
 function ringRadii(kind: number, radius: number): number[] {
-  const outer = radius - 1.6;
+  const outer = radius - RING_WIDTH / 2;
   return Array.from({ length: kind }, (_, i) => (outer * (MAX_RINGS - i)) / MAX_RINGS);
 }
 
@@ -543,6 +546,21 @@ export default function Board({
           <stop offset="55%" stopColor="var(--piece-mid)" />
           <stop offset="100%" stopColor="var(--piece-dark)" />
         </radialGradient>
+        {/* Rings share one light source. The default bounding-box units would
+            scale the gradient to each circle, so every ring would carry its own
+            highlight and the piece would stop reading as one object. Drawn in
+            user space, offset up and left, they are lit together. */}
+        <radialGradient
+          id="ring-gradient"
+          gradientUnits="userSpaceOnUse"
+          cx="-11"
+          cy="-13"
+          r="48"
+        >
+          <stop offset="0%" stopColor="var(--piece-light)" />
+          <stop offset="55%" stopColor="var(--piece-mid)" />
+          <stop offset="100%" stopColor="var(--piece-dark)" />
+        </radialGradient>
         <radialGradient id="gridspot-gradient" cx="0.5" cy="0.5" r="0.5">
           <stop offset="0%" stopColor="var(--gridspot-light)" />
           <stop offset="100%" stopColor="var(--gridspot-dark)" />
@@ -565,8 +583,8 @@ export default function Board({
           viewBox="0 0 10 10"
           refX="8"
           refY="5"
-          markerWidth="5"
-          markerHeight="5"
+          markerWidth="3.8"
+          markerHeight="3.8"
           orient="auto-start-reverse"
         >
           {/* Outlined like the shafts are. Without it the head — the widest,
@@ -703,21 +721,28 @@ export default function Board({
           filter={p.lifted ? "url(#lifted-shadow)" : "url(#piece-shadow)"}
           style={{ pointerEvents: "none" }}
         >
-          <circle
-            r={p.lifted ? PIECE_RADIUS * 1.08 : PIECE_RADIUS}
-            fill="url(#piece-gradient)"
-            stroke="#3a2818"
-            strokeWidth="1"
-          />
-          {ringRadii(p.kind, p.lifted ? PIECE_RADIUS * 1.08 : PIECE_RADIUS).map((r) => (
-            <circle
-              key={r}
-              r={r}
-              fill="none"
-              stroke="var(--piece-ring)"
-              strokeWidth="3.2"
-            />
-          ))}
+          {/* A piece is its rings and nothing else — the middle is the board
+              showing through. So the rings are drawn in the pale piece colour
+              rather than the dark one, which only ever worked as an inlay on a
+              filled disc. The innermost ring of a three is solid: at that size
+              a ring reads as a smudge rather than a ring. */}
+          {(() => {
+            const radius = p.lifted ? PIECE_RADIUS * 1.08 : PIECE_RADIUS;
+            const radii = ringRadii(p.kind, radius);
+            return radii.map((r, i) =>
+              i === MAX_RINGS - 1 ? (
+                <circle key={r} r={r + RING_WIDTH / 2} fill="url(#ring-gradient)" />
+              ) : (
+                <circle
+                  key={r}
+                  r={r}
+                  fill="none"
+                  stroke="url(#ring-gradient)"
+                  strokeWidth={RING_WIDTH}
+                />
+              ),
+            );
+          })()}
         </g>
       ))}
       {/* Dots that belong on a piece — one the piece in hand may land on and

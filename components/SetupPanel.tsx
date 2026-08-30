@@ -149,18 +149,22 @@ function MiniLine({ slots }: { slots: number[] | null }) {
         }
         return (
           <g key={i}>
-            <circle cx={cx} cy={12} r={9.5} fill="var(--piece-mid)" stroke="#3a2818" />
-            {Array.from({ length: kind }, (_, i) => ((9.5 - 0.8) * (3 - i)) / 3).map((r) => (
-              <circle
-                key={r}
-                cx={cx}
-                cy={12}
-                r={r}
-                fill="none"
-                stroke="var(--piece-ring)"
-                strokeWidth="1.8"
-              />
-            ))}
+            {Array.from({ length: kind }, (_, i) => ((9.5 - 0.9) * (3 - i)) / 3).map(
+              (r, i) =>
+                i === 2 ? (
+                  <circle key={r} cx={cx} cy={12} r={r + 0.9} fill="var(--piece-mid)" />
+                ) : (
+                  <circle
+                    key={r}
+                    cx={cx}
+                    cy={12}
+                    r={r}
+                    fill="none"
+                    stroke="var(--piece-mid)"
+                    strokeWidth="1.8"
+                  />
+                ),
+            )}
           </g>
         );
       })}

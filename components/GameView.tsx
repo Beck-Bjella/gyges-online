@@ -110,6 +110,11 @@ export default function GameView({
     setOptimistic(null);
     setStaged(null);
     setJustPlayed(null);
+    // The arrangement preview goes here too, not the moment it is submitted.
+    // It is the only thing drawing the pieces a player has just placed, so
+    // clearing it on submit emptied the home row until the server answered —
+    // a visible reset of the board on the way to the same position.
+    setSetupPreview(null);
   }, [boardKey]);
 
   const liveBoard = optimistic ?? board;
@@ -280,7 +285,6 @@ export default function GameView({
           const body = (await res.json().catch(() => ({}))) as { error?: string };
           setError(body.error ?? "The server rejected that placement.");
         } else {
-          setSetupPreview(null);
           router.refresh();
         }
       } catch {
