@@ -65,93 +65,80 @@ const COMMON: Record<string, string | number | boolean> = {
 /**
  * The bots, weakest first.
  *
- * Four independent settings, not one strength number. There is no honest scale
- * running from "beginner" to "engine" — the search is far past a human even at
- * three ply — so rather than invent one, each bot is a hand-picked combination
- * and the settings say plainly what it does.
+ * **Every one thinks exactly as hard.** Scaling `maxNodes` up the ladder was
+ * tried and dropped: search depth is not the lever it looks like, because even
+ * a shallow search is far past a human, so the rungs mostly differed in how
+ * long the player waited. Holding the budget at 50,000 — about two seconds on a
+ * desktop — makes the ladder a ladder of *judgement*, and makes the wait the
+ * same whichever opponent is chosen.
  *
- * - **`maxNodes`** — how hard it looks. Also what the player waits for, and the
- *   honest way to bound a search: a *depth* limit takes wildly different times
- *   in different positions, so the same bot would sometimes answer at once and
- *   sometimes sit there.
- * - **`skill-accuracy`** — the percentage of turns it plays the best move it
- *   found.
- * - **`skill-movePool`** — how many alternatives it chooses among on the other
- *   turns. Counted *below* the best move, so accuracy alone decides whether the
- *   best move gets played and the two settings stay independent.
- * - **`skill-allowLosing`** — whether moves that lose outright are among those
- *   alternatives. This is the one that decides whether a bot can be beaten by a
- *   threat it can see. Without it a bot errs constantly and still never hangs a
- *   game: every one of its alternatives is another sound reply, so a player can
- *   threaten repeatedly and watch all of them get answered.
+ * So the only thing that changes between these five is `skill-accuracy`: the
+ * percentage of turns the engine plays the best move it found. The other two
+ * settings are deliberately held constant, because a rung that moved three
+ * dials at once would tell you nothing about which one you were feeling.
  *
- * Times measured against this build on a desktop: 10k about half a second, 20k
- * 0.7s, 50k 1.7s, 100k 5.4s, 200k 14.7s. Not a straight line — a deeper search
- * is slower per node, so doubling the budget more than doubles the wait at the
- * top. A phone is two to four times slower again; because the budget is work
- * rather than time, only the waiting changes, never the move.
+ * - **`skill-movePool: 4`** — how many alternatives it chooses among on the
+ *   turns it does not play the best move. Counted *below* the best move, so
+ *   accuracy alone decides whether the best move gets played.
+ * - **`skill-allowLosing: true`** — those alternatives include moves that lose
+ *   outright. This is what makes a bot beatable by a threat it can see. Without
+ *   it a bot errs constantly and still never hangs a game, because every
+ *   alternative is another sound reply.
+ *
+ * Helios-Full sets neither, taking the engine defaults. `skill-allowLosing`
+ * turns off two prunes in the search, which changes how the node budget is
+ * spent even when the engine never slips — measured as the same move with a
+ * different evaluation in about one position in six. A bot billed as having no
+ * handicap should have exactly none.
+ *
+ * A phone is two to four times slower than the two seconds above. Because the
+ * budget is work rather than time, only the waiting changes, never the move.
  */
+const NODES = 50_000;
+
+/** Settings shared by every handicapped bot, so only accuracy varies. */
+const HANDICAP = {
+  maxNodes: NODES,
+  "skill-movePool": 4,
+  "skill-allowLosing": true,
+};
+
 export const BOTS: BotSpec[] = [
   {
     username: "Helios-Novice",
-    strength: 10,
+    strength: 20,
     engineBuild: ENGINE_BUILD,
     description:
-      "Never plays the best move it found, and will walk into a threat. Where to start.",
-    options: {
-      ...COMMON,
-      maxNodes: 10_000,
-      "skill-accuracy": 0,
-      "skill-movePool": 5,
-      "skill-allowLosing": true,
-    },
+      "Never plays the best move it found. Walks into threats. Where to start.",
+    options: { ...COMMON, ...HANDICAP, "skill-accuracy": 0 },
   },
   {
     username: "Helios-Casual",
-    strength: 30,
+    strength: 40,
     engineBuild: ENGINE_BUILD,
-    description: "Quick, loose, and can still lose a game outright. Punishable.",
-    options: {
-      ...COMMON,
-      maxNodes: 20_000,
-      "skill-accuracy": 25,
-      "skill-movePool": 4,
-      "skill-allowLosing": true,
-    },
+    description: "Finds the right move about a quarter of the time. Very punishable.",
+    options: { ...COMMON, ...HANDICAP, "skill-accuracy": 25 },
   },
   {
     username: "Helios-Club",
     strength: 60,
     engineBuild: ENGINE_BUILD,
-    description: "Finds the right move half the time, and blunders the rest.",
-    options: {
-      ...COMMON,
-      maxNodes: 50_000,
-      "skill-accuracy": 50,
-      "skill-movePool": 3,
-      "skill-allowLosing": true,
-    },
+    description: "Right half the time, and can still lose a game outright.",
+    options: { ...COMMON, ...HANDICAP, "skill-accuracy": 50 },
   },
   {
     username: "Helios-Sharp",
-    strength: 85,
+    strength: 80,
     engineBuild: ENGINE_BUILD,
-    description:
-      "Slips now and then, but never into a losing move. You will need a real idea.",
-    options: {
-      ...COMMON,
-      maxNodes: 100_000,
-      "skill-accuracy": 80,
-      "skill-movePool": 3,
-      "skill-allowLosing": false,
-    },
+    description: "Slips about one turn in four. You will need a real idea.",
+    options: { ...COMMON, ...HANDICAP, "skill-accuracy": 75 },
   },
   {
     username: "Helios-Full",
     strength: 100,
     engineBuild: ENGINE_BUILD,
-    description: "No handicap at all. Expect a long wait, and a hard game.",
-    options: { ...COMMON, maxNodes: 200_000, "skill-accuracy": 100 },
+    description: "No handicap at all. Always its best move.",
+    options: { ...COMMON, maxNodes: NODES, "skill-accuracy": 100 },
   },
 ];
 
