@@ -12,8 +12,8 @@ export default function LeaderboardPage() {
     <>
       <h1>Leaderboard</h1>
       <p className="lede">
-        Finished games only. Ratings will arrive once move validation does —
-        ranking players is not meaningful while illegal moves are accepted.
+        Finished games between people. Games against the engine are not counted
+        here — they appear on each player&apos;s profile instead.
       </p>
 
       {rows.length === 0 ? (

@@ -935,13 +935,33 @@ export interface LeaderboardRow {
   played: number;
 }
 
-export interface PlayerStats {
-  user: User;
+/** A win/loss record over some set of games. */
+export interface Record_ {
   wins: number;
   losses: number;
   draws: number;
   played: number;
+}
+
+export interface PlayerStats {
+  user: User;
+  /**
+   * The record against other people. This is *the* record — it is what the
+   * leaderboard ranks and what a profile leads with.
+   *
+   * Games against the engine are deliberately not counted here. A bot plays a
+   * fixed, published strength and will happily play a thousand games, so
+   * beating one says something quite different from beating a person, and
+   * mixing them makes both numbers mean less. Kept in `vsBots` instead.
+   */
+  wins: number;
+  losses: number;
+  draws: number;
+  played: number;
+  /** Games in progress, against anyone. */
   active: number;
+  /** The record against the engine, shown separately. */
+  vsBots: Record_;
 }
 
 /** A player's public record. Returns null for an unknown name. */
@@ -949,36 +969,56 @@ export function playerStats(username: string): PlayerStats | null {
   const user = findUserByName(username);
   if (!user) return null;
 
+  // The opponent in each game — whichever seat this player is not in. Joining
+  // it is what lets a single pass split the record by who was on the other
+  // side. LEFT JOIN because an open game has no second player yet.
   const row = getDb()
     .prepare(
       `SELECT
-         SUM(CASE WHEN g.status = 'finished' AND
-                       ((g.player1_id = ? AND g.result = 1)
-                     OR (g.player2_id = ? AND g.result = -1)) THEN 1 ELSE 0 END) AS wins,
-         SUM(CASE WHEN g.status = 'finished' AND
-                       ((g.player1_id = ? AND g.result = -1)
-                     OR (g.player2_id = ? AND g.result = 1)) THEN 1 ELSE 0 END) AS losses,
-         SUM(CASE WHEN g.status = 'finished' AND g.result = 0 THEN 1 ELSE 0 END) AS draws,
-         SUM(CASE WHEN g.status = 'finished' THEN 1 ELSE 0 END) AS played,
-         SUM(CASE WHEN g.status IN ('active', 'setup') THEN 1 ELSE 0 END) AS active
-       FROM games g
-      WHERE g.player1_id = ? OR g.player2_id = ?`,
+         SUM(CASE WHEN done AND human AND won  THEN 1 ELSE 0 END) AS wins,
+         SUM(CASE WHEN done AND human AND lost THEN 1 ELSE 0 END) AS losses,
+         SUM(CASE WHEN done AND human AND drew THEN 1 ELSE 0 END) AS draws,
+         SUM(CASE WHEN done AND human          THEN 1 ELSE 0 END) AS played,
+         SUM(CASE WHEN done AND bot AND won    THEN 1 ELSE 0 END) AS bot_wins,
+         SUM(CASE WHEN done AND bot AND lost   THEN 1 ELSE 0 END) AS bot_losses,
+         SUM(CASE WHEN done AND bot AND drew   THEN 1 ELSE 0 END) AS bot_draws,
+         SUM(CASE WHEN done AND bot            THEN 1 ELSE 0 END) AS bot_played,
+         SUM(CASE WHEN running THEN 1 ELSE 0 END) AS active
+       FROM (
+         SELECT
+           g.status = 'finished' AS done,
+           g.status IN ('active', 'setup') AS running,
+           opp.bot_strength IS NULL AS human,
+           opp.bot_strength IS NOT NULL AS bot,
+           ((g.player1_id = @id AND g.result = 1)
+         OR (g.player2_id = @id AND g.result = -1)) AS won,
+           ((g.player1_id = @id AND g.result = -1)
+         OR (g.player2_id = @id AND g.result = 1)) AS lost,
+           g.result = 0 AS drew
+         FROM games g
+         LEFT JOIN users opp
+           ON opp.id = CASE WHEN g.player1_id = @id THEN g.player2_id
+                            ELSE g.player1_id END
+        WHERE g.player1_id = @id OR g.player2_id = @id
+       )`,
     )
-    .get(user.id, user.id, user.id, user.id, user.id, user.id) as {
-    wins: number | null;
-    losses: number | null;
-    draws: number | null;
-    played: number | null;
-    active: number | null;
-  };
+    .get({ id: user.id }) as Record<string, number | null>;
+
+  const n = (k: string) => row[k] ?? 0;
 
   return {
     user,
-    wins: row.wins ?? 0,
-    losses: row.losses ?? 0,
-    draws: row.draws ?? 0,
-    played: row.played ?? 0,
-    active: row.active ?? 0,
+    wins: n("wins"),
+    losses: n("losses"),
+    draws: n("draws"),
+    played: n("played"),
+    active: n("active"),
+    vsBots: {
+      wins: n("bot_wins"),
+      losses: n("bot_losses"),
+      draws: n("bot_draws"),
+      played: n("bot_played"),
+    },
   };
 }
 
@@ -1049,10 +1089,16 @@ export function timingStats(userId: string): TimingStats {
 /**
  * The human leaderboard.
  *
- * Bots are excluded. They are real accounts with real records, but ranking a
- * calibration point against people is a category error: a bot's score says
- * what the engine was configured to do, not how well it played. They get their
- * own board, ordered by strength rather than by wins — see botLeaderboard().
+ * Bots are excluded, and so are **games against them**. They are real accounts
+ * with real records, but ranking a calibration point against people is a
+ * category error: a bot's score says what the engine was configured to do, not
+ * how well it played. And a player who beat Helios-Glance forty times has not
+ * out-performed one who beat a person twice — counting those together would
+ * make the board a measure of persistence rather than skill.
+ *
+ * Bot games still appear on a player's profile, under their own heading; they
+ * are simply not what the ranking is about. Bots get their own board, ordered
+ * by strength rather than wins — see botLeaderboard().
  */
 export function leaderboard(limit = 25): LeaderboardRow[] {
   return getDb()
@@ -1067,7 +1113,13 @@ export function leaderboard(limit = 25): LeaderboardRow[] {
          FROM users u
          JOIN games g
            ON (g.player1_id = u.id OR g.player2_id = u.id) AND g.status = 'finished'
-        WHERE u.deleted_at IS NULL AND u.bot_strength IS NULL
+         -- The opponent, so games against the engine can be left out.
+         LEFT JOIN users opp
+           ON opp.id = CASE WHEN g.player1_id = u.id THEN g.player2_id
+                            ELSE g.player1_id END
+        WHERE u.deleted_at IS NULL
+          AND u.bot_strength IS NULL
+          AND opp.bot_strength IS NULL
         GROUP BY u.id, u.username
         ORDER BY wins DESC, played ASC, u.username ASC
         LIMIT ?`,

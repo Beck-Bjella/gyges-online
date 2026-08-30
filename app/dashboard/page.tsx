@@ -69,6 +69,7 @@ export default async function DashboardPage() {
       </header>
 
       <div className="statcards">
+        {/* Against people. Games against the engine are on the profile. */}
         <StatCard label="Played" value={stats.played} />
         <StatCard label="Won" value={stats.wins} accent="mint" />
         <StatCard label="Lost" value={stats.losses} />
