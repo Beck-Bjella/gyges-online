@@ -117,14 +117,8 @@ const MAX_RINGS = 3;
 /** How thick each ring is drawn. */
 const RING_WIDTH = 6;
 
-/**
- * Clear space between one ring and the next, edge to edge.
- *
- * Wider than it needs to look right on its own, because the gap is what sets
- * how far in the innermost ring lands — and on a three that ring is drawn solid,
- * so a narrow gap leaves a fat dot in the middle rather than a small one.
- */
-const RING_GAP = 5.8;
+/** Clear space between one ring and the next, edge to edge. */
+const RING_GAP = 3.8;
 
 
 /**
