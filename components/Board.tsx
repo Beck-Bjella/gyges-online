@@ -117,21 +117,25 @@ const MAX_RINGS = 3;
 /** How thick each ring is drawn. */
 const RING_WIDTH = 7.5;
 
+/** Clear space between one ring and the next, edge to edge. */
+const RING_GAP = 3.8;
+
 /**
  * Where a piece's rings sit, outermost first.
  *
- * The step is the same on every piece — a third of the radius — so a two's
- * inner ring lands exactly where a three's middle ring does. Dividing by the
- * piece's own count instead put them at different radii, which made the pieces
- * read as different sizes of thing rather than as one, two and three of the
- * same thing.
+ * Stepped by a fixed distance — one ring's thickness plus a gap — rather than
+ * by dividing the radius. Dividing tied the spacing to the thickness, so making
+ * the rings heavier closed the gaps between them and the piece turned into a
+ * disc with grooves. This way thickness and separation are set independently.
  *
- * The outermost is always on the edge, inset by the stroke's half-width so it
- * sits on the piece rather than straddling its border.
+ * The step is the same on every piece, so a two's inner ring lands exactly
+ * where a three's middle ring does, and the outermost always sits on the
+ * piece's edge rather than straddling it.
  */
 function ringRadii(kind: number, radius: number): number[] {
   const outer = radius - RING_WIDTH / 2;
-  return Array.from({ length: kind }, (_, i) => (outer * (MAX_RINGS - i)) / MAX_RINGS);
+  const step = (RING_WIDTH + RING_GAP) * (radius / PIECE_RADIUS);
+  return Array.from({ length: kind }, (_, i) => outer - i * step);
 }
 
 export default function Board({
