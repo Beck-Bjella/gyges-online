@@ -412,6 +412,16 @@ const GAME_JOINS = `
   LEFT JOIN users p2 ON p2.id = g.player2_id
 `;
 
+/**
+ * Who moves first, once both home rows are placed.
+ *
+ * Moving first is a real advantage in Gyges, and handing it to whoever happened
+ * to create the game made every game start the same way.
+ */
+function firstMover(): Player {
+  return Math.random() < 0.5 ? 1 : -1;
+}
+
 export function createGame(
   creatorId: string,
   moveSeconds = 259200,
@@ -738,8 +748,17 @@ export function submitSetup(
         encoded,
         ply,
         bothPlaced ? "active" : "setup",
-        // Player 1 places, then player 2 places, then player 1 moves first.
-        bothPlaced ? 1 : -1,
+        // Player 1 places, then player 2 places, then the first move goes to
+        // whichever side the coin says.
+        //
+        // Chosen here rather than at creation because setup order is fixed —
+        // player 1 arranges first either way — and because this is the moment
+        // it stops being decided and starts being recorded. Drawn once and
+        // written inside the transaction, so a retry cannot reroll it.
+        //
+        // Safe for replay: the moves table records `player` on every ply, so
+        // history never infers a side from whether the ply number is odd.
+        bothPlaced ? firstMover() : -1,
         now() + game.move_seconds,
         now(),
         gameId,

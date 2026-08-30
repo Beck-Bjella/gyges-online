@@ -74,11 +74,19 @@ function uniqueName(prefix: string): string {
   return `${prefix}${n++}`;
 }
 
-/** A game that has finished setup and is ready for ordinary play. */
+/**
+ * A game that has finished setup and is ready for ordinary play.
+ *
+ * The first move is handed to player 1, overriding the coin toss the real
+ * game makes. Every test below that is not *about* the toss wants a fixed
+ * starting side, and a random one would make them fail one run in two. The
+ * toss itself is covered by its own test.
+ */
 function twoPlayerGame(moveSeconds = 3600) {
   const { a, b, gameId } = gameInSetup(moveSeconds);
   submitSetup(gameId, a.id, STANDARD);
   submitSetup(gameId, b.id, STANDARD);
+  getDb().prepare("UPDATE games SET turn = 1 WHERE id = ?").run(gameId);
   return { a, b, gameId };
 }
 
@@ -149,6 +157,8 @@ test("renaming keeps every past game", () => {
   joinGame(g.id, b.id);
   submitSetup(g.id, a.id, STANDARD);
   submitSetup(g.id, b.id, STANDARD);
+  // About renaming, not turn order: pin the side the coin toss would pick.
+  getDb().prepare("UPDATE games SET turn = 1 WHERE id = ?").run(g.id);
   submitMove(g.id, a.id, P1_OPENING);
 
   const newName = uniqueName("newname");
@@ -269,7 +279,10 @@ test("players place in turn, then play begins", () => {
 
   const afterP2 = submitSetup(gameId, b.id, STANDARD);
   assert.equal(afterP2.status, "active", "both placed, play begins");
-  assert.equal(afterP2.turn, 1, "player 1 moves first");
+  assert.ok(
+    afterP2.turn === 1 || afterP2.turn === -1,
+    "one side or the other moves first",
+  );
   assert.equal(decodeBoard(afterP2.board).filter((v) => v !== 0).length, 12);
 });
 
@@ -552,6 +565,9 @@ test("a game records when it started and when it ended", () => {
 
   submitSetup(g.id, a.id, STANDARD);
   submitSetup(g.id, b.id, STANDARD);
+  // This test is about timestamps, not turn order, so pin the side the coin
+  // toss would otherwise pick.
+  getDb().prepare("UPDATE games SET turn = 1 WHERE id = ?").run(g.id);
   // 0 -> 6 -> 12 -> 13: the three-ring piece's first legal move.
   const done = submitMove(g.id, a.id, [0, 13]);
   assert.ok(done.updated_at >= joined.started_at!);
@@ -718,4 +734,17 @@ test("the leaderboard counts finished games", () => {
 before(() => {
   // Touch the database so the schema is created before the first test.
   getDb();
+});
+
+test("the first move goes to a random side", () => {
+  // Moving first is a real advantage, so it must not always fall to whoever
+  // created the game. Twenty games: the odds of one side taking all of them by
+  // chance are under one in five hundred thousand.
+  const starters = new Set<number>();
+  for (let i = 0; i < 20; i++) {
+    const { a, b, gameId } = gameInSetup();
+    submitSetup(gameId, a.id, STANDARD);
+    starters.add(submitSetup(gameId, b.id, STANDARD).turn);
+  }
+  assert.deepEqual([...starters].sort(), [-1, 1], "both sides should start some games");
 });
