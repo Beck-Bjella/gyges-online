@@ -64,14 +64,30 @@ export function boardToEngineString(board: BoardState): string {
  * The arrangement a bot places during setup.
  *
  * The engine cannot help here: it asserts a full twelve pieces before it will
- * search, and a home row being arranged has at most six. So the bot uses the
- * conventional order, which is a perfectly ordinary opening and keeps setup
- * deterministic like the rest of its play.
+ * search, and a home row being arranged has at most six. So the bot picks one
+ * of the ninety distinct orderings of the six pieces at random.
  *
- * Varying this per bot would be a real improvement — the arrangement is a
- * genuine decision, and always playing the same one makes a bot predictable
- * from move zero. It needs a way to judge arrangements, which the engine does
- * not currently offer.
+ * Random rather than judged, because judging would need the engine to evaluate
+ * an arrangement and it offers no way to. Random rather than fixed, because a
+ * fixed one made every game against every bot open identically — the same first
+ * position, forever, which is both dull and learnable.
+ *
+ * Chosen once per game and recorded in the moves table like any other ply, so
+ * a game still replays exactly.
+ */
+export function botSetup(): number[] {
+  const pieces = [1, 1, 2, 2, 3, 3];
+  // Fisher-Yates, which is uniform over all orderings; a sort with a random
+  // comparator is not, and quietly favours the identity order.
+  for (let i = pieces.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pieces[i], pieces[j]] = [pieces[j], pieces[i]];
+  }
+  return pieces;
+}
+
+/**
+ * The conventional arrangement, kept for tests and as a sensible default.
  */
 export const BOT_SETUP: readonly number[] = [3, 2, 1, 1, 2, 3];
 

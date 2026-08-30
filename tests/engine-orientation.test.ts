@@ -13,7 +13,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-const { boardForEngine, moveFromEngine, boardToEngineString, BOT_SETUP } =
+const { boardForEngine, moveFromEngine, boardToEngineString, BOT_SETUP, botSetup } =
   await import("../lib/game/engine.ts");
 const { startingBoard, emptyBoard, flipBoard, isValidSetup, P1_GOAL, P2_GOAL } =
   await import("../lib/game/board.ts");
@@ -87,4 +87,16 @@ test("round trip: a move legal for player 2 stays legal after flipping", () => {
 
 test("the bot's setup arrangement is a legal one", () => {
   assert.ok(isValidSetup([...BOT_SETUP]));
+});
+
+test("a bot's arrangement is always legal, and varies between games", () => {
+  const seen = new Set<string>();
+  for (let i = 0; i < 40; i++) {
+    const arrangement = botSetup();
+    assert.ok(isValidSetup(arrangement), `${arrangement.join("")} should be legal`);
+    seen.add(arrangement.join(""));
+  }
+  // 90 distinct orderings exist; drawing the same one forty times running is
+  // effectively impossible, so this catches a shuffle that does not shuffle.
+  assert.ok(seen.size > 1, "a bot should not open the same way every game");
 });

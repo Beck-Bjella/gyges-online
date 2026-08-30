@@ -23,6 +23,32 @@ interface Props {
   onPreview: (arrangement: (number | null)[]) => void;
 }
 
+/**
+ * Openings offered as one click, so a player need not think about placement
+ * before they have any idea what placement does.
+ *
+ * Every one is a legal ordering of the same six pieces — there is no advantage
+ * baked in, only a shape. The names describe where the large pieces sit,
+ * because that is the part that actually changes how the row plays.
+ */
+const OPENINGS: { name: string; slots: number[] }[] = [
+  { name: "Standard", slots: [3, 2, 1, 1, 2, 3] },
+  { name: "Centre", slots: [1, 2, 3, 3, 2, 1] },
+  { name: "Stepped", slots: [1, 2, 3, 1, 2, 3] },
+  { name: "Blocks", slots: [1, 1, 2, 2, 3, 3] },
+  { name: "Split", slots: [3, 1, 2, 2, 1, 3] },
+];
+
+/** A uniform shuffle of the six pieces. See botSetup() for the same reasoning. */
+function randomOpening(): number[] {
+  const pieces = [...SETUP_PIECES];
+  for (let i = pieces.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pieces[i], pieces[j]] = [pieces[j], pieces[i]];
+  }
+  return pieces;
+}
+
 const RING_LABEL: Record<number, string> = {
   1: "one ring",
   2: "two rings",
@@ -79,7 +105,7 @@ export default function SetupPanel({
 
   const reset = useCallback(() => update(Array(6).fill(null)), [update]);
 
-  const standard = useCallback(() => update([...SETUP_PIECES]), [update]);
+  const choose = useCallback((slots: number[]) => update([...slots]), [update]);
 
   const complete = slots.every((s) => s !== null);
 
@@ -135,15 +161,37 @@ export default function SetupPanel({
         >
           {pending ? "…" : "Confirm placement"}
         </button>
-        <button className="btn" onClick={standard} disabled={pending}>
-          Standard
-        </button>
         <button
           className="btn"
           onClick={reset}
           disabled={pending || slots.every((s) => s === null)}
         >
           Clear
+        </button>
+      </div>
+
+      <p className="muted" style={{ margin: "16px 0 8px" }}>
+        Or start from an opening:
+      </p>
+      <div className="setup-openings">
+        {OPENINGS.map((o) => (
+          <button
+            key={o.name}
+            className="btn btn-small"
+            onClick={() => choose(o.slots)}
+            disabled={pending}
+            title={o.slots.join(" ")}
+          >
+            {o.name}
+          </button>
+        ))}
+        <button
+          className="btn btn-small"
+          onClick={() => choose(randomOpening())}
+          disabled={pending}
+          title="Any legal ordering, at random"
+        >
+          Random
         </button>
       </div>
 

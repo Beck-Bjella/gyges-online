@@ -784,6 +784,21 @@ td.num {
 
 /* --- placing pieces before play ----------------------------------------- */
 
+/*
+ * The named openings. Wraps, because there are six of them and the panel is
+ * narrow on a phone.
+ */
+.setup-openings {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.btn-small {
+  padding: 5px 11px;
+  font-size: 13px;
+}
+
 .setup-slots,
 .setup-tray {
   display: flex;

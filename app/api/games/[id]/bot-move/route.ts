@@ -10,7 +10,7 @@ import {
   GameError,
 } from "@/lib/db/queries";
 import {
-  BOT_SETUP,
+  botSetup,
   boardForEngine,
   boardToEngineString,
   moveFromEngine,
@@ -99,7 +99,7 @@ export async function POST(
     // Handled here rather than by the engine, which requires a full twelve
     // pieces before it will search. No round trip to the browser is needed.
     if (game.status === "setup") {
-      const placed = submitSetup(id, bot.id, [...BOT_SETUP]);
+      const placed = submitSetup(id, bot.id, botSetup());
       return NextResponse.json({ done: true, game: placed });
     }
 
