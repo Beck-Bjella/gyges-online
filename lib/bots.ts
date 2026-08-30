@@ -82,16 +82,20 @@ const COMMON: Record<string, string | number | boolean> = {
  *   share rather than fixed ranks, so "middling move" means the same thing
  *   whether there are six replies or eighteen. Never includes the best move,
  *   so accuracy alone decides whether that gets played.
- * - **`skill-allowLosing: true`** — those alternatives include moves that lose
- *   outright. This is what makes a bot beatable by a threat it can see. Without
- *   it a bot errs constantly and still never hangs a game, because every
- *   alternative is another sound reply.
+ * **None of them can throw a game.** `skill-allowLosing` is left off, so moves
+ * the search sees as a forced loss are never choosable. Every bot here is safe
+ * within its horizon: it will not hand you the game, and beating it means
+ * outplaying it or finding something deeper than 50,000 nodes sees.
  *
- * Helios-Full sets neither, taking the engine defaults. `skill-allowLosing`
- * turns off two prunes in the search, which changes how the node budget is
- * spent even when the engine never slips — measured as the same move with a
- * different evaluation in about one position in six. A bot billed as having no
- * handicap should have exactly none.
+ * That was tried the other way first, and the reason it works now is the window.
+ * With `allowLosing` off and a pool of the top few, every alternative was
+ * another good move and the weakest bot was still hard — threaten it and it
+ * answers every time. The window reaches genuinely bad moves without needing
+ * losing ones, which is what makes "worse, but never suicidal" expressible.
+ *
+ * Leaving it off also means the search prunes normally. Turning it on disables
+ * two prunes, so the node budget gets spent on refuted lines — measured as the
+ * same move with a different evaluation in about one position in six.
  *
  * A phone is two to four times slower than the two seconds above. Because the
  * budget is work rather than time, only the waiting changes, never the move.
@@ -101,7 +105,6 @@ const NODES = 50_000;
 /** Settings shared by every handicapped bot. */
 const HANDICAP = {
   maxNodes: NODES,
-  "skill-allowLosing": true,
 };
 
 export const BOTS: BotSpec[] = [
@@ -110,52 +113,52 @@ export const BOTS: BotSpec[] = [
     strength: 20,
     engineBuild: ENGINE_BUILD,
     description:
-      "Never plays the best move it found. Walks into threats. Where to start.",
+      "Never plays the best move it found, and usually one of its worst. Where to start.",
     options: {
       ...COMMON,
       ...HANDICAP,
       "skill-accuracy": 0,
-      "skill-poolFrom": 40,
-      "skill-poolTo": 90,
+      "skill-poolFrom": 50,
+      "skill-poolTo": 100,
     },
   },
   {
     username: "Helios-Casual",
     strength: 40,
     engineBuild: ENGINE_BUILD,
-    description: "Finds the right move about a quarter of the time. Very punishable.",
+    description: "Finds the right move about a fifth of the time. Very punishable.",
     options: {
       ...COMMON,
       ...HANDICAP,
-      "skill-accuracy": 25,
-      "skill-poolFrom": 25,
-      "skill-poolTo": 65,
+      "skill-accuracy": 20,
+      "skill-poolFrom": 35,
+      "skill-poolTo": 80,
     },
   },
   {
     username: "Helios-Club",
     strength: 60,
     engineBuild: ENGINE_BUILD,
-    description: "Right half the time, and can still lose a game outright.",
+    description: "Right about half the time, and the rest are visibly worse.",
     options: {
       ...COMMON,
       ...HANDICAP,
-      "skill-accuracy": 50,
-      "skill-poolFrom": 10,
-      "skill-poolTo": 45,
+      "skill-accuracy": 45,
+      "skill-poolFrom": 20,
+      "skill-poolTo": 60,
     },
   },
   {
     username: "Helios-Sharp",
     strength: 80,
     engineBuild: ENGINE_BUILD,
-    description: "Slips about one turn in four. You will need a real idea.",
+    description: "Slips about one turn in three, but only slightly. You will need a real idea.",
     options: {
       ...COMMON,
       ...HANDICAP,
-      "skill-accuracy": 75,
-      "skill-poolFrom": 0,
-      "skill-poolTo": 25,
+      "skill-accuracy": 70,
+      "skill-poolFrom": 5,
+      "skill-poolTo": 30,
     },
   },
   {
