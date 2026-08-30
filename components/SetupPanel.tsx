@@ -149,7 +149,9 @@ function MiniLine({ slots }: { slots: number[] | null }) {
         }
         return (
           <g key={i}>
-            {Array.from({ length: kind }, (_, i) => ((9.5 - 1.1) * (3 - i)) / 3).map(
+            {/* The board's geometry at a third the size: fixed step, so the
+                gaps do not close as the rings thicken. See ringRadii there. */}
+            {Array.from({ length: kind }, (_, i) => 9.5 - 1.1 - i * 3.35).map(
               (r, i) =>
                 i === 2 ? (
                   <circle key={r} cx={cx} cy={12} r={r + 1.1} fill="var(--piece-mid)" />
