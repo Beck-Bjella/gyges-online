@@ -594,6 +594,35 @@ input::placeholder {
 
 /* --- grid --------------------------------------------------------------- */
 
+/*
+ * The game page gets more room than the rest of the site.
+ *
+ * Everywhere else 1120px keeps text at a readable measure. A board is not text:
+ * it is the thing being looked at, and the reading-width cap was holding it
+ * well under what the screen could show.
+ *
+ * Widened here rather than on `main`, which the root layout owns and every
+ * other page shares. `left: 50%` with a half-width translate re-centres an
+ * element wider than its parent, so this needs no wrapper class and no change
+ * to the layout.
+ */
+.game-grid {
+  width: min(1500px, calc(100vw - 48px));
+  gap: 32px;
+  position: relative;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+@media (max-width: 900px) {
+  /* Single column here anyway, so the breakout would only add overflow. */
+  .game-grid {
+    width: 100%;
+    left: 0;
+    transform: none;
+  }
+}
+
 .grid-2 {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 296px;
@@ -696,9 +725,18 @@ td.num {
 
 /* --- board -------------------------------------------------------------- */
 
+/*
+ * The board is square, so it has to fit the SHORTER of the space available
+ * across and down — sizing it by width alone pushes the bottom rows off screen
+ * on a laptop, which is where most of these games get played.
+ *
+ * The subtraction is the chrome above and below it: site header, the two player
+ * bars, and the control row. Generous rather than exact, because being a little
+ * small is survivable and being cut off is not.
+ */
 .board {
   width: 100%;
-  max-width: 620px;
+  max-width: min(100%, calc(100vh - 300px));
   height: auto;
   display: block;
   margin: 0 auto;
@@ -780,6 +818,18 @@ td.num {
 .review-banner .btn {
   padding: 5px 11px;
   font-size: 13px;
+}
+
+/*
+ * Separates a view toggle from the history controls beside it. Without it the
+ * row reads as one undifferentiated set of buttons, and "Flip board" looks
+ * like it belongs with "Opening" and "Latest".
+ */
+.control-divider {
+  width: 1px;
+  align-self: stretch;
+  margin: 2px 4px;
+  background: var(--border-subtle);
 }
 
 /* --- placing pieces before play ----------------------------------------- */

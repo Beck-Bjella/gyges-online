@@ -181,6 +181,21 @@ export default function GameView({
   const lastPlayed = history.length ? history[history.length - 1] : null;
   const reviewed = reviewing ? history.find((h) => h.ply === viewingPly) : null;
 
+  /**
+   * The ply to jump to for "the start of the game".
+   *
+   * The last setup ply, not ply 0. Ply 0 is the empty board before anyone has
+   * placed anything, which is not a position a player thinks of as the start —
+   * it is the state before the game had one. What they mean is both home rows
+   * down and nobody having moved yet.
+   *
+   * Null while setup is still in progress, when there is no such position yet.
+   */
+  const openingPly = useMemo(() => {
+    const setups = history.filter((h) => h.kind === "setup");
+    return setups.length === 2 ? setups[setups.length - 1].ply : null;
+  }, [history]);
+
   const highlight = yourPlacement ? homeRow(viewerSide!) : [];
 
   const shownMove: Move =
@@ -348,7 +363,7 @@ export default function GameView({
   });
 
   return (
-    <div className="grid-2">
+    <div className="grid-2 game-grid">
       <div>
         <PlayerBar {...seat(topSide)} />
 
@@ -410,13 +425,14 @@ export default function GameView({
           <button className="btn" onClick={() => setFlipped((f) => !f)}>
             Flip board
           </button>
+          <span className="control-divider" aria-hidden="true" />
           <button
             className="btn"
-            onClick={() => setViewingPly(0)}
-            disabled={game.ply === 0 || viewingPly === 0}
-            title="The position this game started from"
+            onClick={() => setViewingPly(openingPly)}
+            disabled={openingPly === null || viewingPly === openingPly}
+            title="Both home rows placed, before the first move"
           >
-            Start
+            Opening
           </button>
           <button
             className="btn"
