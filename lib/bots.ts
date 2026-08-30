@@ -31,11 +31,10 @@
  *
  * ## Changing a bot
  *
- * Editing a bot's settings changes how it plays, which makes its existing
- * record a record of a different opponent. So syncBots() will update a bot's
- * description freely, but treats its *settings* as immutable once it has
- * played: see the notes there. To meaningfully change a bot's strength, add a
- * new one and retire the old.
+ * Edit it here and it changes, including after it has played. Strictly this
+ * makes its existing record a record of a different opponent, and on a live
+ * site that would matter — but the bots are still being tuned, and a guard
+ * against it meant wiping the database after every game. See syncBots().
  */
 
 import { getDb } from "./db/index.ts";
@@ -174,7 +173,7 @@ export interface SyncResult {
   created: string[];
   updated: string[];
   unchanged: string[];
-  /** Bots whose settings differ from this file but which have already played. */
+  /** Bots that could not be synced at all, with the reason. */
   frozen: string[];
 }
 
@@ -187,10 +186,11 @@ export interface SyncResult {
  * out its opponents' history. Retire a bot by removing it from BOTS and, if it
  * should stop being offered, marking it deleted by hand.
  *
- * **Settings are frozen once a bot has played.** Changing `maxNodes` or
- * `strength` makes it a different opponent, so its existing record would no
- * longer describe the thing people beat. Such a change is reported rather than
- * applied; to actually change a bot's strength, add a new one under a new name.
+ * **A bot's settings always follow this file**, even once it has played. That
+ * is wrong for a live site — changing what a bot does makes its existing record
+ * a record of a different opponent — and it is right for now, because the bots
+ * are still being tuned and every change would otherwise mean wiping the
+ * database. Restore the guard before anyone's games are worth keeping.
  */
 export function syncBots(): SyncResult {
   const db = getDb();
@@ -229,29 +229,11 @@ export function syncBots(): SyncResult {
       continue;
     }
 
-    const played = (
-      db
-        .prepare(
-          `SELECT COUNT(*) AS n FROM games
-            WHERE (player1_id = ? OR player2_id = ?) AND status = 'finished'`,
-        )
-        .get(existing.id, existing.id) as { n: number }
-    ).n;
-
     const wantOptions = JSON.stringify(spec.options);
     const settingsDiffer =
       existing.bot_strength !== spec.strength ||
       existing.bot_options !== wantOptions ||
       existing.bot_engine_build !== spec.engineBuild;
-
-    if (settingsDiffer && played > 0) {
-      // Its record describes the old settings. Report, do not rewrite history.
-      result.frozen.push(
-        `${spec.username} (settings changed but it has ${played} finished ` +
-          `game(s); add a new bot instead of changing this one)`,
-      );
-      continue;
-    }
 
     const descriptionDiffers = existing.bot_description !== (spec.description ?? null);
     if (!settingsDiffer && !descriptionDiffers) {
