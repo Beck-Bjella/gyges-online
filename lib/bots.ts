@@ -97,10 +97,6 @@ const COMMON: Record<string, string | number | boolean> = {
  *   setting wanders freely in a quiet position and stays honest in a sharp one,
  *   which a rank-based rule cannot do.
  *
- * - **`skill-poolDepth`** — how far down the ranked list is considered at all,
- *   as a percent of however many moves the position offers. Stockfish's
- *   MultiPV, in effect: a bound on how bad the worst candidate can be, with
- *   weakness deciding among them.
  * - **`skill-allowLosing`** — whether moves the search sees as a forced loss
  *   stay choosable. Losing moves sort to the *bottom* of the list, so this and
  *   the window together are a gradient rather than a switch: with it on, a low
@@ -129,7 +125,6 @@ export const BOTS: BotSpec[] = [
       ...COMMON,
       maxPly: 1,
       "skill-weakness": 90,
-      "skill-poolDepth": 100,
       "skill-allowLosing": true,
     },
   },
@@ -142,7 +137,6 @@ export const BOTS: BotSpec[] = [
       ...COMMON,
       maxPly: 1,
       "skill-weakness": 75,
-      "skill-poolDepth": 70,
       "skill-allowLosing": true,
     },
   },
@@ -155,7 +149,6 @@ export const BOTS: BotSpec[] = [
       ...COMMON,
       maxPly: 1,
       "skill-weakness": 45,
-      "skill-poolDepth": 40,
     },
   },
   {
@@ -167,7 +160,6 @@ export const BOTS: BotSpec[] = [
       ...COMMON,
       maxPly: 3,
       "skill-weakness": 30,
-      "skill-poolDepth": 40,
     },
   },
   {

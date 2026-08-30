@@ -15,8 +15,6 @@ export interface BotOption {
   maxPly: number | null;
   /** How much of the gap to the best move is forgiven, 0-100. */
   weakness: number | null;
-  /** How far down the ranked list a slip may reach, as a percentage. */
-  poolDepth: number | null;
   /** Whether those alternatives include moves that lose outright. */
   allowLosing: boolean;
 }
@@ -199,16 +197,9 @@ function describeThinking(bot: BotOption): string {
  */
 function describeAccuracy(bot: BotOption): string {
   if (bot.weakness == null || bot.weakness <= 0) return "always its best move";
-  const depth = bot.poolDepth ?? 100;
-  const otherwise =
-    depth >= 80
-      ? "otherwise anything down to its worst"
-      : depth >= 50
-        ? "otherwise something well down its list"
-        : "otherwise one of the next few";
   const wander =
     bot.weakness >= 80 ? "picks almost freely" : bot.weakness >= 50 ? "wanders a good deal" : "wanders a little";
   return bot.allowLosing
-    ? `${wander} among its options, ${otherwise} — losing moves included`
-    : `${wander} among its options, ${otherwise}, but never a losing one`;
+    ? `${wander} among its options, losing moves included`
+    : `${wander} among its options, but never a losing one`;
 }
