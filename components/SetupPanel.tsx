@@ -49,12 +49,6 @@ function randomOpening(): number[] {
   return pieces;
 }
 
-const RING_LABEL: Record<number, string> = {
-  1: "one ring",
-  2: "two rings",
-  3: "three rings",
-};
-
 export default function SetupPanel({
   side,
   pending,
@@ -62,79 +56,17 @@ export default function SetupPanel({
   setup,
   onSubmit,
 }: Props) {
-  const { slots, remaining, held, hold, placeAt, clear, choose, complete } = setup;
+  const { clear, choose, complete, slots } = setup;
 
   return (
     <div className="panel">
       <h2>Place your pieces</h2>
       <p className="muted" style={{ margin: "0 0 14px", lineHeight: 1.6 }}>
-        Click a square on your highlighted home row to place a piece, or pick
-        one up here first to choose which. You are player{" "}
-        {side === 1 ? "1" : "2"}.
+        Drag the pieces below the board onto your highlighted home row, or pick
+        an opening. Move them around as much as you like — nothing is sent until
+        you confirm. You are player {side === 1 ? "1" : "2"}.
       </p>
 
-      <div className="setup-slots">
-        {slots.map((piece, i) => (
-          <button
-            key={i}
-            className={piece === null ? "setup-slot" : "setup-slot filled"}
-            onClick={() => placeAt(i)}
-            disabled={pending}
-            title={
-              piece === null
-                ? held
-                  ? `Place the ${RING_LABEL[held]} piece here`
-                  : "Empty — click to place the next piece"
-                : `${RING_LABEL[piece]} — click to take back`
-            }
-          >
-            {piece === null ? (
-              <span className="setup-empty">{i + 1}</span>
-            ) : (
-              <PieceGlyph kind={piece} />
-            )}
-          </button>
-        ))}
-      </div>
-
-      <p className="muted" style={{ margin: "16px 0 8px" }}>
-        {remaining.length > 0 ? "Pieces left to place:" : "All six placed."}
-      </p>
-
-      <div className="setup-tray">
-        {remaining.map((piece, i) => (
-          <button
-            key={`${piece}-${i}`}
-            className={held === piece ? "setup-slot filled held" : "setup-slot filled"}
-            onClick={() => hold(piece)}
-            disabled={pending}
-            title={`Pick up a ${RING_LABEL[piece]} piece, then click a square`}
-          >
-            <PieceGlyph kind={piece} />
-          </button>
-        ))}
-      </div>
-
-      <div className="row" style={{ marginTop: 16 }}>
-        <button
-          className="btn btn-primary"
-          onClick={() => onSubmit(slots as number[])}
-          disabled={!complete || pending}
-        >
-          {pending ? "…" : "Confirm placement"}
-        </button>
-        <button
-          className="btn"
-          onClick={clear}
-          disabled={pending || slots.every((s) => s === null)}
-        >
-          Clear
-        </button>
-      </div>
-
-      <p className="muted" style={{ margin: "16px 0 8px" }}>
-        Or start from an opening:
-      </p>
       <div className="setup-openings">
         {OPENINGS.map((o) => (
           <button
@@ -159,42 +91,29 @@ export default function SetupPanel({
         </button>
       </div>
 
+      <div className="row" style={{ marginTop: 16 }}>
+        <button
+          className="btn btn-primary"
+          onClick={() => onSubmit(slots as number[])}
+          disabled={!complete || pending}
+        >
+          {pending ? "…" : "Confirm placement"}
+        </button>
+        <button
+          className="btn"
+          onClick={clear}
+          disabled={pending || slots.every((s) => s === null)}
+        >
+          Clear
+        </button>
+      </div>
+
       <p className="muted" style={{ margin: "12px 0 0", lineHeight: 1.5 }}>
         Once confirmed this cannot be changed.
       </p>
 
       {error && <p className="error">{error}</p>}
     </div>
-  );
-}
-
-/**
- * A small board piece.
- *
- * Carries its own gradient rather than referencing the board's: an SVG <defs>
- * is scoped to its own document fragment, so a url(#id) here would not resolve
- * against the board's definitions.
- */
-function PieceGlyph({ kind }: { kind: number }) {
-  return (
-    <svg viewBox="-34 -34 68 68" width="34" height="34" aria-hidden>
-      <defs>
-        <radialGradient id="setup-piece-gradient" cx="0.4" cy="0.35" r="0.7">
-          <stop offset="0%" stopColor="var(--piece-light)" />
-          <stop offset="55%" stopColor="var(--piece-mid)" />
-          <stop offset="100%" stopColor="var(--piece-dark)" />
-        </radialGradient>
-      </defs>
-      <circle
-        r="32"
-        fill="url(#setup-piece-gradient)"
-        stroke="#3a2818"
-        strokeWidth="1"
-      />
-      {Array.from({ length: kind }, (_, i) => ((32 - 1.6) * (kind - i)) / kind).map((r) => (
-        <circle key={r} r={r} fill="none" stroke="var(--piece-ring)" strokeWidth="2.5" />
-      ))}
-    </svg>
   );
 }
 

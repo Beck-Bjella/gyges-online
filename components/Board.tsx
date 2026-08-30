@@ -75,12 +75,30 @@ interface Props {
   setupSide?: Player;
   /** Home-row position clicked, 0-5 from that player's own left. */
   onSetupSquare?: (slot: number) => void;
+  /** Pieces not yet placed, drawn in the tray under the board. */
+  setupRemaining?: number[];
+  /** A tray piece dropped onto home-row position `slot`. */
+  onSetupDrop?: (slot: number, piece: number) => void;
 }
 
 type Drag =
   | { kind: "none" }
   | { kind: "piece"; from: number; x: number; y: number }
-  | { kind: "displaced"; from: number; landedOn: number; x: number; y: number };
+  | { kind: "displaced"; from: number; landedOn: number; x: number; y: number }
+  // A piece carried from the setup tray, before it has a square.
+  | { kind: "tray"; piece: number; slot: number; x: number; y: number };
+
+/**
+ * Where the setup tray sits, in view space.
+ *
+ * Inside the board's own SVG, below the goal, rather than as separate markup in
+ * the page. Dragging from one element onto another means hit-testing across
+ * two coordinate systems; drawn here it is the same surface, and the pointer
+ * handling that already moves pieces moves these too.
+ */
+const TRAY_CY = 828;
+const TRAY_PITCH = 76;
+const trayCx = (i: number) => VIEWBOX / 2 + (i - 2.5) * TRAY_PITCH;
 
 /**
  * Where a piece's rings sit, outermost first.
@@ -109,6 +127,8 @@ export default function Board({
   player,
   setupSide,
   onSetupSquare,
+  setupRemaining = [],
+  onSetupDrop,
 }: Props) {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const [drag, setDrag] = useState<Drag>({ kind: "none" });
@@ -227,6 +247,21 @@ export default function Board({
       // Placing during setup, which happens before the board is interactive in
       // the ordinary sense — there is no move to make yet.
       if (setupSide !== undefined && onSetupSquare) {
+        // A tray piece under the pointer is picked up and carried.
+        const trayIdx = setupRemaining.findIndex(
+          (_, i) => Math.hypot(p.x - trayCx(i), p.y - TRAY_CY) <= PIECE_RADIUS,
+        );
+        if (trayIdx >= 0) {
+          e.currentTarget.setPointerCapture(e.pointerId);
+          setDrag({
+            kind: "tray",
+            piece: setupRemaining[trayIdx],
+            slot: trayIdx,
+            x: p.x,
+            y: p.y,
+          });
+          return;
+        }
         const target = nearestIndex(p.x, p.y, view, true);
         if (target === null) return;
         const slot = homeRow(setupSide).indexOf(toBoard(target));
@@ -255,7 +290,18 @@ export default function Board({
       e.currentTarget.setPointerCapture(e.pointerId);
       setDrag({ kind: "piece", from, x: p.x, y: p.y });
     },
-    [interactive, toBoardSpace, drag, view, emit, dropTargets, setupSide, onSetupSquare, toBoard],
+    [
+      interactive,
+      toBoardSpace,
+      drag,
+      view,
+      emit,
+      dropTargets,
+      setupSide,
+      onSetupSquare,
+      setupRemaining,
+      toBoard,
+    ],
   );
 
   const onPointerMove = useCallback(
@@ -270,6 +316,17 @@ export default function Board({
 
   const onPointerUp = useCallback(
     (e: React.PointerEvent<SVGSVGElement>) => {
+      if (drag.kind === "tray") {
+        const p = toBoardSpace(e);
+        if (p && setupSide !== undefined && onSetupDrop) {
+          const target = nearestIndex(p.x, p.y, view, true);
+          const slot = target === null ? -1 : homeRow(setupSide).indexOf(toBoard(target));
+          // Dropped anywhere else, it simply goes back to the tray.
+          if (slot >= 0) onSetupDrop(slot, drag.piece);
+        }
+        setDrag({ kind: "none" });
+        return;
+      }
       if (drag.kind !== "piece") return;
       const p = toBoardSpace(e);
       if (p) {
@@ -303,7 +360,7 @@ export default function Board({
       }
       setDrag({ kind: "none" });
     },
-    [drag, toBoardSpace, view, emit, legalTargets],
+    [drag, toBoardSpace, view, emit, legalTargets, setupSide, onSetupDrop, toBoard],
   );
 
   // ---- what to draw -------------------------------------------------------
@@ -319,6 +376,31 @@ export default function Board({
     if (drag.kind === "displaced" && (i === drag.from || i === drag.landedOn)) continue;
     const { cx, cy } = idxToCenter(i);
     pieces.push({ key: `p${i}`, idx: i, kind, cx, cy, lifted: false });
+  }
+
+  // The setup tray, and whatever has been lifted out of it.
+  if (setupSide !== undefined) {
+    setupRemaining.forEach((kind, i) => {
+      if (drag.kind === "tray" && drag.slot === i) return;
+      pieces.push({
+        key: `tray${i}`,
+        idx: -1,
+        kind,
+        cx: trayCx(i),
+        cy: TRAY_CY,
+        lifted: false,
+      });
+    });
+  }
+  if (drag.kind === "tray") {
+    pieces.push({
+      key: "tray-dragging",
+      idx: -1,
+      kind: drag.piece,
+      cx: drag.x,
+      cy: drag.y,
+      lifted: true,
+    });
   }
 
   if (drag.kind === "piece") {

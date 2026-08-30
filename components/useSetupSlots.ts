@@ -31,6 +31,13 @@ export interface SetupSlots {
    * realised they can pick pieces up first still gets a sensible result.
    */
   placeAt: (i: number) => void;
+  /**
+   * A specific piece dropped on home-row position i.
+   *
+   * Whatever was already there goes back to the tray, so a row can be rearranged
+   * freely right up until it is confirmed.
+   */
+  dropAt: (i: number, piece: number) => void;
   clear: () => void;
   /** Replace the whole row, for the named openings. */
   choose: (slots: number[]) => void;
@@ -82,9 +89,21 @@ export function useSetupSlots(
     [slots, held, remaining, update],
   );
 
+  const dropAt = useCallback(
+    (i: number, piece: number) => {
+      if (!remaining.includes(piece)) return;
+      const next = [...slots];
+      next[i] = piece;
+      setHeld(null);
+      update(next);
+    },
+    [slots, remaining, update],
+  );
+
   return {
     slots,
     remaining,
+    dropAt,
     held,
     hold: useCallback(
       (piece: number | null) => setHeld((h) => (h === piece ? null : piece)),

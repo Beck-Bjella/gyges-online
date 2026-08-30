@@ -733,10 +733,15 @@ td.num {
  * The subtraction is the chrome above and below it: site header, the two player
  * bars, and the control row. Generous rather than exact, because being a little
  * small is survivable and being cut off is not.
+ *
+ * The 340px floor is what stops a phone held sideways from collapsing the board
+ * to nothing. A landscape viewport can be under 400px tall, so the subtraction
+ * alone leaves almost no room and the board becomes unusable — better to let
+ * the page scroll than to render something nobody can play on.
  */
 .board {
   width: 100%;
-  max-width: min(100%, calc(100vh - 300px));
+  max-width: min(100%, max(340px, calc(100vh - 300px)));
   height: auto;
   display: block;
   margin: 0 auto;

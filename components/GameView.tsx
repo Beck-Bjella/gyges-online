@@ -388,6 +388,8 @@ export default function GameView({
             player={viewerSide ?? undefined}
             setupSide={yourPlacement ? viewerSide! : undefined}
             onSetupSquare={setup.placeAt}
+            setupRemaining={setup.remaining}
+            onSetupDrop={setup.dropAt}
           />
           {reviewing && (
             <div className="review-banner">
