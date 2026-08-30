@@ -115,7 +115,7 @@ const trayCx = (i: number) => VIEWBOX / 2 + (i - 2.5) * TRAY_PITCH;
 const MAX_RINGS = 3;
 
 /** How thick each ring is drawn. */
-const RING_WIDTH = 6;
+const RING_WIDTH = 7.5;
 
 /**
  * Where a piece's rings sit, outermost first.
