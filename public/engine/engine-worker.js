@@ -146,14 +146,30 @@ function createWasi(stdinBytes, onStdout) {
   };
 }
 
+/**
+ * Always ask the server whether the engine changed.
+ *
+ * `no-cache` is a revalidation, not a re-download: the browser sends its ETag
+ * and gets a 304 when the build is unchanged, so the 29MB body crosses the wire
+ * only when it actually differs. That costs a few hundred bytes per worker and
+ * removes a whole class of confusion — without it a stale engine is served from
+ * cache, which looks exactly like a settings change having no effect. Note that
+ * a hard reload does not fix this on its own: it bypasses the cache for the
+ * page and its subresources, not for a fetch a worker makes itself.
+ *
+ * Deliberately not `no-store`, which would re-download the whole engine on
+ * every move.
+ */
+const WASM_FETCH = { cache: "no-cache" };
+
 /** The compiled module, kept so only instantiation repeats between searches. */
 let modulePromise = null;
 
 function loadModule() {
   if (!modulePromise) {
     modulePromise = WebAssembly.compileStreaming
-      ? WebAssembly.compileStreaming(fetch(WASM_URL))
-      : fetch(WASM_URL)
+      ? WebAssembly.compileStreaming(fetch(WASM_URL, WASM_FETCH))
+      : fetch(WASM_URL, WASM_FETCH)
           .then((r) => r.arrayBuffer())
           .then((b) => WebAssembly.compile(b));
   }
