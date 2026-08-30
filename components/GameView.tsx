@@ -166,14 +166,25 @@ export default function GameView({
   const inSetup = game.status === "setup";
   const yourPlacement = inSetup && viewerSide !== null && viewerSide === game.turn;
 
-  const lastMove = history.length ? history[history.length - 1].move : [];
-  const highlight = staged && viewingPly === null
-    ? staged
-    : yourPlacement
-    ? homeRow(viewerSide!)
-    : reviewing
-      ? (history.find((h) => h.ply === viewingPly)?.move ?? [])
-      : lastMove;
+  // Two different things, drawn two different ways.
+  //
+  // `highlight` rings squares — only the home row, while a player is placing.
+  // `shownMove` is drawn as arrows: the move being staged, the one being
+  // reviewed, or the last one played. A setup ply is six ring counts rather
+  // than board indices, so it is never drawn as a move.
+  const lastPlayed = history.length ? history[history.length - 1] : null;
+  const reviewed = reviewing ? history.find((h) => h.ply === viewingPly) : null;
+
+  const highlight = yourPlacement ? homeRow(viewerSide!) : [];
+
+  const shownMove: Move =
+    staged && viewingPly === null
+      ? staged
+      : reviewing
+        ? (reviewed && reviewed.kind === "move" ? reviewed.move : [])
+        : lastPlayed && lastPlayed.kind === "move"
+          ? lastPlayed.move
+          : [];
 
   /** Choose a move without sending it. Replaces any move already staged. */
   const stage = useCallback((mv: Move) => {
@@ -330,6 +341,7 @@ export default function GameView({
             flipped={flipped}
             onMove={stage}
             highlight={highlight}
+            lastMove={shownMove}
             // Marks legal destinations while dragging. A convenience only —
             // the server validates every move regardless. Passing undefined
             // rather than null when there is no viewer keeps the hint off for

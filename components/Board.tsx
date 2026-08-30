@@ -46,8 +46,16 @@ interface Props {
   /** Render from player 2's perspective. */
   flipped?: boolean;
   onMove?: (mv: Move) => void;
-  /** Indices to highlight, e.g. the most recent move. */
+  /**
+   * Squares to ring — the home row while a player is placing.
+   *
+   * Distinct from `lastMove`, which is drawn as arrows. Ringing the squares of
+   * a move showed *where* it touched but not what happened: three unconnected
+   * circles for a displacement read as decoration rather than as a move.
+   */
   highlight?: number[];
+  /** The move to draw, as arrows. Empty or absent draws nothing. */
+  lastMove?: Move;
   /**
    * Which side the viewer is playing.
    *
@@ -68,6 +76,7 @@ export default function Board({
   flipped = false,
   onMove,
   highlight = [],
+  lastMove = [],
   player,
 }: Props) {
   const svgRef = useRef<SVGSVGElement | null>(null);
@@ -80,6 +89,37 @@ export default function Board({
     () => (flipped ? flipMove(highlight) : highlight),
     [highlight, flipped],
   );
+  const viewLastMove = useMemo(
+    () => (flipped ? flipMove(lastMove) : lastMove),
+    [lastMove, flipped],
+  );
+
+  /**
+   * A line between two squares, pulled back at both ends so it starts and stops
+   * clear of the pieces rather than disappearing beneath them.
+   */
+  const arrow = useCallback((fromIdx: number, toIdx: number) => {
+    const a = idxToCenter(fromIdx);
+    const b = idxToCenter(toIdx);
+    const dx = b.cx - a.cx;
+    const dy = b.cy - a.cy;
+    const len = Math.hypot(dx, dy);
+    if (len < 1) return null;
+
+    // Pull back from each end so the arrow points *between* pieces rather than
+    // through their centres. Proportional as well as absolute, because a move
+    // between neighbouring squares is only one grid pitch long — a fixed inset
+    // sized for the pieces would consume the whole line and draw nothing.
+    const gap = Math.min(PIECE_RADIUS * 0.8, len * 0.28);
+    const head = Math.min(PIECE_RADIUS * 0.9, len * 0.34);
+
+    return {
+      x1: a.cx + (dx / len) * gap,
+      y1: a.cy + (dy / len) * gap,
+      x2: a.cx + (dx / len) * (len - head),
+      y2: a.cy + (dy / len) * (len - head),
+    };
+  }, []);
 
   const toBoardSpace = useCallback((e: { clientX: number; clientY: number }) => {
     const svg = svgRef.current;
@@ -319,6 +359,21 @@ export default function Board({
         <filter id="piece-shadow" x="-50%" y="-50%" width="200%" height="200%">
           <feDropShadow dx="0" dy="4" stdDeviation="6" floodColor="#000" floodOpacity="0.6" />
         </filter>
+        {/* Arrowhead for the last-move arrows. `context-stroke` makes it take
+            the colour of the line it terminates, so the solid and dotted
+            arrows need only one marker between them. */}
+        <marker
+          id="arrowhead"
+          viewBox="0 0 10 10"
+          refX="8"
+          refY="5"
+          markerWidth="5"
+          markerHeight="5"
+          orient="auto-start-reverse"
+        >
+          <path d="M 0 1 L 9 5 L 0 9 z" fill="var(--accent-blue)" />
+        </marker>
+
         <filter id="lifted-shadow" x="-60%" y="-60%" width="220%" height="220%">
           <feDropShadow dx="0" dy="12" stdDeviation="12" floodColor="#000" floodOpacity="0.65" />
         </filter>
@@ -403,6 +458,7 @@ export default function Board({
         />
       )}
 
+      {/* Squares to ring — the home row while placing. */}
       {viewHighlight.map((i) => {
         const { cx, cy } = idxToCenter(i);
         return (
@@ -473,6 +529,40 @@ export default function Board({
           />
         );
       })}
+
+      {/* The last move, drawn as arrows so it reads as an action rather than a
+          scattering of circles. A solid arrow is the piece travelling; a dashed
+          one is the piece it displaced being pushed aside. */}
+      {viewLastMove.length >= 2 &&
+        (() => {
+          const travel = arrow(viewLastMove[0], viewLastMove[1]);
+          const push =
+            viewLastMove.length === 3 ? arrow(viewLastMove[1], viewLastMove[2]) : null;
+          return (
+            <g opacity="0.75" pointerEvents="none">
+              {travel && (
+                <line
+                  {...travel}
+                  stroke="var(--accent-blue)"
+                  strokeWidth="4"
+                  strokeLinecap="round"
+                  markerEnd="url(#arrowhead)"
+                />
+              )}
+              {push && (
+                <line
+                  {...push}
+                  stroke="var(--accent-blue)"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  strokeDasharray="7 7"
+                  opacity="0.8"
+                  markerEnd="url(#arrowhead)"
+                />
+              )}
+            </g>
+          );
+        })()}
 
     </svg>
   );
