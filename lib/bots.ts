@@ -86,16 +86,23 @@ const COMMON: Record<string, string | number | boolean> = {
  *
  * - **`skill-weakness`** — how much of the gap between a move and the best one
  *   is forgiven, 0-100. At 0 it always plays the best move; at 100 everything
- *   it considers is roughly level and the choice is near random.
+ *   it considers is level and the choice is near random. Stockfish's rule, and
+ *   smoother than choosing a rank: a slightly worse move is easy to land on, a
+ *   much worse one is not, and because it reads the *scores* rather than the
+ *   ordering, one setting wanders freely in a quiet position and stays honest
+ *   in a sharp one.
  *
- *   This is Stockfish's rule, and it replaced a "plays the best move N% of the
- *   time, otherwise a random one from a band" scheme that was bimodal by
- *   construction: the bot played either the single best move or something
- *   definitely poor, never anything in between. Forgiving part of the gap is
- *   smooth instead — a slightly worse move is easy to land on, a much worse one
- *   is not — and because it reads the *scores* rather than the ranking, one
- *   setting wanders freely in a quiet position and stays honest in a sharp one,
- *   which a rank-based rule cannot do.
+ * - **`skill-reach`** — how far down the ranked list the handicap is measured
+ *   against, as a percent. This sets the unit weakness is denominated in: a
+ *   move can beat the best one only when its deficit is under
+ *   `gap-to-the-reach-th-move x w/(100-w)`.
+ *
+ *   It has to move with weakness, not be left at a default. Stockfish takes
+ *   this span across the top four because MultiPV fixes its pool at four; taken
+ *   across a wider pool while still measured over the top four, the reach stays
+ *   pinned to how much the leading moves happen to differ, and the engine plays
+ *   its best move whatever weakness says. That is why the ply-1 bots stayed
+ *   strong against good play.
  *
  * - **`skill-allowLosing`** — whether moves the search sees as a forced loss
  *   stay choosable. Losing moves sort to the *bottom* of the list, so this and
@@ -124,7 +131,8 @@ export const BOTS: BotSpec[] = [
     options: {
       ...COMMON,
       maxPly: 1,
-      "skill-weakness": 90,
+      "skill-weakness": 85,
+      "skill-reach": 60,
       "skill-allowLosing": true,
     },
   },
@@ -136,7 +144,8 @@ export const BOTS: BotSpec[] = [
     options: {
       ...COMMON,
       maxPly: 1,
-      "skill-weakness": 75,
+      "skill-weakness": 70,
+      "skill-reach": 35,
       "skill-allowLosing": true,
     },
   },
@@ -148,7 +157,8 @@ export const BOTS: BotSpec[] = [
     options: {
       ...COMMON,
       maxPly: 1,
-      "skill-weakness": 45,
+      "skill-weakness": 50,
+      "skill-reach": 20,
     },
   },
   {
@@ -160,6 +170,7 @@ export const BOTS: BotSpec[] = [
       ...COMMON,
       maxPly: 3,
       "skill-weakness": 30,
+      "skill-reach": 10,
     },
   },
   {
