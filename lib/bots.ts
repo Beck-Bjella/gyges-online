@@ -148,9 +148,9 @@ export const BOTS: BotSpec[] = [
     description: "Right about half the time, and the rest are visibly worse.",
     options: {
       ...COMMON,
-      maxPly: 3,
-      "skill-accuracy": 65,
-      "skill-poolDepth": 40,
+      maxPly: 1,
+      "skill-accuracy": 85,
+      "skill-poolDepth": 35,
     },
   },
   {
@@ -161,8 +161,8 @@ export const BOTS: BotSpec[] = [
     options: {
       ...COMMON,
       maxPly: 3,
-      "skill-accuracy": 85,
-      "skill-poolDepth": 30,
+      "skill-accuracy": 65,
+      "skill-poolDepth": 40,
     },
   },
   {
