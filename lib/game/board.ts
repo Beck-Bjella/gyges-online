@@ -192,8 +192,13 @@ export function applyMove(board: BoardState, mv: Move): BoardState {
   const next = [...board];
   if (mv.length === 2) {
     const [from, to] = mv;
-    next[to] = next[from];
+    // Read the piece out before clearing, because a move may end where it began
+    // — a piece can loop back to its own square, which is legal and leaves the
+    // board unchanged. Writing the destination first and then blanking the
+    // origin deletes the piece outright in that case.
+    const moving = next[from];
     next[from] = 0;
+    next[to] = moving;
   } else if (mv.length === 3) {
     const [from, landedOn, displacedTo] = mv;
     const moving = next[from];

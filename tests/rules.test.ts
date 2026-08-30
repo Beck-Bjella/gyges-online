@@ -30,7 +30,7 @@ const {
   hasLegalMove,
 } = await import("../lib/game/rules.ts");
 
-const { emptyBoard, startingBoard, P1_GOAL, P2_GOAL, BOARD_SIZE } = await import(
+const { emptyBoard, startingBoard, applyMove, P1_GOAL, P2_GOAL, BOARD_SIZE } = await import(
   "../lib/game/board.ts"
 );
 
@@ -369,4 +369,22 @@ test("every drop the board offers is one the rules accept", () => {
     const verdict = checkMoveLegality(board, 1, [14, 15, target]);
     assert.ok(verdict.legal, `drop on ${target} refused: ${verdict.reason}`);
   }
+});
+
+test("a move that loops back to its own square leaves the board unchanged", () => {
+  // Legal in Gyges: a piece may travel its full count and end where it began.
+  // applyMove used to write the destination and then blank the origin, which
+  // deleted the piece when the two were the same square.
+  const board = "00213000010010320032010000203000000000".split("").map(Number);
+  assert.ok(
+    legalMoves(board, 1).some((m) => m.length === 2 && m[0] === m[1]),
+    "expected this position to offer a move ending on its own square",
+  );
+  const after = applyMove(board, [3, 3]);
+  assert.deepEqual(after, board);
+  assert.equal(
+    after.filter((sq) => sq !== 0).length,
+    board.filter((sq) => sq !== 0).length,
+    "no piece may be lost",
+  );
 });
