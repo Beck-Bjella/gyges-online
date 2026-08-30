@@ -127,6 +127,35 @@ export const BOTS: BotSpec[] = [
   },
 ];
 
+/**
+ * A controlled set for judging the skill dial on its own.
+ *
+ * Every one thinks exactly as hard — 50,000 nodes, about two seconds — so the
+ * only thing that differs between them is how often they take the best move
+ * they found. Playing two of these back to back isolates skill in a way the
+ * ladder above cannot, because there both dials move at once.
+ *
+ * These are for testing. Delete the block and they stop being offered, though
+ * the accounts and any games played against them stay — syncBots never removes
+ * anything, on the grounds that deleting an account would blank out its
+ * opponents' history.
+ */
+const SKILL_TEST_NODES = 50_000;
+
+const SKILL_TESTS: BotSpec[] = [0, 25, 50, 75, 100].map((skill) => ({
+  username: `Skill-${String(skill).padStart(3, "0")}`,
+  // Ordered after the ladder so the two sets do not interleave in the list.
+  strength: 100 + skill,
+  engineBuild: ENGINE_BUILD,
+  description:
+    skill === 100
+      ? "Test bot. Always its best move, at a fixed two seconds of thinking."
+      : `Test bot. Best move ${skill}% of turns, at a fixed two seconds of thinking.`,
+  options: { ...COMMON, maxNodes: SKILL_TEST_NODES, skill },
+}));
+
+BOTS.push(...SKILL_TESTS);
+
 export interface SyncResult {
   created: string[];
   updated: string[];
