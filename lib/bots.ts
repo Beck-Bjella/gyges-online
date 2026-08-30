@@ -64,62 +64,41 @@ const COMMON: Record<string, string | number | boolean> = {
 /**
  * The bots, weakest first.
  *
- * **Depth is capped, not nodes, and only 1 and 3 are usable.**
+ * **None of these is easy, and that is deliberate.** Every one of them refuses
+ * to hand you the game: `skill-allowLosing` is off throughout, so no bot will
+ * ever play a move the search has already proven loses. Beating any of them
+ * means actually trapping it. The ladder is how *thoroughly* you have to.
  *
- * A node budget cannot bound depth: the same 20,000 nodes reaches about three
- * ply in a crowded opening and thirteen in a sparse endgame, so a node-bounded
- * bot gets *stronger as the game simplifies* — exactly when a player is trying
- * to convert. That is what made the 50,000-node ladder unbeatable in endgames.
+ * Two settings, two values each, which is the whole design:
  *
- * Iterative deepening runs odd plies only (1, 3, 5, 7), so `maxPly: 2` behaves
- * identically to 1. Of what remains, 1 is pinnable, 3 already forces you to
- * plan, and 5 is both near-impossible and slow in some positions. One usable
- * step.
+ * - **`maxPly`** — 1 or 3. At one ply it sees only what is already on the
+ *   board, so a two-move idea gets through. At three it sees your reply and
+ *   its own answer, and has to be trapped properly.
+ * - **`skill-weakness`** with **`skill-reach`** — 85/60 or off. Weakness
+ *   forgives part of the gap between a move and the best one, so a slightly
+ *   worse move is easy to land on and a much worse one is not. `reach` sets
+ *   the unit that is measured in, as a share of the ranked list, and the two
+ *   have to move together: measured against only the top few moves, weakness
+ *   has nothing to spend and the bot plays its best move whatever it is set to.
  *
- * So depth is not the ladder — it picks the class, and the ladder lives inside
- * it. Three rungs at one ply, where a game is winnable, and two at three ply.
+ * Depth cannot be the ladder on its own here. Iterative deepening runs odd
+ * plies only, so `maxPly: 2` is really 1, and 5 is both near-unbeatable and
+ * slow in some positions. Two usable depths, so weakness supplies the rest.
  *
- * Bounding by depth was avoided earlier because a low ply can take unpredictable
- * time in a tactical position. Measured across a real game at ply 3: median
- * 0.17s a move, worst case 2.4s. That concern is real further up and does not
- * bite here.
+ * The last bot is bounded by nodes rather than depth, which is a different
+ * thing again: 200,000 nodes reaches three ply in a crowded opening and far
+ * deeper in a sparse endgame, so it gets stronger exactly as the game
+ * simplifies. Unbeatable is the point of it.
  *
- * - **`skill-weakness`** — how much of the gap between a move and the best one
- *   is forgiven, 0-100. At 0 it always plays the best move; at 100 everything
- *   it considers is level and the choice is near random. Stockfish's rule, and
- *   smoother than choosing a rank: a slightly worse move is easy to land on, a
- *   much worse one is not, and because it reads the *scores* rather than the
- *   ordering, one setting wanders freely in a quiet position and stays honest
- *   in a sharp one.
- *
- * - **`skill-reach`** — how far down the ranked list the handicap is measured
- *   against, as a percent. This sets the unit weakness is denominated in: a
- *   move can beat the best one only when its deficit is under
- *   `gap-to-the-reach-th-move x w/(100-w)`.
- *
- *   It has to move with weakness, not be left at a default. Stockfish takes
- *   this span across the top four because MultiPV fixes its pool at four; taken
- *   across a wider pool while still measured over the top four, the reach stays
- *   pinned to how much the leading moves happen to differ, and the engine plays
- *   its best move whatever weakness says. That is why the ply-1 bots stayed
- *   strong against good play.
- *
- * - **`skill-allowLosing`** — whether moves the search sees as a forced loss
- *   stay choosable. Losing moves sort to the *bottom* of the list, so this and
- *   the window together are a gradient rather than a switch: with it on, a low
- *   window rarely reaches a losing move and a high one lands on them often.
- *
- * Turning it off entirely was tried and made the bottom of the ladder *harder*.
- * A bot that never throws a game answers every threat inside its horizon, so
- * beating it means genuinely breaking through — which is not what the easiest
- * opponent should ask of anyone. The bottom three keep it on; Sharp and Full do
- * not, which is what separates "makes real mistakes" from "only misses deep
- * ideas".
- *
- * A phone is two to four times slower. Because the bound is depth rather than
- * seconds, only the waiting changes, never the move.
+ * Times on a desktop: the ply-bounded four answer in well under a second
+ * typically, worst case a couple of seconds; the node-bounded one takes about
+ * fifteen. A phone is two to four times slower, and because the bound is work
+ * rather than seconds, only the waiting changes — never the move.
  */
-
+const WEAK = {
+  "skill-weakness": 85,
+  "skill-reach": 60,
+};
 
 export const BOTS: BotSpec[] = [
   {
@@ -127,58 +106,40 @@ export const BOTS: BotSpec[] = [
     strength: 20,
     engineBuild: ENGINE_BUILD,
     description:
-      "Never plays the best move it found, and usually one of its worst. Where to start.",
-    options: {
-      ...COMMON,
-      maxPly: 1,
-      "skill-weakness": 85,
-      "skill-reach": 60,
-      "skill-allowLosing": true,
-    },
-  },
-  {
-    username: "Helios-Casual",
-    strength: 40,
-    engineBuild: ENGINE_BUILD,
-    description: "Finds the right move about a fifth of the time. Very punishable.",
-    options: {
-      ...COMMON,
-      maxPly: 1,
-      "skill-weakness": 70,
-      "skill-reach": 35,
-      "skill-allowLosing": true,
-    },
+      "Looks one move ahead and often picks a poor one. It still will not hand you the game.",
+    options: { ...COMMON, maxPly: 1, ...WEAK },
   },
   {
     username: "Helios-Club",
-    strength: 60,
+    strength: 40,
     engineBuild: ENGINE_BUILD,
-    description: "Right about half the time, and the rest are visibly worse.",
-    options: {
-      ...COMMON,
-      maxPly: 1,
-      "skill-weakness": 50,
-      "skill-reach": 20,
-    },
+    description:
+      "Looks one move ahead and plays the best it finds. A two-move idea still gets through.",
+    options: { ...COMMON, maxPly: 1 },
   },
   {
     username: "Helios-Sharp",
+    strength: 60,
+    engineBuild: ENGINE_BUILD,
+    description:
+      "Sees your reply and its own answer, but chooses poorly. Trap it thoroughly.",
+    options: { ...COMMON, maxPly: 3, ...WEAK },
+  },
+  {
+    username: "Helios-Master",
     strength: 80,
     engineBuild: ENGINE_BUILD,
-    description: "Slips about one turn in three, but only slightly. You will need a real idea.",
-    options: {
-      ...COMMON,
-      maxPly: 3,
-      "skill-weakness": 30,
-      "skill-reach": 10,
-    },
+    description:
+      "Three ply, no handicap. You will need a plan it cannot see the end of.",
+    options: { ...COMMON, maxPly: 3 },
   },
   {
     username: "Helios-Full",
     strength: 100,
     engineBuild: ENGINE_BUILD,
-    description: "No handicap at all. Always its best move.",
-    options: { ...COMMON, maxPly: 3 },
+    description:
+      "No limit but work. Searches deepest exactly when the position simplifies. Expect a wait.",
+    options: { ...COMMON, maxNodes: 200_000 },
   },
 ];
 
@@ -186,6 +147,8 @@ export interface SyncResult {
   created: string[];
   updated: string[];
   unchanged: string[];
+  /** Bots dropped from this file, hidden but not destroyed. */
+  retired: string[];
   /** Bots that could not be synced at all, with the reason. */
   frozen: string[];
 }
@@ -195,9 +158,9 @@ export interface SyncResult {
  *
  * Safe to call on every start: existing bots are left alone unless their
  * description changed. Idempotent, and it never deletes — a bot removed from
- * this file keeps its account and its games, because deleting it would blank
- * out its opponents' history. Retire a bot by removing it from BOTS and, if it
- * should stop being offered, marking it deleted by hand.
+ * this file is retired rather than destroyed — `deleted_at` is set, so it stops
+ * being offered while its account and games survive and an opponent's history
+ * still resolves. Listing it again brings it back.
  *
  * **A bot's settings always follow this file**, even once it has played. That
  * is wrong for a live site — changing what a bot does makes its existing record
@@ -207,12 +170,41 @@ export interface SyncResult {
  */
 export function syncBots(): SyncResult {
   const db = getDb();
-  const result: SyncResult = { created: [], updated: [], unchanged: [], frozen: [] };
+  const result: SyncResult = {
+    created: [],
+    updated: [],
+    unchanged: [],
+    retired: [],
+    frozen: [],
+  };
+
+  // Hide any bot no longer listed above. Reshaping the ladder used to leave the
+  // old rungs behind, still offered and still carrying whatever settings they
+  // had — which is worse than either keeping or removing them.
+  //
+  // Soft, via deleted_at, never a DELETE: the account and its games survive, so
+  // an opponent's history still resolves. Listing the bot again un-retires it.
+  const wanted = BOTS.map((b) => b.username.toLowerCase());
+  const stale = db
+    .prepare(
+      `SELECT id, username FROM users
+        WHERE bot_strength IS NOT NULL AND deleted_at IS NULL
+          AND username_key NOT IN (${wanted.map(() => "?").join(", ")})`,
+    )
+    .all(...wanted) as { id: string; username: string }[];
+  for (const bot of stale) {
+    db.prepare(`UPDATE users SET deleted_at = ? WHERE id = ?`).run(
+      new Date().toISOString(),
+      bot.id,
+    );
+    result.retired.push(bot.username);
+  }
 
   for (const spec of BOTS) {
     const existing = db
       .prepare(
-        `SELECT id, username, bot_strength, bot_options, bot_description, bot_engine_build
+        `SELECT id, username, bot_strength, bot_options, bot_description,
+              bot_engine_build, deleted_at
            FROM users WHERE username_key = ?`,
       )
       .get(spec.username.toLowerCase()) as
@@ -223,8 +215,16 @@ export function syncBots(): SyncResult {
           bot_options: string | null;
           bot_description: string | null;
           bot_engine_build: string | null;
+          deleted_at: string | null;
         }
       | undefined;
+
+    if (existing?.deleted_at) {
+      // Listed again after being dropped: bring it back rather than refusing
+      // the name.
+      db.prepare(`UPDATE users SET deleted_at = NULL WHERE id = ?`).run(existing.id);
+      existing.deleted_at = null;
+    }
 
     if (!existing) {
       createBot(spec);

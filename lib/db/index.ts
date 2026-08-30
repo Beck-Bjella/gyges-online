@@ -63,6 +63,9 @@ function syncBotsOnce(): void {
     if (result.created.length) {
       console.log(`  seeded bots: ${result.created.join(", ")}`);
     }
+    if (result.retired.length) {
+      console.log(`  retired bots: ${result.retired.join(", ")}`);
+    }
     for (const note of result.frozen) {
       console.warn(`  bot not synced — ${note}`);
     }
