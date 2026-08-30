@@ -61,6 +61,19 @@
   box-sizing: border-box;
 }
 
+html {
+  /*
+   * Keep room for the scrollbar whether or not one is needed.
+   *
+   * Without it, anything that changes the page height — the staged-move panel
+   * appearing and going again as a move is confirmed — makes the scrollbar come
+   * and go, and the viewport width jumps with it. The board is sized against
+   * that width, so it resized and re-centred on every move, which read as the
+   * whole board flashing.
+   */
+  scrollbar-gutter: stable;
+}
+
 html,
 body {
   margin: 0;

@@ -569,7 +569,18 @@ export default function Board({
           markerHeight="5"
           orient="auto-start-reverse"
         >
-          <path d="M 0 1 L 9 5 L 0 9 z" fill="var(--accent-amber)" />
+          {/* Outlined like the shafts are. Without it the head — the widest,
+              most visible part of the arrow — was the one piece with no edge,
+              so it washed out wherever it crossed a pale piece. */}
+          <path
+            d="M 0 1 L 9 5 L 0 9 z"
+            fill="var(--accent-amber)"
+            stroke="#1a1108"
+            strokeWidth="1.6"
+            strokeOpacity="0.55"
+            strokeLinejoin="round"
+            paintOrder="stroke"
+          />
         </marker>
 
         <filter id="lifted-shadow" x="-60%" y="-60%" width="220%" height="220%">
