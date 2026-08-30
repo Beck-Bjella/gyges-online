@@ -81,6 +81,17 @@ const COMMON: Record<string, string | number | boolean> = {
  *   have to move together: measured against only the top few moves, weakness
  *   has nothing to spend and the bot plays its best move whatever it is set to.
  *
+ * **The order is measured, not assumed, and it is not the obvious one.** Over
+ * twenty games each, every one from a different random opening:
+ *
+ *     ply1 weak     1 - 19  ply1 perfect
+ *     ply3 weak     0 - 20  ply3 perfect
+ *     ply1 perfect 17 -  3  ply3 weak
+ *
+ * So choosing well matters more than seeing further: a perfect one-ply bot beats
+ * a handicapped three-ply one comfortably, which puts Club above Casual despite
+ * looking half as deep. Ordering these by depth alone would list them wrong.
+ *
  * Depth cannot be the ladder on its own here. Iterative deepening runs odd
  * plies only, so `maxPly: 2` is really 1, and 5 is both near-unbeatable and
  * slow in some positions. Two usable depths, so weakness supplies the rest.
@@ -106,27 +117,27 @@ export const BOTS: BotSpec[] = [
     strength: 20,
     engineBuild: ENGINE_BUILD,
     description:
-      "Looks one move ahead and often picks a poor one. It still will not hand you the game.",
+      "Sees only what is already on the board, and often picks a poor answer to it.",
     options: { ...COMMON, maxPly: 1, ...WEAK },
   },
   {
-    username: "Helios-Club",
+    username: "Helios-Casual",
     strength: 40,
     engineBuild: ENGINE_BUILD,
     description:
-      "Looks one move ahead and plays the best it finds. A two-move idea still gets through.",
+      "Sees your reply coming, but chooses badly among its own. Punishable.",
+    options: { ...COMMON, maxPly: 3, ...WEAK },
+  },
+  {
+    username: "Helios-Club",
+    strength: 60,
+    engineBuild: ENGINE_BUILD,
+    description:
+      "One move ahead, played well. A two-move idea still gets past it.",
     options: { ...COMMON, maxPly: 1 },
   },
   {
     username: "Helios-Sharp",
-    strength: 60,
-    engineBuild: ENGINE_BUILD,
-    description:
-      "Sees your reply and its own answer, but chooses poorly. Trap it thoroughly.",
-    options: { ...COMMON, maxPly: 3, ...WEAK },
-  },
-  {
-    username: "Helios-Master",
     strength: 80,
     engineBuild: ENGINE_BUILD,
     description:
@@ -138,7 +149,7 @@ export const BOTS: BotSpec[] = [
     strength: 100,
     engineBuild: ENGINE_BUILD,
     description:
-      "No limit but work. Searches deepest exactly when the position simplifies. Expect a wait.",
+      "No limit but work. Searches deepest exactly when the position simplifies.",
     options: { ...COMMON, maxNodes: 200_000 },
   },
 ];
