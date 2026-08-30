@@ -191,7 +191,7 @@ positions with zero differences.
 player's browser** — no queued job, no second machine, no hosting bill. It keeps
 its ordinary UGI interface: a Web Worker writes `setpos`/`go` to stdin and reads
 `bestmove` from stdout. Three `cfg`-gated changes to the engine made this
-possible; the diff is at `docs/engine-wasm.patch`.
+possible, committed there as "support x86-64 and wasm32-wasip1 targets".
 
 Each strength is an ordinary `users` row, so profiles, history and the
 leaderboard work on bots with no special-casing. Play is bounded by node count

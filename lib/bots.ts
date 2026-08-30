@@ -48,7 +48,7 @@ import { createBot, type BotSpec } from "./db/queries.ts";
  * evaluation network, a different table size, changed search behaviour. Games
  * played against an earlier build keep that build recorded against them.
  */
-export const ENGINE_BUILD = "v2.0.0-wasm";
+export const ENGINE_BUILD = "v2.0.0-wasm-skill";
 
 /**
  * Options every bot shares.

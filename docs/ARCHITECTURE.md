@@ -199,7 +199,7 @@ and there is nothing to keep alive.
 ### What it took
 
 Three changes to the engine, all `cfg`-gated so native builds are untouched
-(the diff is kept at `docs/engine-wasm.patch`):
+(committed in the engine repo as "support x86-64 and wasm32-wasip1 targets"):
 
 - a portable software fallback for `_pext_u64`, the one x86-only instruction;
 - the evaluation network compiled in with `include_bytes!`, since a browser has

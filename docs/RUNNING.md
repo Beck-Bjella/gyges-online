@@ -249,8 +249,8 @@ because this engine is small and self-contained enough to ship whole.
 Nothing to run — it is part of the page. `public/engine/gyges_engine.wasm` is
 served like any other static file, so local development is one terminal.
 
-Rebuilding it is a separate job in the engine repository; the changes that make
-it compile for the web are kept at `docs/engine-wasm.patch`.
+Rebuilding it is a separate job in the engine repository, which carries the
+`cfg` blocks that make it compile for the web.
 
 ---
 
