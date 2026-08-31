@@ -26,6 +26,7 @@ import {
   GRID_SIZE,
   P1_GOAL,
   P2_GOAL,
+  GRID_PITCH,
   PIECE_RADIUS,
   VIEWBOX,
   flipBoard,
@@ -38,7 +39,7 @@ import {
   type Move,
   type Player,
 } from "@/lib/game/board";
-import { canMoveFrom, dropSquares, pathTo, reachableFrom } from "@/lib/game/rules";
+import { canMoveFrom, dropSquares, reachableFrom } from "@/lib/game/rules";
 
 interface Props {
   board: BoardState;
@@ -114,7 +115,7 @@ const trayCx = (i: number) => VIEWBOX / 2 + (i - 2.5) * TRAY_PITCH;
 /** The most rings any piece carries, which fixes where every ring sits. */
 const MAX_RINGS = 3;
 
-/** How long a piece spends crossing one square. */
+/** Travel time per square of distance, before the per-leg floor. */
 const STEP_MS = 90;
 
 /** A drawing offset from the square a piece is recorded on. */
@@ -176,101 +177,80 @@ export default function Board({
   );
 
   /**
-   * Walk the pieces a move touched along the route they actually took.
+   * Slide the pieces a move touched, one straight leg per piece.
    *
    * Driven by the move rather than by diffing boards: two pieces of the same
    * size are interchangeable, so a diff cannot say which one travelled.
    *
-   * The route comes from pathTo, re-walking the rules over the position as it
-   * was *before* the move — hence prevBoard. A straight line was tried first
-   * and read as the piece cutting across squares it never touched.
+   * Direct from square to square. Stepping along the legal route was tried and
+   * read as wandering — the route is not recorded with the move, so the one
+   * shown was arbitrary, and a piece zigzagging through squares the player
+   * never thought about looked like noise, not like the move.
    *
-   * One animation over all the waypoints, rather than a timer stepping React
-   * state a square at a time. That was visibly rough: each hop was a separate
-   * render racing a CSS transition, and the first hop fired before the browser
-   * had painted the starting square, so the piece jumped instead of setting
-   * off. Handing the whole route to the animation engine keeps it one
-   * continuous motion at a constant speed.
+   * Both legs of a displacement are scheduled up front, the second delayed
+   * until the first lands and held at its starting square by fill:backwards.
+   * Running them from an async loop instead left the displaced piece drawn on
+   * its final square while the mover was still travelling, then snapping back
+   * to animate — the glitch this replaces.
    *
-   * Offsets are relative to the square the piece already occupies, so the board
-   * is never in a wrong state — only the drawing lags behind it.
+   * Offsets are relative to the square the piece is already recorded on, and
+   * every leg ends at zero offset, so finishing (or cancelling) an animation
+   * leaves the piece exactly where the board says it is. The board is never in
+   * a wrong state; only the drawing lags behind it.
    */
   const pieceEls = useRef(new Map<number, SVGGElement>());
-  const running = useRef<Animation | null>(null);
+  const running = useRef<Animation[]>([]);
   const prevBoard = useRef<BoardState | null>(null);
   const lastAnimated = useRef<string | null>(null);
 
   useLayoutEffect(() => {
     const key = lastMove.join("|");
     const first = lastAnimated.current === null;
-    const before = prevBoard.current;
     prevBoard.current = board;
     if (key === lastAnimated.current) return;
     lastAnimated.current = key;
-    // Nothing to walk from on the first paint: the position is simply what it
+    // Nothing to slide from on the first paint: the position is simply what it
     // is when the page opens.
-    if (first || before === null || lastMove.length < 2) return;
+    if (first || lastMove.length < 2) return;
 
     const [from, to, dropped] = lastMove;
-    // Only the goal squares say whose move it was, and only bearing off depends
-    // on knowing. Every other route is the same for either side.
-    const mover: Player = to === P1_GOAL ? 1 : to === P2_GOAL ? -1 : 1;
-    const route = pathTo(before, mover, from, to);
     const inView = (i: number) => (flipped ? flipMove([i])[0] : i);
 
-    const legs: { idx: number; pts: Offset[] }[] = [];
-    if (route && route.length >= 2) {
-      const end = idxToCenter(to);
-      legs.push({
-        idx: inView(to),
-        pts: route.map((sq) => {
-          const c = idxToCenter(sq);
-          return { x: c.cx - end.cx, y: c.cy - end.cy };
-        }),
-      });
-    }
+    const legs: { idx: number; from: number; to: number }[] = [
+      { idx: inView(to), from, to },
+    ];
     if (dropped !== undefined) {
-      // The displaced piece moves after the mover arrives, not alongside it —
-      // shown together they read as two unrelated pieces drifting rather than
-      // as one piece striking another.
-      const struck = idxToCenter(to);
-      const landed = idxToCenter(dropped);
-      legs.push({
-        idx: inView(dropped),
-        pts: [{ x: struck.cx - landed.cx, y: struck.cy - landed.cy }, { x: 0, y: 0 }],
-      });
+      legs.push({ idx: inView(dropped), from: to, to: dropped });
     }
-    if (legs.length === 0) return;
 
-    running.current?.cancel();
-    let stopped = false;
+    for (const a of running.current) a.cancel();
+    running.current = [];
 
-    void (async () => {
-      for (const leg of legs) {
-        if (stopped) return;
-        const el = pieceEls.current.get(leg.idx);
-        if (!el) continue;
-        const anim = el.animate(
-          leg.pts.map((pt) => ({ transform: `translate(${pt.x}px, ${pt.y}px)` })),
-          // Linear, and per segment: a piece crossing waypoints at a constant
-          // speed reads as one motion. Easing each segment makes it hesitate at
-          // every square it passes through.
-          { duration: (leg.pts.length - 1) * STEP_MS, easing: "linear" },
-        );
-        running.current = anim;
-        try {
-          await anim.finished;
-        } catch {
-          return; // cancelled by a newer move
-        }
-      }
-      running.current = null;
-    })();
+    let delay = 0;
+    for (const leg of legs) {
+      const el = pieceEls.current.get(leg.idx);
+      if (!el) continue;
+      const a = idxToCenter(leg.from);
+      const b = idxToCenter(leg.to);
+      const len = Math.hypot(b.cx - a.cx, b.cy - a.cy);
+      // Longer moves take longer, so everything travels at about the same
+      // speed, with a floor so a one-square nudge is still visible.
+      const duration = Math.max(160, (len / GRID_PITCH) * STEP_MS);
+      running.current.push(
+        el.animate(
+          [
+            { transform: `translate(${a.cx - b.cx}px, ${a.cy - b.cy}px)` },
+            { transform: "translate(0px, 0px)" },
+          ],
+          { duration, delay, easing: "ease-in-out", fill: "backwards" },
+        ),
+      );
+      delay += duration;
+    }
 
     return () => {
-      stopped = true;
-      running.current?.cancel();
-      running.current = null;
+      for (const a of running.current) a.cancel();
+      running.current = [];
     };
   }, [lastMove, board, flipped]);
 
