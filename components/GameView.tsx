@@ -1045,13 +1045,14 @@ function Status({
         <p style={{ margin: "0 0 8px" }}>
           {game.invitedName ? (
             <>
-              <strong>{p1}</strong> is waiting for{" "}
-              <strong>{game.invitedName}</strong>
+              <strong>{nameLink(game.player1Name)}</strong> is waiting for{" "}
+              <strong>{nameLink(game.invitedName)}</strong>
               {game.youAreInvited ? " — that is you" : ""}.
             </>
           ) : (
             <>
-              <strong>{p1}</strong> is waiting for an opponent.
+              <strong>{nameLink(game.player1Name)}</strong> is waiting for an
+              opponent.
             </>
           )}
         </p>
@@ -1068,7 +1069,6 @@ function Status({
   }
 
   if (game.status === "setup") {
-    const placing = game.turn === 1 ? p1 : p2;
     return (
       <>
         <p style={{ margin: "0 0 8px" }}>
@@ -1077,7 +1077,11 @@ function Status({
               Place your pieces
             </strong>
           ) : (
-            <span>Waiting for {placing} to place their pieces</span>
+            <span>
+              Waiting for{" "}
+              {nameLink(game.turn === 1 ? game.player1Name : game.player2Name)} to
+              place their pieces
+            </span>
           )}
         </p>
         <p className="muted" style={{ margin: 0, lineHeight: 1.6 }}>
@@ -1090,11 +1094,13 @@ function Status({
 
   if (game.status === "finished") {
     const label =
-      game.result === 0
-        ? "Drawn"
-        : game.result === 1
-          ? `${p1} won`
-          : `${p2} won`;
+      game.result === 0 ? (
+        "Drawn"
+      ) : (
+        <>
+          {nameLink(game.result === 1 ? game.player1Name : game.player2Name)} won
+        </>
+      );
     const how =
       game.resultReason === "resign"
         ? " by resignation"
@@ -1123,7 +1129,10 @@ function Status({
         {yourTurn ? (
           <strong style={{ color: "var(--accent-mint)" }}>Your turn</strong>
         ) : (
-          <span>Waiting for {game.turn === 1 ? p1 : p2}</span>
+          <span>
+            Waiting for{" "}
+            {nameLink(game.turn === 1 ? game.player1Name : game.player2Name)}
+          </span>
         )}
       </p>
       <p className="muted" style={{ margin: 0, lineHeight: 1.6 }}>

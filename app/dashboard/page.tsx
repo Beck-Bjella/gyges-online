@@ -329,7 +329,7 @@ function MyGame({
         {(opponent ?? "?").charAt(0).toUpperCase()}
       </span>
       <span style={{ flex: 1, minWidth: 0 }}>
-        <Link href={`/game/${game.id}`}>
+        <Link className="stretch-link" href={`/game/${game.id}`}>
           {opponent ? `vs ${opponent}` : "Open game"}
         </Link>
         <br />

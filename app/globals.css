@@ -853,6 +853,32 @@ td.num {
   background: var(--border-subtle);
 }
 
+/*
+ * A row whose whole surface is a link.
+ *
+ * The .stretch-link's ::after blankets the positioned row, so clicking
+ * anywhere opens the row's subject; every other interactive thing inside is
+ * lifted above the blanket so buttons and name-links still win their own
+ * clicks.
+ */
+.list-item {
+  position: relative;
+}
+
+.stretch-link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+
+.list-item .btn,
+.list-item .tag,
+.list-item form,
+.list-item a:not(.stretch-link) {
+  position: relative;
+  z-index: 1;
+}
+
 /* --- placing pieces before play ----------------------------------------- */
 
 /*

@@ -36,7 +36,10 @@ export default function FriendsPanel({
           {requests.map((p) => (
             <li key={p.id} className="list-item">
               <span style={{ flex: 1 }}>
-                <Link href={`/player/${encodeURIComponent(p.username)}`}>
+                <Link
+                  className="stretch-link"
+                  href={`/player/${encodeURIComponent(p.username)}`}
+                >
                   {p.username}
                 </Link>{" "}
                 wants to be friends
@@ -57,7 +60,10 @@ export default function FriendsPanel({
           {friends.map((p) => (
             <li key={p.id} className="list-item">
               <span style={{ flex: 1 }}>
-                <Link href={`/player/${encodeURIComponent(p.username)}`}>
+                <Link
+                  className="stretch-link"
+                  href={`/player/${encodeURIComponent(p.username)}`}
+                >
                   {p.username}
                 </Link>
               </span>

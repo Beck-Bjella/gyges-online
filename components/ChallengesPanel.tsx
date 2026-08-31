@@ -72,6 +72,7 @@ export default function ChallengesPanel({
         <ul className="list" style={{ margin: 0 }}>
           {incoming.map((c) => (
             <li key={c.id} className="list-item urgent">
+              <Link className="stretch-link" href={`/game/${c.id}`} aria-label="Open game" />
               <span className="avatar avatar-mint">
                 {c.name.charAt(0).toUpperCase()}
               </span>
@@ -101,6 +102,7 @@ export default function ChallengesPanel({
           ))}
           {outgoing.map((c) => (
             <li key={c.id} className="list-item">
+              <Link className="stretch-link" href={`/game/${c.id}`} aria-label="Open game" />
               <span className="avatar avatar-amber">
                 {c.name.charAt(0).toUpperCase()}
               </span>
