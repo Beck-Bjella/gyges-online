@@ -729,6 +729,28 @@ export default function GameView({
               </button>
             </div>
           )}
+          {/* The staged move's buttons, floated over the board's empty lower
+              band — where the setup tray sits before play. The move itself is
+              already drawn as an arrow; repeating its notation said nothing
+              the board was not saying better. */}
+          {staged && viewingPly === null && !exploring && (
+            <div className="staged-float">
+              <button
+                className="btn btn-primary btn-large"
+                onClick={() => submit(staged)}
+                disabled={pending}
+              >
+                {pending ? "…" : "Submit move"}
+              </button>
+              <button
+                className="btn btn-large"
+                onClick={resetStaged}
+                disabled={pending}
+              >
+                Reset
+              </button>
+            </div>
+          )}
           {!exploring && reviewing && (
             <div className="review-banner">
               <span>
@@ -746,68 +768,47 @@ export default function GameView({
 
         <PlayerBar {...seat(bottomSide)} />
 
-        {/* A staged move, waiting to be sent. Placed under the board because
-            that is where the player is looking once they have dragged. */}
-        {staged && viewingPly === null && (
-          <div className="panel staged-move" style={{ marginTop: 14 }}>
-            <div className="row">
-              <span style={{ flex: 1, minWidth: 0 }}>
-                <strong>{moveToNotation(staged)}</strong>
-                <span className="muted"> · not sent yet</span>
-              </span>
-              <button
-                className="btn btn-primary"
-                onClick={() => submit(staged)}
-                disabled={pending}
-              >
-                {pending ? "…" : "Submit move"}
-              </button>
-              <button className="btn" onClick={resetStaged} disabled={pending}>
-                Reset
-              </button>
-            </div>
-          </div>
-        )}
-
-        <div className="row" style={{ marginTop: 14 }}>
-          <button className="btn" onClick={() => setFlipped((f) => !f)}>
-            Flip board
-          </button>
-          {(game.status === "active" || game.status === "finished") && !exploring && (
-            <button
-              className="btn"
-              onClick={enterExplore}
-              title="Push pieces around freely to test an idea, then come back"
-            >
-              Explore
-            </button>
-          )}
-          <span className="control-divider" aria-hidden="true" />
-          <button
-            className="btn"
-            onClick={() => goToPly(openingPly)}
-            disabled={openingPly === null || viewingPly === openingPly}
-            title="Both home rows placed, before the first move"
-          >
-            Opening
-          </button>
-          <button
-            className="btn"
-            onClick={() => goToPly(null)}
-            disabled={!reviewing}
-          >
-            Latest
-          </button>
-          <span className="muted">
-            {reviewing
-              ? `Reviewing move ${viewingPly} of ${game.ply}`
-              : "← → to review history"}
-          </span>
-        </div>
-        {error && <p className="error">{error}</p>}
       </div>
 
       <aside style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <div className="panel">
+          <div className="row">
+            <button className="btn" onClick={() => setFlipped((f) => !f)}>
+              Flip board
+            </button>
+            {(game.status === "active" || game.status === "finished") && !exploring && (
+              <button
+                className="btn"
+                onClick={enterExplore}
+                title="Push pieces around freely to test an idea, then come back"
+              >
+                Explore
+              </button>
+            )}
+            <span className="control-divider" aria-hidden="true" />
+            <button
+              className="btn"
+              onClick={() => goToPly(openingPly)}
+              disabled={openingPly === null || viewingPly === openingPly}
+              title="Both home rows placed, before the first move"
+            >
+              Opening
+            </button>
+            <button
+              className="btn"
+              onClick={() => goToPly(null)}
+              disabled={!reviewing}
+            >
+              Latest
+            </button>
+          </div>
+          <p className="hint" style={{ margin: "10px 0 0" }}>
+            {reviewing
+              ? `Reviewing move ${viewingPly} of ${game.ply}`
+              : "← → to review history"}
+          </p>
+          {error && <p className="error" style={{ margin: "10px 0 0" }}>{error}</p>}
+        </div>
         {yourPlacement && (
           <SetupPanel
             side={viewerSide!}

@@ -768,7 +768,7 @@ td.num {
  */
 .board {
   width: 100%;
-  max-width: min(100%, max(340px, calc(100vh - 300px)));
+  max-width: min(100%, max(340px, calc(100vh - 210px)));
   height: auto;
   display: block;
   margin: 0 auto;
@@ -891,6 +891,26 @@ td.num {
 .list-item a:not(.stretch-link) {
   position: relative;
   z-index: 1;
+}
+
+/*
+ * The staged move's controls, floated over the board's empty lower band —
+ * the region the setup tray occupies before play, unused once it starts.
+ * Centered and oversized: this is the one decision on screen.
+ */
+.staged-float {
+  position: absolute;
+  left: 50%;
+  bottom: 4.5%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 12px;
+  z-index: 2;
+}
+
+.btn-large {
+  padding: 12px 26px;
+  font-size: 16px;
 }
 
 /* --- chat ---------------------------------------------------------------- */
