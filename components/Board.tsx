@@ -20,7 +20,7 @@
  * the authority either way.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   BOARD_SIZE,
   GRID_SIZE,
@@ -181,24 +181,26 @@ export default function Board({
    * Driven by the move rather than by diffing boards: two pieces of the same
    * size are interchangeable, so a diff cannot say which one travelled.
    *
-   * The route comes from pathTo, which re-walks the rules over the position as
-   * it was *before* the move — hence prevBoard. A straight line between the two
-   * squares was tried first and read as the piece cutting across the board
-   * through squares it never touched; stepping shows why the move was legal,
-   * which is the part of Gyges hardest to read off a static board.
+   * The route comes from pathTo, re-walking the rules over the position as it
+   * was *before* the move — hence prevBoard. A straight line was tried first
+   * and read as the piece cutting across squares it never touched.
+   *
+   * One animation over all the waypoints, rather than a timer stepping React
+   * state a square at a time. That was visibly rough: each hop was a separate
+   * render racing a CSS transition, and the first hop fired before the browser
+   * had painted the starting square, so the piece jumped instead of setting
+   * off. Handing the whole route to the animation engine keeps it one
+   * continuous motion at a constant speed.
    *
    * Offsets are relative to the square the piece already occupies, so the board
    * is never in a wrong state — only the drawing lags behind it.
    */
-  const [walk, setWalk] = useState<{ idx: number; pts: Offset[]; step: number } | null>(
-    null,
-  );
-  const legs = useRef<{ idx: number; pts: Offset[] }[]>([]);
+  const pieceEls = useRef(new Map<number, SVGGElement>());
+  const running = useRef<Animation | null>(null);
   const prevBoard = useRef<BoardState | null>(null);
   const lastAnimated = useRef<string | null>(null);
-  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const key = lastMove.join("|");
     const first = lastAnimated.current === null;
     const before = prevBoard.current;
@@ -210,19 +212,16 @@ export default function Board({
     if (first || before === null || lastMove.length < 2) return;
 
     const [from, to, dropped] = lastMove;
-    // Only the goal squares tell us whose move it was, and only bearing off
-    // depends on knowing. Every other route is the same for either side.
+    // Only the goal squares say whose move it was, and only bearing off depends
+    // on knowing. Every other route is the same for either side.
     const mover: Player = to === P1_GOAL ? 1 : to === P2_GOAL ? -1 : 1;
     const route = pathTo(before, mover, from, to);
-
-    // flipMove rather than the toView helper below, only so this effect does
-    // not have to be ordered after it.
     const inView = (i: number) => (flipped ? flipMove([i])[0] : i);
 
-    const built: { idx: number; pts: Offset[] }[] = [];
+    const legs: { idx: number; pts: Offset[] }[] = [];
     if (route && route.length >= 2) {
       const end = idxToCenter(to);
-      built.push({
+      legs.push({
         idx: inView(to),
         pts: route.map((sq) => {
           const c = idxToCenter(sq);
@@ -232,38 +231,48 @@ export default function Board({
     }
     if (dropped !== undefined) {
       // The displaced piece moves after the mover arrives, not alongside it —
-      // they are two halves of one move, and shown together they read as two
-      // unrelated pieces drifting.
+      // shown together they read as two unrelated pieces drifting rather than
+      // as one piece striking another.
       const struck = idxToCenter(to);
       const landed = idxToCenter(dropped);
-      built.push({
+      legs.push({
         idx: inView(dropped),
         pts: [{ x: struck.cx - landed.cx, y: struck.cy - landed.cy }, { x: 0, y: 0 }],
       });
     }
-    if (built.length === 0) return;
+    if (legs.length === 0) return;
 
-    legs.current = built.slice(1);
-    setWalk({ ...built[0], step: 0 });
+    running.current?.cancel();
+    let stopped = false;
+
+    void (async () => {
+      for (const leg of legs) {
+        if (stopped) return;
+        const el = pieceEls.current.get(leg.idx);
+        if (!el) continue;
+        const anim = el.animate(
+          leg.pts.map((pt) => ({ transform: `translate(${pt.x}px, ${pt.y}px)` })),
+          // Linear, and per segment: a piece crossing waypoints at a constant
+          // speed reads as one motion. Easing each segment makes it hesitate at
+          // every square it passes through.
+          { duration: (leg.pts.length - 1) * STEP_MS, easing: "linear" },
+        );
+        running.current = anim;
+        try {
+          await anim.finished;
+        } catch {
+          return; // cancelled by a newer move
+        }
+      }
+      running.current = null;
+    })();
+
+    return () => {
+      stopped = true;
+      running.current?.cancel();
+      running.current = null;
+    };
   }, [lastMove, board, flipped]);
-
-  // Advance one square at a time, then hand over to the next leg.
-  useEffect(() => {
-    if (!walk) return;
-    if (walk.step < walk.pts.length - 1) {
-      timer.current = setTimeout(
-        () => setWalk((w) => (w ? { ...w, step: w.step + 1 } : w)),
-        walk.step === 0 ? 0 : STEP_MS,
-      );
-    } else {
-      const next = legs.current.shift();
-      timer.current = setTimeout(
-        () => setWalk(next ? { ...next, step: 0 } : null),
-        STEP_MS,
-      );
-    }
-    return () => clearTimeout(timer.current);
-  }, [walk]);
 
   const arrow = useCallback((fromIdx: number, toIdx: number) => {
     const a = idxToCenter(fromIdx);
@@ -813,8 +822,6 @@ export default function Board({
       )}
 
       {pieces.map((p) => {
-        // A piece in hand follows the cursor and must never be animated too.
-        const at = p.lifted || !walk || walk.idx !== p.idx ? null : walk.pts[walk.step];
         return (
         <g
           key={p.key}
@@ -827,9 +834,11 @@ export default function Board({
               on the group above would discard its translate to the square and
               fling the piece to the top-left of the board. */}
           <g
-            style={{
-              transform: at ? `translate(${at.x}px, ${at.y}px)` : undefined,
-              transition: walk && walk.step > 0 ? `transform ${STEP_MS}ms linear` : "none",
+            ref={(el) => {
+              // A piece in hand follows the cursor and must never be animated
+              // as well, so it is kept out of the map entirely.
+              if (el && !p.lifted) pieceEls.current.set(p.idx, el);
+              else pieceEls.current.delete(p.idx);
             }}
           >
           {/* A piece is its rings and nothing else — the middle is the board
