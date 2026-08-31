@@ -82,6 +82,12 @@ interface Props {
   onSetupDrop?: (slot: number, piece: number) => void;
   /** A placed piece moved to another square, or off the row when null. */
   onSetupMove?: (fromSlot: number, toSlot: number | null) => void;
+  /**
+   * When to play `lastMove` as motion. Null never animates; a value the board
+   * has not seen before plays the move once. The caller owns the policy — a
+   * player's own moves are not animated, since they just made them.
+   */
+  animateKey?: string | null;
 }
 
 type Drag =
@@ -159,6 +165,7 @@ export default function Board({
   setupRemaining = [],
   onSetupDrop,
   onSetupMove,
+  animateKey = null,
 }: Props) {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const raf = useRef(0);
@@ -179,47 +186,52 @@ export default function Board({
   /**
    * Slide the pieces a move touched, one straight leg per piece.
    *
-   * Driven by the move rather than by diffing boards: two pieces of the same
-   * size are interchangeable, so a diff cannot say which one travelled.
+   * When to animate is the caller's decision, made through `animateKey`: the
+   * board draws whatever position it is handed, and plays `lastMove` only when
+   * the key changes to a value it has not handled. That keeps policy — "not my
+   * own moves, yes the opponent's, yes history" — out of here entirely.
    *
-   * Direct from square to square. Stepping along the legal route was tried and
-   * read as wandering — the route is not recorded with the move, so the one
-   * shown was arbitrary, and a piece zigzagging through squares the player
-   * never thought about looked like noise, not like the move.
+   * The effect depends on nothing else. An earlier version also depended on
+   * the board array, which is rebuilt on every render, so any re-render at all
+   * — the thinking clock, a poll — re-ran the effect and its cleanup cancelled
+   * the animation mid-flight. That was most of the glitchiness. Unmount is the
+   * only thing that cancels now, besides a newer move starting.
    *
    * Both legs of a displacement are scheduled up front, the second delayed
-   * until the first lands and held at its starting square by fill:backwards.
-   * Running them from an async loop instead left the displaced piece drawn on
-   * its final square while the mover was still travelling, then snapping back
-   * to animate — the glitch this replaces.
-   *
-   * Offsets are relative to the square the piece is already recorded on, and
-   * every leg ends at zero offset, so finishing (or cancelling) an animation
-   * leaves the piece exactly where the board says it is. The board is never in
-   * a wrong state; only the drawing lags behind it.
+   * behind the first and held at its starting square by fill:backwards. Every
+   * leg ends at zero offset, so finishing or cancelling leaves the piece
+   * exactly where the board says it is — the board is never in a wrong state,
+   * only the drawing lags behind it.
    */
   const pieceEls = useRef(new Map<number, SVGGElement>());
   const running = useRef<Animation[]>([]);
-  const prevBoard = useRef<BoardState | null>(null);
   const lastAnimated = useRef<string | null>(null);
+  // The move belonging to the current key, read at fire time rather than
+  // captured, so the effect needs no other dependencies.
+  const moveRef = useRef<{ move: Move; flipped: boolean }>({ move: lastMove, flipped });
+  moveRef.current = { move: lastMove, flipped };
 
   useLayoutEffect(() => {
-    const key = lastMove.join("|");
+    if (animateKey === null) return;
     const first = lastAnimated.current === null;
-    prevBoard.current = board;
-    if (key === lastAnimated.current) return;
-    lastAnimated.current = key;
+    if (animateKey === lastAnimated.current) return;
+    lastAnimated.current = animateKey;
     // Nothing to slide from on the first paint: the position is simply what it
     // is when the page opens.
-    if (first || lastMove.length < 2) return;
+    if (first) return;
 
-    const [from, to, dropped] = lastMove;
-    const inView = (i: number) => (flipped ? flipMove([i])[0] : i);
+    const { move, flipped: flip } = moveRef.current;
+    if (move.length < 2) return;
+    const [from, to, dropped] = move;
+    const inView = (i: number) => (flip ? flipMove([i])[0] : i);
 
     const legs: { idx: number; from: number; to: number }[] = [
       { idx: inView(to), from, to },
     ];
     if (dropped !== undefined) {
+      // The displaced piece moves after the mover arrives, not alongside it —
+      // shown together they read as two unrelated pieces drifting rather than
+      // as one piece striking another.
       legs.push({ idx: inView(dropped), from: to, to: dropped });
     }
 
@@ -247,12 +259,16 @@ export default function Board({
       );
       delay += duration;
     }
+  }, [animateKey]);
 
-    return () => {
+  // Unmount is the only cleanup. Cancelling from the animation effect itself
+  // would tear the animation down whenever the effect re-ran.
+  useLayoutEffect(
+    () => () => {
       for (const a of running.current) a.cancel();
-      running.current = [];
-    };
-  }, [lastMove, board, flipped]);
+    },
+    [],
+  );
 
   const arrow = useCallback((fromIdx: number, toIdx: number) => {
     const a = idxToCenter(fromIdx);
@@ -801,7 +817,17 @@ export default function Board({
         />
       )}
 
-      {pieces.map((p) => {
+      {/* Ordered so the pieces the move touches draw last and travel OVER the
+          rest — mid-animation a mover crosses other pieces' squares, and going
+          under them reads as a rendering mistake. A piece in hand stays on top
+          of everything. */}
+      {[...pieces]
+        .sort((a, b) => {
+          const rank = (p: (typeof pieces)[number]) =>
+            p.lifted ? 2 : p.idx === viewLastMove[1] || p.idx === viewLastMove[2] ? 1 : 0;
+          return rank(a) - rank(b);
+        })
+        .map((p) => {
         return (
         <g
           key={p.key}

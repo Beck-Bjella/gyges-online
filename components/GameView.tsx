@@ -222,6 +222,23 @@ export default function GameView({
             ? lastPlayed.move
             : [];
 
+  /**
+   * When the board should play `shownMove` as motion.
+   *
+   * Your own moves never animate — you just made them, and the board already
+   * showed the result while you were staging. What animates is what you did
+   * not do yourself: the opponent's move arriving, and history as you step
+   * through it. Null while a move of ours is staged or in flight, so nothing
+   * replays when the preview comes and goes.
+   */
+  const animateKey = useMemo(() => {
+    if (reviewing) return `h${viewingPly}`;
+    if (staged || justPlayed) return null;
+    if (!lastPlayed || lastPlayed.kind !== "move") return null;
+    if (viewerSide !== null && lastPlayed.player === viewerSide) return null;
+    return `p${game.ply}`;
+  }, [reviewing, viewingPly, staged, justPlayed, lastPlayed, viewerSide, game.ply]);
+
   /** Choose a move without sending it. Replaces any move already staged. */
   const stage = useCallback((mv: Move) => {
     setError(null);
@@ -393,6 +410,7 @@ export default function GameView({
             setupSide={yourPlacement ? viewerSide! : undefined}
             onSetupSquare={setup.placeAt}
             setupRemaining={setup.remaining}
+            animateKey={animateKey}
             onSetupDrop={setup.dropAt}
             onSetupMove={setup.moveSlot}
           />
