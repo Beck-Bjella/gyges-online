@@ -608,27 +608,27 @@ input::placeholder {
 /* --- grid --------------------------------------------------------------- */
 
 /*
- * The game page gets more room than the rest of the site.
+ * The game page's layout, by declared design: the board owns the middle of
+ * the screen, sized by viewport HEIGHT, and the two columns sit at the actual
+ * sides of the display. Width tiers exist because that shape is only right
+ * when there is room for it:
  *
- * Everywhere else 1120px keeps text at a readable measure. A board is not text:
- * it is the thing being looked at, and the reading-width cap was holding it
- * well under what the screen could show.
+ *   wide      chat | board | rail   — columns pinned to the viewport edges
+ *   middle           board | rail   — chat drops below, full width; three
+ *                                     columns at tablet width would leave the
+ *                                     board a few hundred pixels
+ *   narrow           board          — one column: board, then status and
+ *                                     moves, chat last; the board is why
+ *                                     anyone came
  *
- * Widened here rather than on `main`, which the root layout owns and every
- * other page shares. `left: 50%` with a half-width translate re-centres an
- * element wider than its parent, so this needs no wrapper class and no change
- * to the layout.
- */
-/*
  * Doubled selectors on purpose: the element carries grid-2 as well, whose
- * two-column rule appears later in this file and would otherwise win the tie
- * — which put the chat in the wide column and the board in the 296px one.
+ * two-column rule appears later in this file and would otherwise win the
+ * specificity tie. The width breakout (100vw plus the centring transform)
+ * escapes main's reading-width cap, which is right for text and wrong for a
+ * board; widened here rather than on main, which the root layout owns and
+ * every page shares.
  */
 .grid-2.game-grid {
-  /* The full viewport, not a reading-width cap: the board is sized by screen
-     HEIGHT, and capping the page width was what stopped it getting there —
-     the middle column ran out of room while empty space pooled underneath.
-     The side columns go to the actual sides; the board fills the middle. */
   width: calc(100vw - 48px);
   gap: 32px;
   position: relative;
@@ -637,15 +637,23 @@ input::placeholder {
   grid-template-columns: 320px minmax(0, 1fr) 296px;
 }
 
-@media (max-width: 1150px) {
+@media (max-width: 1400px) {
+  .grid-2.game-grid {
+    grid-template-columns: minmax(0, 1fr) 296px;
+  }
+  .grid-2.game-grid .chat-rail {
+    grid-column: 1 / -1;
+    order: 9;
+  }
+}
+
+@media (max-width: 760px) {
   .grid-2.game-grid {
     grid-template-columns: minmax(0, 1fr);
     width: 100%;
     left: 0;
     transform: none;
-  }
-  .grid-2.game-grid .chat-rail {
-    order: 9;
+    gap: 22px;
   }
 }
 
@@ -768,8 +776,11 @@ td.num {
 .board {
   width: 100%;
   /* The chrome above the board plus a bottom gap equal to the top one, so
-     the board floats with the same air on both sides of it. */
+     the board floats with the same air on both sides of it. dvh where the
+     browser has it: on phones vh includes the retracting URL bar, and a board
+     sized against it overflows until the bar hides. */
   max-width: min(100%, max(340px, calc(100vh - 212px)));
+  max-width: min(100%, max(340px, calc(100dvh - 212px)));
   height: auto;
   display: block;
   margin: 0 auto;
