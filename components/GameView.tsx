@@ -285,42 +285,49 @@ export default function GameView({
   const goToPly = useCallback(
     (target: number | null) => {
       stopRun();
-      const resolve = (p: number | null) => p ?? game.ply;
+      const tgt = target ?? game.ply;
       const moveAt = (ply: number): Move | null => {
         const h = history.find((x) => x.ply === ply);
         return h && h.kind === "move" ? h.move : null;
       };
 
-      const step = () => {
-        setViewingPly((current) => {
-          const cur = resolve(current);
-          const tgt = resolve(target);
-          if (cur === tgt) return current;
+      // The walk owns its position in this closure. It must NOT live inside a
+      // setViewingPly updater: updaters have to be pure, React invokes them
+      // twice in dev to enforce it, and side effects there ran every step
+      // twice — the walk skipped plies and animations trampled each other.
+      let cur = viewingPly ?? game.ply;
 
-          const next = cur + Math.sign(tgt - cur);
-          const remaining = Math.abs(tgt - cur);
-          const speed = paceFor(remaining);
-          const reverse = next < cur;
-          // Backwards, the move being animated is the one just undone — the
-          // move AT the square we left, not the one we land on.
-          const mv = moveAt(reverse ? cur : next);
-          if (mv) {
-            setAnim({ key: `h${next}:${reverse ? "r" : "f"}`, move: mv, reverse, speed });
-          }
-          if (next !== tgt) {
-            // The next step waits for this one to play out, plus a beat of
-            // stillness — moves running into each other with no pause read as
-            // one long scramble rather than a sequence of moves.
-            run.current = setTimeout(
-              step,
-              Math.max(200, 620 * paceFor(remaining - 1)) + 240,
-            );
-          }
-          return next === game.ply ? null : next;
-        });
+      const step = () => {
+        if (cur === tgt) return;
+        const next = cur + Math.sign(tgt - cur);
+        const remaining = Math.abs(tgt - cur);
+        const reverse = next < cur;
+        // Backwards, the move being animated is the one just undone — the
+        // move AT the square we left, not the one we land on.
+        const mv = moveAt(reverse ? cur : next);
+        cur = next;
+
+        setViewingPly(next === game.ply ? null : next);
+        if (mv) {
+          setAnim({
+            key: `h${next}:${reverse ? "r" : "f"}`,
+            move: mv,
+            reverse,
+            speed: paceFor(remaining),
+          });
+        }
+        if (cur !== tgt) {
+          // The next step waits for this one to play out, plus a beat of
+          // stillness — moves running into each other with no pause read as
+          // one long scramble rather than a sequence of moves.
+          run.current = setTimeout(
+            step,
+            Math.max(200, 620 * paceFor(remaining - 1)) + 240,
+          );
+        }
       };
 
-      if (resolve(target) !== resolve(viewingPly)) step();
+      if (cur !== tgt) step();
     },
     [game.ply, history, viewingPly, stopRun],
   );
