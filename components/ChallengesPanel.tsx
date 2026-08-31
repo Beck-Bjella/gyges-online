@@ -22,6 +22,9 @@ interface Challenge {
   name: string;
 }
 
+/** Where a player's profile lives, from their name. */
+const profile = (name: string) => `/player/${encodeURIComponent(name)}`;
+
 const initial: ActionState = {};
 
 export default function ChallengesPanel({
@@ -37,8 +40,10 @@ export default function ChallengesPanel({
 
   if (incoming.length === 0 && outgoing.length === 0) return null;
 
+  // Rendered like the game sections around it, not as a rail panel — a
+  // challenge is a game asking to exist, and it belongs with the games.
   return (
-    <div className="panel">
+    <div style={{ marginBottom: 28 }}>
       <h2>Challenges</h2>
 
       {incoming.length > 0 && (
@@ -46,7 +51,10 @@ export default function ChallengesPanel({
           {incoming.map((c) => (
             <li key={c.id} className="list-item">
               <span style={{ flex: 1 }}>
-                <strong>{c.name}</strong> challenged you
+                <Link href={profile(c.name)}>
+                  <strong>{c.name}</strong>
+                </Link>{" "}
+                challenged you
               </span>
               <form action={submitJoin}>
                 <input type="hidden" name="game_id" value={c.id} />
@@ -67,7 +75,8 @@ export default function ChallengesPanel({
           {outgoing.map((c, i) => (
             <span key={c.id}>
               {i > 0 && ", "}
-              <Link href={`/game/${c.id}`}>{c.name}</Link>
+              <Link href={profile(c.name)}>{c.name}</Link> (
+              <Link href={`/game/${c.id}`}>game</Link>)
             </span>
           ))}
         </p>

@@ -114,6 +114,8 @@ export default async function DashboardPage() {
             learn where anything lives, and an absent section is
             indistinguishable from a section you have scrolled past.
           */}
+          <ChallengesPanel incoming={incoming} outgoing={outgoing} />
+
           <GameSection
             title="Active games"
             games={active}
@@ -152,7 +154,6 @@ export default async function DashboardPage() {
         </section>
 
         <aside className="rail">
-          <ChallengesPanel incoming={incoming} outgoing={outgoing} />
           <FriendsPanel requests={requests} friends={friends} />
 
           <div className="panel">
