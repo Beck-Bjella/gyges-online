@@ -76,7 +76,8 @@ export default function ChallengesPanel({
                 {c.name.charAt(0).toUpperCase()}
               </span>
               <span style={{ flex: 1, minWidth: 0 }}>
-                <Link href={`/game/${c.id}`}>Incoming challenge from {c.name}</Link>
+                Incoming challenge from{" "}
+                <Link href={`/player/${encodeURIComponent(c.name)}`}>{c.name}</Link>
                 <br />
                 <span className="muted" style={{ color: "var(--accent-mint)" }}>
                   {relativeTime(c.at)}
@@ -104,9 +105,9 @@ export default function ChallengesPanel({
                 {c.name.charAt(0).toUpperCase()}
               </span>
               <span style={{ flex: 1, minWidth: 0 }}>
-                <Link href={`/game/${c.id}`}>
-                  Waiting for {c.name} to accept this challenge
-                </Link>
+                Waiting for{" "}
+                <Link href={`/player/${encodeURIComponent(c.name)}`}>{c.name}</Link>{" "}
+                to accept this challenge
                 <br />
                 <span className="muted" style={{ color: "var(--accent-amber)" }}>
                   {relativeTime(c.at)}
