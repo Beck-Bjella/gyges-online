@@ -39,6 +39,7 @@ const {
   respondToFriendRequest,
   listFriends,
   resignGame,
+  abandonGame,
   getGame,
   getMoves,
   listOpenGames,
@@ -903,4 +904,10 @@ test("the chat cursor returns only what is new", () => {
   const first = postChatMessage(a.id, gameId, "one");
   const fresh = listChatMessages(gameId, first.id);
   assert.equal(fresh.length, 0, "nothing after the latest");
+});
+
+test("a game in setup can be abandoned by either player, leaving nothing", () => {
+  const { b, gameId } = gameInSetup();
+  abandonGame(gameId, b.id);
+  assert.equal(getGame(gameId), null, "the game is gone, not finished");
 });

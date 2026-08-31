@@ -600,6 +600,27 @@ export default function GameView({
     }
   }, [game.id, router]);
 
+  /**
+   * Walk away during setup. Distinct from resigning: nothing has happened yet,
+   * so the game is deleted and no result is recorded for either player.
+   */
+  const abandon = useCallback(async () => {
+    if (!confirm("Abandon this game? It will be removed, with no result for anyone."))
+      return;
+    setPending(true);
+    try {
+      const res = await fetch(`/api/games/${game.id}/abandon`, { method: "POST" });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        setError(body.error ?? "Could not abandon.");
+        return;
+      }
+      router.push("/dashboard");
+    } finally {
+      setPending(false);
+    }
+  }, [game.id, router]);
+
   const resign = useCallback(async () => {
     if (!confirm("Resign this game?")) return;
     setPending(true);
@@ -899,6 +920,13 @@ export default function GameView({
                   </button>
                 </>
               )}
+            </div>
+          )}
+          {game.status === "setup" && viewerSide !== null && (
+            <div className="row" style={{ marginTop: 14 }}>
+              <button className="btn btn-danger" onClick={abandon} disabled={pending}>
+                Abandon game
+              </button>
             </div>
           )}
           {game.status === "active" && viewerSide !== null && (

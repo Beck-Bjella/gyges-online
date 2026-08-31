@@ -1260,6 +1260,29 @@ export function submitMove(gameId: string, userId: string, mv: Move): GameWithPl
   });
 }
 
+/**
+ * Walk away from a game still being set up. Either player, and the game is
+ * DELETED — with only home rows placed nothing has happened worth recording,
+ * so unlike a resignation it leaves no result and touches no statistics.
+ * Resigning is for games where play has begun.
+ */
+export function abandonGame(gameId: string, userId: string): void {
+  return transaction(() => {
+    const db = getDb();
+    const game = db.prepare("SELECT * FROM games WHERE id = ?").get(gameId) as
+      | Game
+      | undefined;
+    if (!game) throw new GameError("Game not found.", 404);
+    if (game.status !== "setup") {
+      throw new GameError("Abandoning is for games still being set up.");
+    }
+    if (sideOf(game, userId) === null) {
+      throw new GameError("You are not a player in this game.", 403);
+    }
+    db.prepare("DELETE FROM games WHERE id = ?").run(gameId);
+  });
+}
+
 export function resignGame(gameId: string, userId: string): GameWithPlayers {
   return transaction(() => {
     const db = getDb();
@@ -1275,6 +1298,7 @@ export function resignGame(gameId: string, userId: string): GameWithPlayers {
     db.prepare(
       `UPDATE games
           SET status = 'finished', result = ?, result_reason = 'resign',
+
               deadline_at = NULL, finished_at = ?, updated_at = ?
         WHERE id = ? AND status IN ('active', 'setup')`,
     ).run(-side, now(), now(), gameId);
