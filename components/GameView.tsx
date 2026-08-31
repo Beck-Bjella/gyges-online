@@ -47,6 +47,10 @@ interface GameSummary {
   /** The engine's side, when one of the players is a bot. Null for human games. */
   botSide: Player | null;
   botName: string | null;
+  /** Who the reserved seat is for, when this open game is a challenge. */
+  invitedName: string | null;
+  /** The viewer is the one this challenge is for. */
+  youAreInvited: boolean;
 }
 
 interface HistoryEntry {
@@ -522,6 +526,30 @@ export default function GameView({
     }
   }, [game.id, router]);
 
+  /** Answer a challenge from its own page: sit down, or turn it down. */
+  const answerChallenge = useCallback(
+    async (accept: boolean) => {
+      if (!accept && !confirm("Decline this challenge? It will be removed.")) return;
+      setPending(true);
+      try {
+        const res = await fetch(
+          `/api/games/${game.id}/${accept ? "join" : "decline"}`,
+          { method: "POST" },
+        );
+        if (!res.ok) {
+          const body = (await res.json().catch(() => ({}))) as { error?: string };
+          setError(body.error ?? "Could not answer the challenge.");
+          return;
+        }
+        if (accept) router.refresh();
+        else router.push("/dashboard");
+      } finally {
+        setPending(false);
+      }
+    },
+    [game.id, router],
+  );
+
   /** The takeback conversation: op is offer, accept or decline. */
   const takeback = useCallback(
     async (op: "offer" | "accept" | "decline") => {
@@ -802,6 +830,20 @@ export default function GameView({
               </button>
             </div>
           )}
+          {game.status === "open" && game.youAreInvited && (
+            <div className="row" style={{ marginTop: 14 }}>
+              <button
+                className="btn btn-primary"
+                onClick={() => answerChallenge(true)}
+                disabled={pending}
+              >
+                Accept challenge
+              </button>
+              <button className="btn" onClick={() => answerChallenge(false)} disabled={pending}>
+                Decline
+              </button>
+            </div>
+          )}
           {game.status === "finished" && viewerSide !== null && signedIn && (
             <div className="row" style={{ marginTop: 14 }}>
               <button className="btn btn-primary" onClick={playAgain} disabled={pending}>
@@ -1001,11 +1043,21 @@ function Status({
     return (
       <>
         <p style={{ margin: "0 0 8px" }}>
-          <strong>{p1}</strong> is waiting for an opponent.
+          {game.invitedName ? (
+            <>
+              <strong>{p1}</strong> is waiting for{" "}
+              <strong>{game.invitedName}</strong>
+              {game.youAreInvited ? " — that is you" : ""}.
+            </>
+          ) : (
+            <>
+              <strong>{p1}</strong> is waiting for an opponent.
+            </>
+          )}
         </p>
         <p className="muted" style={{ margin: 0 }}>
           {describeTimeControl(game.moveSeconds)}.{" "}
-          {signedIn ? (
+          {game.invitedName ? null : signedIn ? (
             <Link href="/">Join from the game list.</Link>
           ) : (
             "Sign in to join."

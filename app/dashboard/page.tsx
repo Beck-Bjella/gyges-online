@@ -12,7 +12,6 @@ import {
   listFriends,
   listFriendRequests,
   listIncomingChallenges,
-  listOutgoingChallenges,
   openSeatCount,
   MAX_OPEN_GAMES,
 } from "@/lib/db/queries";
@@ -66,10 +65,7 @@ export default async function DashboardPage() {
     id: g.id,
     name: g.player1_name ?? "someone",
   }));
-  const outgoing = listOutgoingChallenges(user.id).map((g) => ({
-    id: g.id,
-    name: g.invited_name ?? "someone",
-  }));
+
   const finished = games.filter((g) => g.status === "finished");
 
   return (
@@ -114,7 +110,7 @@ export default async function DashboardPage() {
             learn where anything lives, and an absent section is
             indistinguishable from a section you have scrolled past.
           */}
-          <ChallengesPanel incoming={incoming} outgoing={outgoing} />
+          <ChallengesPanel incoming={incoming} />
 
           <GameSection
             title="Active games"
@@ -300,7 +296,11 @@ function MyGame({
   // visible the moment the game is opened, and the list reads faster without
   // them.
   let label: string;
-  if (open) label = "waiting for opponent";
+  if (open) {
+    // A challenge waits for someone in particular, and saying who is the
+    // difference between a table and an invitation.
+    label = game.invited_name ? `waiting for ${game.invited_name}` : "waiting for opponent";
+  }
   else if (game.status === "setup") {
     label = yourTurn ? "your turn" : "waiting for opponent";
   } else if (game.status === "finished") {

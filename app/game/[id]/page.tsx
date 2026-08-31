@@ -48,6 +48,8 @@ export default async function GamePage({
         hasPlayer2: game.player2_id !== null,
         botSide: bot ? sideOf(game, bot.id) : null,
         botName: bot?.username ?? null,
+        invitedName: game.invited_name,
+        youAreInvited: user !== null && game.invited_id === user.id,
       }}
       board={decodeBoard(game.board)}
       startBoard={decodeBoard(game.start_board)}
