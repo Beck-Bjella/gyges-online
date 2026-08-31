@@ -286,7 +286,7 @@ export default function GameView({
    * of stillness and long ones tighten up.
    */
   const paceFor = (remaining: number) =>
-    Math.max(0.2, 1 / (1 + (remaining - 1) * 0.35));
+    Math.max(0.12, 1 / (1 + (remaining - 1) * 0.5));
 
   /**
    * Every way of moving through history funnels through here.
@@ -351,7 +351,7 @@ export default function GameView({
         const aheadPace = paceFor(Math.abs(walkTarget.current - cur));
         run.current = setTimeout(
           step,
-          Math.max(150, 620 * aheadPace) + Math.max(60, 260 * aheadPace),
+          Math.max(110, 620 * aheadPace) + Math.max(45, 260 * aheadPace),
         );
       };
 
