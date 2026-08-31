@@ -648,7 +648,10 @@ export default function GameView({
    * which errs the right way.
    */
   const [splash, setSplash] = useState(false);
-  const splashKey = `result-seen:${game.id}`;
+  // Keyed on the ply as well as the game: a takeback can revive a finished
+  // game, and its SECOND ending deserves its own splash — the ply differs
+  // once the ending is replayed, while a plain game key would stay dismissed.
+  const splashKey = `result-seen:${game.id}:${game.ply}`;
   useEffect(() => {
     if (game.status !== "finished" || viewerSide === null) return;
     try {
