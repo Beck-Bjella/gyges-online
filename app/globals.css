@@ -767,7 +767,9 @@ td.num {
  */
 .board {
   width: 100%;
-  max-width: min(100%, max(340px, calc(100vh - 178px)));
+  /* The chrome above the board plus a bottom gap equal to the top one, so
+     the board floats with the same air on both sides of it. */
+  max-width: min(100%, max(340px, calc(100vh - 212px)));
   height: auto;
   display: block;
   margin: 0 auto;
