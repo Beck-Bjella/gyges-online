@@ -287,7 +287,12 @@ function MyGame({
     (side === 1 ? game.player2_name : game.player1_name) ?? game.invited_name;
 
   const inPlay = game.status === "active" || game.status === "setup";
-  const yourTurn = inPlay && side === game.turn;
+  // A takeback offered to you reads as your turn: there is a decision waiting
+  // on this game and it is yours, even though the game is over unless you say
+  // otherwise.
+  const takebackForYou =
+    game.status === "finished" && game.takeback_offered === 1 && side !== game.result;
+  const yourTurn = (inPlay && side === game.turn) || takebackForYou;
   const open = game.status === "open";
 
   let label: string;
@@ -295,9 +300,11 @@ function MyGame({
   else if (game.status === "setup") {
     label = yourTurn ? "place your pieces" : "opponent is placing";
   } else if (game.status === "finished") {
-    label =
-      (game.result === 0 ? "drawn" : game.result === side ? "you won" : "you lost") +
-      endingSuffix(game.result_reason);
+    label = takebackForYou
+      ? "takeback offered — your call"
+      : (game.result === 0 ? "drawn" : game.result === side ? "you won" : "you lost") +
+        endingSuffix(game.result_reason) +
+        (game.takeback_offered === 1 ? " · takeback offered" : "");
   } else {
     label = yourTurn ? "your move" : "their move";
   }
