@@ -981,6 +981,14 @@ export interface PlayerStats {
   active: number;
   /** The record against the engine, shown separately. */
   vsBots: Record_;
+  /**
+   * The human record split by seat. Which side moves first is a coin toss, but
+   * the seats still differ — player 1 places first, so their opponent arranges
+   * with full knowledge of their row. Whether that matters in practice is
+   * exactly what this split lets a player see.
+   */
+  asP1: Record_;
+  asP2: Record_;
 }
 
 /** A player's public record. Returns null for an unknown name. */
@@ -1002,6 +1010,14 @@ export function playerStats(username: string): PlayerStats | null {
          SUM(CASE WHEN done AND bot AND lost   THEN 1 ELSE 0 END) AS bot_losses,
          SUM(CASE WHEN done AND bot AND drew   THEN 1 ELSE 0 END) AS bot_draws,
          SUM(CASE WHEN done AND bot            THEN 1 ELSE 0 END) AS bot_played,
+         SUM(CASE WHEN done AND human AND won  AND seat1 THEN 1 ELSE 0 END) AS p1_wins,
+         SUM(CASE WHEN done AND human AND lost AND seat1 THEN 1 ELSE 0 END) AS p1_losses,
+         SUM(CASE WHEN done AND human AND drew AND seat1 THEN 1 ELSE 0 END) AS p1_draws,
+         SUM(CASE WHEN done AND human AND seat1          THEN 1 ELSE 0 END) AS p1_played,
+         SUM(CASE WHEN done AND human AND won  AND NOT seat1 THEN 1 ELSE 0 END) AS p2_wins,
+         SUM(CASE WHEN done AND human AND lost AND NOT seat1 THEN 1 ELSE 0 END) AS p2_losses,
+         SUM(CASE WHEN done AND human AND drew AND NOT seat1 THEN 1 ELSE 0 END) AS p2_draws,
+         SUM(CASE WHEN done AND human AND NOT seat1          THEN 1 ELSE 0 END) AS p2_played,
          SUM(CASE WHEN running THEN 1 ELSE 0 END) AS active
        FROM (
          SELECT
@@ -1013,7 +1029,8 @@ export function playerStats(username: string): PlayerStats | null {
          OR (g.player2_id = @id AND g.result = -1)) AS won,
            ((g.player1_id = @id AND g.result = -1)
          OR (g.player2_id = @id AND g.result = 1)) AS lost,
-           g.result = 0 AS drew
+           g.result = 0 AS drew,
+           g.player1_id = @id AS seat1
          FROM games g
          LEFT JOIN users opp
            ON opp.id = CASE WHEN g.player1_id = @id THEN g.player2_id
@@ -1038,6 +1055,48 @@ export function playerStats(username: string): PlayerStats | null {
       draws: n("bot_draws"),
       played: n("bot_played"),
     },
+    asP1: {
+      wins: n("p1_wins"),
+      losses: n("p1_losses"),
+      draws: n("p1_draws"),
+      played: n("p1_played"),
+    },
+    asP2: {
+      wins: n("p2_wins"),
+      losses: n("p2_losses"),
+      draws: n("p2_draws"),
+      played: n("p2_played"),
+    },
+  };
+}
+
+/**
+ * One player's record against one other, from `userId`'s side of the board.
+ *
+ * Bots included when the other party is one — the whole point of a bot
+ * profile is that this number is meaningful against a fixed opponent.
+ */
+export function headToHead(userId: string, otherId: string): Record_ {
+  const row = getDb()
+    .prepare(
+      `SELECT
+         SUM(CASE WHEN (g.player1_id = @me AND g.result = 1)
+                    OR (g.player2_id = @me AND g.result = -1) THEN 1 ELSE 0 END) AS wins,
+         SUM(CASE WHEN (g.player1_id = @me AND g.result = -1)
+                    OR (g.player2_id = @me AND g.result = 1) THEN 1 ELSE 0 END) AS losses,
+         SUM(CASE WHEN g.result = 0 THEN 1 ELSE 0 END) AS draws,
+         COUNT(g.id) AS played
+       FROM games g
+      WHERE g.status = 'finished'
+        AND ((g.player1_id = @me AND g.player2_id = @them)
+          OR (g.player1_id = @them AND g.player2_id = @me))`,
+    )
+    .get({ me: userId, them: otherId }) as Record<string, number | null>;
+  return {
+    wins: row.wins ?? 0,
+    losses: row.losses ?? 0,
+    draws: row.draws ?? 0,
+    played: row.played ?? 0,
   };
 }
 

@@ -29,6 +29,7 @@ export default function LeaderboardPage() {
                 <th style={{ textAlign: "right" }}>Lost</th>
                 <th style={{ textAlign: "right" }}>Drawn</th>
                 <th style={{ textAlign: "right" }}>Played</th>
+                <th style={{ textAlign: "right" }}>Win %</th>
               </tr>
             </thead>
             <tbody>
@@ -46,6 +47,9 @@ export default function LeaderboardPage() {
                   <td className="num">{r.losses}</td>
                   <td className="num">{r.draws}</td>
                   <td className="num">{r.played}</td>
+                  <td className="num">
+                    {r.played ? `${Math.round((100 * r.wins) / r.played)}%` : "—"}
+                  </td>
                 </tr>
               ))}
             </tbody>

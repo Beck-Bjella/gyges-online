@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
+  headToHead,
   playerStats,
   finishedGamesForUser,
   listGamesForUser,
   settleExpiredGames,
   sideOf,
+  type Record_,
 } from "@/lib/db/queries";
 import { relativeTime, endingSuffix } from "@/lib/format";
 import { currentUser } from "@/lib/auth";
@@ -41,6 +43,23 @@ export default async function PlayerPage({
   const finished = finishedGamesForUser(user.id);
   const active = listGamesForUser(user.id).filter((g) => g.status === "active");
 
+  // The viewer's own record against this player. Only worth a panel when
+  // there is one — most profiles a player looks at are strangers.
+  const h2h = viewer && !isMe ? headToHead(viewer.id, user.id) : null;
+
+  // Current streak, walked off the finished games already fetched: how many
+  // of the most recent ended the same way. Decided in code rather than SQL
+  // because "same way in a row" is awkward in a query and 25 rows is nothing.
+  let streak = 0;
+  let streakKind: "won" | "lost" | null = null;
+  for (const g of finished) {
+    if (g.result === 0) break;
+    const kind = g.result === sideOf(g, user.id) ? "won" : "lost";
+    if (streakKind === null) streakKind = kind;
+    if (kind !== streakKind) break;
+    streak++;
+  }
+
   return (
     <>
       <h1>{user.username}</h1>
@@ -62,7 +81,39 @@ export default async function PlayerPage({
         <Stat label="Lost" value={stats.losses} />
         <Stat label="Drawn" value={stats.draws} />
         <Stat label="In progress" value={stats.active} accent="var(--accent-amber)" />
+        {stats.played > 0 && (
+          <Stat
+            label="Win rate"
+            value={`${Math.round((100 * stats.wins) / stats.played)}%`}
+          />
+        )}
+        {streak >= 2 && (
+          <Stat
+            label="Streak"
+            value={`${streak} ${streakKind}`}
+            accent={streakKind === "won" ? "var(--accent-mint)" : undefined}
+          />
+        )}
       </div>
+
+      {/* The same record split by seat. Player 1 places first, so their
+          opponent arranges knowing their row — whether that matters is what
+          this lets a player see about their own games. */}
+      {stats.asP1.played > 0 && stats.asP2.played > 0 && (
+        <p className="hint" style={{ margin: "0 0 26px" }}>
+          As player 1: {recordLine(stats.asP1)} · as player 2:{" "}
+          {recordLine(stats.asP2)}
+        </p>
+      )}
+
+      {h2h && h2h.played > 0 && (
+        <div className="panel" style={{ marginBottom: 26 }}>
+          <h2>You against {user.username}</h2>
+          <p style={{ margin: 0 }}>
+            {recordLine(h2h)} across {h2h.played} game{h2h.played === 1 ? "" : "s"}.
+          </p>
+        </div>
+      )}
 
       {/* Against the engine, kept apart rather than hidden. A bot plays a fixed
           published strength and will play a thousand games, so these numbers
@@ -143,13 +194,18 @@ export default async function PlayerPage({
   );
 }
 
+/** A compact "3W – 1L – 2D" line for a record. */
+function recordLine(r: Record_): string {
+  return `${r.wins}W – ${r.losses}L${r.draws ? ` – ${r.draws}D` : ""}`;
+}
+
 function Stat({
   label,
   value,
   accent,
 }: {
   label: string;
-  value: number;
+  value: number | string;
   accent?: string;
 }) {
   return (
