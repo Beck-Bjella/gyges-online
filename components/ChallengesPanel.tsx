@@ -76,10 +76,10 @@ export default function ChallengesPanel({
                 {c.name.charAt(0).toUpperCase()}
               </span>
               <span style={{ flex: 1, minWidth: 0 }}>
-                <Link href={`/game/${c.id}`}>vs {c.name}</Link>
+                <Link href={`/game/${c.id}`}>Incoming challenge from {c.name}</Link>
                 <br />
                 <span className="muted" style={{ color: "var(--accent-mint)" }}>
-                  challenged you · {relativeTime(c.at)}
+                  {relativeTime(c.at)}
                 </span>
               </span>
               <button
@@ -104,10 +104,12 @@ export default function ChallengesPanel({
                 {c.name.charAt(0).toUpperCase()}
               </span>
               <span style={{ flex: 1, minWidth: 0 }}>
-                <Link href={`/game/${c.id}`}>vs {c.name}</Link>
+                <Link href={`/game/${c.id}`}>
+                  Waiting for {c.name} to accept this challenge
+                </Link>
                 <br />
                 <span className="muted" style={{ color: "var(--accent-amber)" }}>
-                  waiting for {c.name} · {relativeTime(c.at)}
+                  {relativeTime(c.at)}
                 </span>
               </span>
               <button
