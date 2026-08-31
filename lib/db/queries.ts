@@ -738,6 +738,36 @@ export function listOutgoingChallenges(userId: string): GameWithPlayers[] {
     .all(userId) as GameWithPlayers[];
 }
 
+/**
+ * Everything the dashboard watches, folded into one opaque string.
+ *
+ * The site-wide version only sees the games table, but a dashboard also
+ * changes when a friend request lands, a friendship forms, or a challenge
+ * appears — so this folds those in, scoped to one player. Same contract as
+ * siteVersion: the page renders with it, the probe re-asks, plain equality
+ * decides.
+ */
+export function dashboardVersion(userId: string): string {
+  const db = getDb();
+  const games = db
+    .prepare(
+      `SELECT COUNT(*) AS n, COALESCE(MAX(updated_at), 0) AS latest
+         FROM games
+        WHERE player1_id = @id OR player2_id = @id OR invited_id = @id`,
+    )
+    .get({ id: userId }) as { n: number; latest: number };
+  const social = db
+    .prepare(
+      `SELECT
+         SUM(CASE WHEN status = 'accepted' THEN 1 ELSE 0 END) AS friends,
+         SUM(CASE WHEN status = 'pending' AND addressee_id = @id THEN 1 ELSE 0 END) AS asks
+         FROM friends
+        WHERE requester_id = @id OR addressee_id = @id`,
+    )
+    .get({ id: userId }) as { friends: number | null; asks: number | null };
+  return [games.n, games.latest, social.friends ?? 0, social.asks ?? 0].join(":");
+}
+
 // --- chat ------------------------------------------------------------------
 
 export interface ChatMessage {

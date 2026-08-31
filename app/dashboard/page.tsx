@@ -6,13 +6,13 @@ import {
   playerStats,
   timingStats,
   sideOf,
-  siteVersion,
   type GameWithPlayers,
   listFriends,
   listFriendRequests,
   listIncomingChallenges,
   listOutgoingChallenges,
   openSeatCount,
+  dashboardVersion,
   MAX_OPEN_GAMES,
 } from "@/lib/db/queries";
 import FriendsPanel from "@/components/FriendsPanel";
@@ -85,7 +85,9 @@ export default async function DashboardPage() {
   return (
     <>
       {/* Your games change when an opponent acts, so this page watches too. */}
-      <AutoRefresh version={siteVersion()} />
+      {/* The site version only watches games; a dashboard also changes when
+          a friend request or challenge lands, so it polls its own probe. */}
+      <AutoRefresh url="/api/me/version" version={dashboardVersion(user.id)} />
       <header className="page-head">
         <div>
           <h1>{user.username}</h1>
