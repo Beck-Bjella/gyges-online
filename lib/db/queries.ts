@@ -428,11 +428,40 @@ function firstMover(): Player {
   return Math.random() < 0.5 ? 1 : -1;
 }
 
+/** The most unfinished games — open, setting up, or active — one person may hold. */
+export const MAX_OPEN_GAMES = 10;
+
+/**
+ * Refuse a new seat for someone already holding MAX_OPEN_GAMES.
+ *
+ * Counted on seats actually taken, so a challenge counts against its sender
+ * from the moment it is sent, but against the invited player only once they
+ * accept. Bots are never checked — their whole purpose is to be available.
+ */
+function assertRoomForGame(userId: string): void {
+  if (getUser(userId)?.bot_strength !== null) return;
+  const n = (
+    getDb()
+      .prepare(
+        `SELECT COUNT(*) AS n FROM games
+          WHERE (player1_id = ? OR player2_id = ?) AND status != 'finished'`,
+      )
+      .get(userId, userId) as { n: number }
+  ).n;
+  if (n >= MAX_OPEN_GAMES) {
+    throw new GameError(
+      `You already have ${MAX_OPEN_GAMES} games going. Finish one first.`,
+    );
+  }
+}
+
 export function createGame(
   creatorId: string,
   moveSeconds = 259200,
   from: BoardState = emptyBoard(),
 ): Game {
+  assertRoomForGame(creatorId);
+
   // A game begins from an empty board: both players arrange their home row
   // before play starts. See the setup section below.
   const board = encodeBoard(from);
@@ -624,6 +653,7 @@ export function joinGame(gameId: string, userId: string): Game {
     if (game.invited_id && game.invited_id !== userId) {
       throw new GameError("That game is reserved for someone else.", 403);
     }
+    assertRoomForGame(userId);
 
     const deadline = now() + game.move_seconds;
     const startedAt = now();

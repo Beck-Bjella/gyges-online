@@ -187,9 +187,9 @@ export default async function PlayerPage({
         </>
       )}
 
-      <h2>Finished games</h2>
+      <h2>Complete games</h2>
       {finished.length === 0 ? (
-        <p className="muted">No finished games yet.</p>
+        <p className="muted">No complete games yet.</p>
       ) : (
         <ul className="list">
           {finished.map((g) => {

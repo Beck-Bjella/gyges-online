@@ -119,7 +119,7 @@ export default async function DashboardPage() {
           />
 
           <GameSection
-            title="Waiting for a challenger"
+            title="Waiting for opponent"
             games={waiting}
             userId={user.id}
             accent="amber"
@@ -132,7 +132,7 @@ export default async function DashboardPage() {
           />
 
           <GameSection
-            title="Finished"
+            title="Complete"
             games={finished}
             userId={user.id}
             empty={
@@ -273,7 +273,7 @@ function MyGame({
   const open = game.status === "open";
 
   let label: string;
-  if (open) label = game.invited_id ? "waiting for them to accept" : "waiting for a challenger";
+  if (open) label = game.invited_id ? "waiting for them to accept" : "waiting for an opponent";
   else if (game.status === "setup") {
     label = yourTurn ? "place your pieces" : "opponent is placing";
   } else if (game.status === "finished") {

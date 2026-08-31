@@ -817,3 +817,15 @@ test("friendship: ask, answer, and asking back accepts", () => {
   sendFriendRequest(c.id, a.id);
   assert.equal(friendState(c.id, a.id), "friends");
 });
+
+test("nobody holds more than ten unfinished games", () => {
+  const a = createUser(uniqueName("busy"));
+  for (let i = 0; i < 10; i++) createGame(a.id);
+  assert.throws(() => createGame(a.id), /10 games/i);
+  assert.throws(() => createChallenge(a.id, createUser(uniqueName("bz")).id), /10 games/i);
+
+  // Joining takes a seat too, so a full player cannot slip in that way.
+  const host = createUser(uniqueName("host"));
+  const g = createGame(host.id);
+  assert.throws(() => joinGame(g.id, a.id), /10 games/i);
+});
