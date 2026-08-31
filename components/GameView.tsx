@@ -34,6 +34,8 @@ interface GameSummary {
   turn: Player;
   result: number | null;
   resultReason: string | null;
+  /** The winner of a goal-ended game is offering the loser a rewind. */
+  takebackOffered: boolean;
   ply: number;
   moveSeconds: number;
   deadlineAt: number | null;
@@ -475,22 +477,17 @@ export default function GameView({
    */
   const canGiveBack =
     game.status === "active" &&
+    game.botSide !== null &&
     viewerSide !== null &&
     viewerSide === game.turn &&
-    history.length > 0 &&
+    history.length > 1 &&
     history[history.length - 1].kind === "move" &&
     history[history.length - 1].player !== viewerSide &&
-    (game.botSide === null ||
-      (history.length > 1 &&
-        history[history.length - 2].kind === "move" &&
-        history[history.length - 2].player === viewerSide));
+    history[history.length - 2].kind === "move" &&
+    history[history.length - 2].player === viewerSide;
 
   const giveBack = useCallback(async () => {
-    const ask =
-      game.botSide === null
-        ? "Return your opponent's last move so they can play a different one?"
-        : "Take back your last move and the engine's reply?";
-    if (!confirm(ask)) return;
+    if (!confirm("Take back your last move and the engine's reply?")) return;
     setPending(true);
     try {
       const res = await fetch(`/api/games/${game.id}/undo`, { method: "POST" });
@@ -524,6 +521,31 @@ export default function GameView({
       setPending(false);
     }
   }, [game.id, router]);
+
+  /** The takeback conversation: op is offer, accept or decline. */
+  const takeback = useCallback(
+    async (op: "offer" | "accept" | "decline") => {
+      if (op === "offer" && !confirm("Offer to let them take their last move back?"))
+        return;
+      setPending(true);
+      try {
+        const res = await fetch(`/api/games/${game.id}/takeback`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ op }),
+        });
+        if (!res.ok) {
+          const body = (await res.json().catch(() => ({}))) as { error?: string };
+          setError(body.error ?? "Could not do that.");
+          return;
+        }
+        router.refresh();
+      } finally {
+        setPending(false);
+      }
+    },
+    [game.id, router],
+  );
 
   /** Withdraw an open table before anyone joins. The game is deleted. */
   const cancel = useCallback(async () => {
@@ -574,8 +596,12 @@ export default function GameView({
     `/api/games/${game.id}/version`,
     [game.ply, game.status, game.updatedAt].join(":"),
     {
+      // A finished human game keeps listening: a takeback can arrive, be
+      // answered, and bring the game back to life under both players.
       enabled:
-        (game.status === "active" || game.status === "setup") &&
+        (game.status === "active" ||
+          game.status === "setup" ||
+          (game.status === "finished" && game.botSide === null)) &&
         !pending &&
         staged === null,
     },
@@ -781,6 +807,31 @@ export default function GameView({
               <button className="btn btn-primary" onClick={playAgain} disabled={pending}>
                 {game.botSide !== null ? "Play again" : "Offer a rematch"}
               </button>
+              {game.resultReason === "goal" &&
+                game.botSide === null &&
+                viewerSide === game.result &&
+                !game.takebackOffered && (
+                  <button className="btn" onClick={() => takeback("offer")} disabled={pending}>
+                    Offer takeback
+                  </button>
+                )}
+              {game.takebackOffered && viewerSide === game.result && (
+                <span className="muted">Takeback offered — their call.</span>
+              )}
+              {game.takebackOffered && viewerSide !== game.result && (
+                <>
+                  <button
+                    className="btn btn-primary"
+                    onClick={() => takeback("accept")}
+                    disabled={pending}
+                  >
+                    Accept takeback
+                  </button>
+                  <button className="btn" onClick={() => takeback("decline")} disabled={pending}>
+                    Decline
+                  </button>
+                </>
+              )}
             </div>
           )}
           {game.status === "active" && viewerSide !== null && (

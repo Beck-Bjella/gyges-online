@@ -27,6 +27,8 @@ const {
   submitSetup,
   submitMove,
   undoTurn,
+  offerTakeback,
+  answerTakeback,
   createBot,
   createBotGame,
   createChallenge,
@@ -757,27 +759,45 @@ test("the first move goes to a random side", () => {
   assert.deepEqual([...starters].sort(), [-1, 1], "both sides should start some games");
 });
 
-test("the player to move can give the last move back", () => {
+test("between people, a move is never taken back unilaterally", () => {
   const { a, b, gameId } = twoPlayerGame();
   submitMove(gameId, a.id, [0, 13]);
+  // The instant takeback is for bot games; between people it is an offer,
+  // made by the winner once the game ends at the goal.
+  assert.throws(() => undoTurn(gameId, b.id), /offered/i);
+});
 
-  // Only b, whose turn it is, may return a's move — and a cannot grab it back.
-  assert.throws(() => undoTurn(gameId, a.id), /player to move/i);
+test("a takeback is offered by the winner and answered by the loser", () => {
+  const { a, b, gameId } = gameFromPosition(winnableByP1());
+  submitMove(gameId, a.id, [24, 26]);
+  submitMove(gameId, b.id, [26, 24]); // the blunder to be regretted
+  const done = submitMove(gameId, a.id, [24, P2_GOAL]);
+  assert.equal(done.status, "finished");
 
-  const before = getGame(gameId)!;
-  const undone = undoTurn(gameId, b.id);
-  assert.equal(undone.ply, before.ply - 1, "one ply removed");
-  assert.equal(undone.turn, 1, "the move returns to the player who made it");
-  const remaining = getMoves(gameId);
-  assert.equal(remaining.length, 2, "only the setups remain");
-  assert.equal(
-    undone.board,
-    remaining[1].board_after,
-    "the board returns to the position after both setups",
-  );
+  // Only the winner offers, and only the loser answers.
+  assert.throws(() => offerTakeback(gameId, b.id), /winner/i);
+  const offered = offerTakeback(gameId, a.id);
+  assert.equal(offered.takeback_offered, 1);
+  assert.throws(() => answerTakeback(gameId, a.id, true), /yours to make/i);
 
-  // Nothing left to take back: the remaining plies are setup.
-  assert.throws(() => undoTurn(gameId, a.id), /nothing to take back/i);
+  const live = answerTakeback(gameId, b.id, true);
+  assert.equal(live.status, "active", "the game comes back to life");
+  assert.equal(live.result, null);
+  assert.equal(live.turn, -1, "the loser replays their move");
+  assert.equal(decodeBoard(live.board)[26], 2, "rewound to before the blunder");
+  assert.equal(live.takeback_offered, 0);
+});
+
+test("declining a takeback lets the result stand", () => {
+  const { a, b, gameId } = gameFromPosition(winnableByP1());
+  submitMove(gameId, a.id, [24, 26]);
+  submitMove(gameId, b.id, [26, 24]);
+  submitMove(gameId, a.id, [24, P2_GOAL]);
+  offerTakeback(gameId, a.id);
+  const g = answerTakeback(gameId, b.id, false);
+  assert.equal(g.status, "finished");
+  assert.equal(g.result, 1);
+  assert.equal(g.takeback_offered, 0);
 });
 
 test("a challenge is an open game only the invited player can join", () => {

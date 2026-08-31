@@ -114,6 +114,8 @@ export interface Game {
   updated_at: number;
   /** Reserved second seat: only this user may join. Null for a public game. */
   invited_id: string | null;
+  /** 1 while the winner of a goal-ended game is offering the loser a rewind. */
+  takeback_offered: number;
 }
 
 export interface MoveRow {
@@ -407,6 +409,7 @@ const GAME_COLUMNS = `
   g.id, g.player1_id, g.player2_id, g.status, g.turn, g.result, g.result_reason,
   g.start_board, g.board, g.ply, g.move_seconds, g.deadline_at,
   g.created_at, g.started_at, g.finished_at, g.updated_at, g.invited_id,
+  g.takeback_offered,
   p1.username AS player1_name, p2.username AS player2_name,
   inv.username AS invited_name
 `;
@@ -478,6 +481,7 @@ export function createGame(
     finished_at: null,
     updated_at: now(),
     invited_id: null,
+    takeback_offered: 0,
   };
 
   getDb()
@@ -1162,17 +1166,16 @@ export function resignGame(gameId: string, userId: string): GameWithPlayers {
 }
 
 /**
- * Give the last move back, so it can be played again.
+ * Take your own last move back, in a game against the engine.
  *
- * Granted by the player whose turn it is — the one the mistake HELPED. Against
- * a person that undoes the opponent's last move and hands them the turn.
- * Against the engine it undoes two plies, the bot's reply and your own move:
- * undoing only the bot's would have it immediately replay the same move, since
- * a bot's choice is a function of the position.
+ * Bot games only. Undoes two plies — the bot's reply and your move beneath
+ * it, since undoing only the reply would have the bot immediately replay it:
+ * a bot's choice is a function of the position. A bot needs no consent, which
+ * is exactly why this is instant here and an offer between people — see
+ * offerTakeback.
  *
- * History is genuinely rewritten — the rows are deleted, not marked. A
- * correspondence takeback is a courtesy between the players, and keeping the
- * retracted move around would make every consumer of history reason about
+ * History is genuinely rewritten — the rows are deleted, not marked. Keeping
+ * a retracted move around would make every consumer of history reason about
  * whether a ply "really happened".
  */
 export function undoTurn(gameId: string, userId: string): GameWithPlayers {
@@ -1198,7 +1201,10 @@ export function undoTurn(gameId: string, userId: string): GameWithPlayers {
       .all(gameId) as { ply: number; player: Player; kind: string }[];
 
     const bot = botInGame(game);
-    const removed = bot === null ? 1 : 2;
+    if (bot === null) {
+      throw new GameError("Against a person, takebacks are offered — from the winner, when the game ends.", 409);
+    }
+    const removed = 2;
 
     // Every removed row must be an ordinary move by the expected side; setup
     // cannot be taken back. Against a person: the opponent's move. Against the
@@ -1233,6 +1239,94 @@ export function undoTurn(gameId: string, userId: string): GameWithPlayers {
       now(),
       gameId,
     );
+
+    return getGame(gameId)!;
+  });
+}
+
+/**
+ * Offer the loser a rewind, from a game that just ended at the goal.
+ *
+ * The winner's gesture for a game decided by a simple blunder: an OFFER the
+ * loser accepts or declines, never something done to them — their move is
+ * theirs. Only for goal endings; a resignation or timeout was the loser's own
+ * decision to end things.
+ */
+export function offerTakeback(gameId: string, userId: string): GameWithPlayers {
+  return transaction(() => {
+    const db = getDb();
+    const game = db.prepare("SELECT * FROM games WHERE id = ?").get(gameId) as
+      | Game
+      | undefined;
+    if (!game) throw new GameError("Game not found.", 404);
+    if (game.status !== "finished" || game.result_reason !== "goal") {
+      throw new GameError("A takeback is offered from a game won at the goal.");
+    }
+    if (botInGame(game)) throw new GameError("The engine takes no takebacks.");
+    const side = sideOf(game, userId);
+    if (side === null) throw new GameError("You are not a player in this game.", 403);
+    if (side !== game.result) throw new GameError("Only the winner can offer.", 403);
+
+    db.prepare("UPDATE games SET takeback_offered = 1, updated_at = ? WHERE id = ?").run(
+      now(),
+      gameId,
+    );
+    return getGame(gameId)!;
+  });
+}
+
+/**
+ * Answer a takeback offer.
+ *
+ * Accepting rewinds to just before the loser's last move — theirs to replay,
+ * with the winning sequence above it deleted — and the game is live again.
+ * Declining clears the offer and the result stands.
+ */
+export function answerTakeback(
+  gameId: string,
+  userId: string,
+  accept: boolean,
+): GameWithPlayers {
+  return transaction(() => {
+    const db = getDb();
+    const game = db.prepare("SELECT * FROM games WHERE id = ?").get(gameId) as
+      | Game
+      | undefined;
+    if (!game) throw new GameError("Game not found.", 404);
+    if (!game.takeback_offered) throw new GameError("No takeback is on offer.", 404);
+    const side = sideOf(game, userId);
+    if (side === null) throw new GameError("You are not a player in this game.", 403);
+    if (side === game.result) throw new GameError("The offer is yours to make, not answer.", 403);
+
+    if (!accept) {
+      db.prepare(
+        "UPDATE games SET takeback_offered = 0, updated_at = ? WHERE id = ?",
+      ).run(now(), gameId);
+      return getGame(gameId)!;
+    }
+
+    const lastOwn = db
+      .prepare(
+        `SELECT MAX(ply) AS ply FROM moves
+          WHERE game_id = ? AND kind = 'move' AND player = ?`,
+      )
+      .get(gameId, side) as { ply: number | null };
+    if (lastOwn.ply === null) throw new GameError("Nothing to take back.");
+
+    const cutoff = lastOwn.ply - 1;
+    const before = db
+      .prepare("SELECT board_after FROM moves WHERE game_id = ? AND ply = ?")
+      .get(gameId, cutoff) as { board_after: string } | undefined;
+    if (!before) throw new GameError("Nothing to take back.");
+
+    db.prepare("DELETE FROM moves WHERE game_id = ? AND ply > ?").run(gameId, cutoff);
+    db.prepare(
+      `UPDATE games
+          SET board = ?, ply = ?, turn = ?, status = 'active',
+              result = NULL, result_reason = NULL, finished_at = NULL,
+              takeback_offered = 0, deadline_at = ?, updated_at = ?
+        WHERE id = ?`,
+    ).run(before.board_after, cutoff, side, now() + game.move_seconds, now(), gameId);
 
     return getGame(gameId)!;
   });
