@@ -809,6 +809,19 @@ export function respondToFriendRequest(
   if (done.changes === 0) throw new GameError("No such request.", 404);
 }
 
+/** End a friendship, from either side. The row goes; asking again works. */
+export function removeFriend(userId: string, otherId: string): void {
+  const done = getDb()
+    .prepare(
+      `DELETE FROM friends
+        WHERE status = 'accepted'
+          AND ((requester_id = ? AND addressee_id = ?)
+            OR (requester_id = ? AND addressee_id = ?))`,
+    )
+    .run(userId, otherId, otherId, userId);
+  if (done.changes === 0) throw new GameError("You are not friends.", 404);
+}
+
 /** Everyone this player is friends with. */
 export function listFriends(userId: string): User[] {
   return getDb()

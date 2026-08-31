@@ -12,6 +12,7 @@ import {
   createChallenge,
   declineChallenge,
   respondToFriendRequest,
+  removeFriend,
   sendFriendRequest,
 } from "@/lib/db/queries";
 
@@ -192,6 +193,7 @@ export async function friendAction(
     if (op === "send") sendFriendRequest(user.id, otherId);
     else if (op === "accept") respondToFriendRequest(user.id, otherId, true);
     else if (op === "decline") respondToFriendRequest(user.id, otherId, false);
+    else if (op === "remove") removeFriend(user.id, otherId);
     else return { error: "Unknown request." };
   } catch (err) {
     if (err instanceof GameError) return { error: err.message };

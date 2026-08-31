@@ -36,9 +36,24 @@ export default function SocialButtons({
   return (
     <div className="row" style={{ margin: "0 0 22px" }}>
       {state === "friends" ? (
-        <span className="tag" style={{ borderColor: "var(--accent-mint)", color: "var(--accent-mint)" }}>
-          Friends
-        </span>
+        <>
+          <span className="tag" style={{ borderColor: "var(--accent-mint)", color: "var(--accent-mint)" }}>
+            Friends
+          </span>
+          <form
+            action={submitFriend}
+            onSubmit={(e) => {
+              if (!confirm("Remove this friend?")) e.preventDefault();
+            }}
+          >
+            <input type="hidden" name="user_id" value={userId} />
+            <input type="hidden" name="op" value="remove" />
+            <input type="hidden" name="path" value={path} />
+            <button className="btn" disabled={friendPending}>
+              Unfriend
+            </button>
+          </form>
+        </>
       ) : state === "received" ? (
         <>
           <FriendForm op="accept" label="Accept friend request" primary

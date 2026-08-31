@@ -295,10 +295,14 @@ function MyGame({
   const yourTurn = (inPlay && side === game.turn) || takebackForYou;
   const open = game.status === "open";
 
+  // Two states cover everything unfinished: it is your turn, or you are
+  // waiting. The distinctions underneath — placing, moving, joining — are
+  // visible the moment the game is opened, and the list reads faster without
+  // them.
   let label: string;
-  if (open) label = game.invited_id ? "waiting for them to accept" : "waiting for an opponent";
+  if (open) label = "waiting for opponent";
   else if (game.status === "setup") {
-    label = yourTurn ? "place your pieces" : "opponent is placing";
+    label = yourTurn ? "your turn" : "waiting for opponent";
   } else if (game.status === "finished") {
     label = takebackForYou
       ? "takeback offered — your call"
@@ -306,7 +310,7 @@ function MyGame({
         endingSuffix(game.result_reason) +
         (game.takeback_offered === 1 ? " · takeback offered" : "");
   } else {
-    label = yourTurn ? "your move" : "their move";
+    label = yourTurn ? "your turn" : "waiting for opponent";
   }
 
   const avatarClass = yourTurn
