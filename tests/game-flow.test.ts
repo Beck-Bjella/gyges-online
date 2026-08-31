@@ -27,6 +27,11 @@ const {
   submitSetup,
   submitMove,
   undoTurn,
+  createChallenge,
+  friendState,
+  sendFriendRequest,
+  respondToFriendRequest,
+  listFriends,
   resignGame,
   getGame,
   getMoves,
@@ -771,4 +776,44 @@ test("the player to move can give the last move back", () => {
 
   // Nothing left to take back: the remaining plies are setup.
   assert.throws(() => undoTurn(gameId, a.id), /nothing to take back/i);
+});
+
+test("a challenge is an open game only the invited player can join", () => {
+  const a = createUser(uniqueName("chal-a"));
+  const b = createUser(uniqueName("chal-b"));
+  const c = createUser(uniqueName("chal-c"));
+  const g = createChallenge(a.id, b.id);
+
+  assert.ok(
+    !listOpenGames().some((x) => x.id === g.id),
+    "reserved games stay out of the public lobby",
+  );
+  assert.throws(() => joinGame(g.id, c.id), /reserved/i);
+  const joined = joinGame(g.id, b.id);
+  assert.equal(joined.status, "setup");
+});
+
+test("friendship: ask, answer, and asking back accepts", () => {
+  const a = createUser(uniqueName("fr-a"));
+  const b = createUser(uniqueName("fr-b"));
+  const c = createUser(uniqueName("fr-c"));
+
+  assert.equal(friendState(a.id, b.id), "none");
+  sendFriendRequest(a.id, b.id);
+  assert.equal(friendState(a.id, b.id), "sent");
+  assert.equal(friendState(b.id, a.id), "received");
+
+  // Declining removes the request entirely, so asking again works.
+  respondToFriendRequest(b.id, a.id, false);
+  assert.equal(friendState(a.id, b.id), "none");
+
+  sendFriendRequest(a.id, b.id);
+  respondToFriendRequest(b.id, a.id, true);
+  assert.equal(friendState(a.id, b.id), "friends");
+  assert.ok(listFriends(b.id).some((u) => u.id === a.id));
+
+  // Both reaching out makes friends without a formality.
+  sendFriendRequest(a.id, c.id);
+  sendFriendRequest(c.id, a.id);
+  assert.equal(friendState(c.id, a.id), "friends");
 });

@@ -9,7 +9,12 @@ import {
   sideOf,
   siteVersion,
   type GameWithPlayers,
+  listFriends,
+  listFriendRequests,
+  listIncomingChallenges,
+  listOutgoingChallenges,
 } from "@/lib/db/queries";
+import FriendsPanel from "@/components/FriendsPanel";
 import { relativeTime, describeThinkTime, endingSuffix } from "@/lib/format";
 import AutoRefresh from "@/components/AutoRefresh";
 
@@ -47,7 +52,20 @@ export default async function DashboardPage() {
     (g) => sideOf(g, user.id) === g.turn,
   ).length;
 
-  const waiting = games.filter((g) => g.status === "open");
+  const waiting = games.filter((g) => g.status === "open" && !g.invited_id);
+  const friends = listFriends(user.id).map((u) => ({ id: u.id, username: u.username }));
+  const requests = listFriendRequests(user.id).map((u) => ({
+    id: u.id,
+    username: u.username,
+  }));
+  const incoming = listIncomingChallenges(user.id).map((g) => ({
+    id: g.id,
+    name: g.player1_name ?? "someone",
+  }));
+  const outgoing = listOutgoingChallenges(user.id).map((g) => ({
+    id: g.id,
+    name: g.invited_name,
+  }));
   const finished = games.filter((g) => g.status === "finished");
 
   return (
@@ -126,6 +144,13 @@ export default async function DashboardPage() {
         </section>
 
         <aside className="rail">
+          <FriendsPanel
+            requests={requests}
+            friends={friends}
+            incoming={incoming}
+            outgoing={outgoing}
+          />
+
           <div className="panel">
             <h2>Account</h2>
             <p className="muted" style={{ margin: "0 0 14px", lineHeight: 1.6 }}>

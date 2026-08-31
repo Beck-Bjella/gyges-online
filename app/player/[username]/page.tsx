@@ -12,6 +12,8 @@ import {
 import { relativeTime, endingSuffix } from "@/lib/format";
 import { currentUser } from "@/lib/auth";
 import RenameForm from "@/components/RenameForm";
+import SocialButtons from "@/components/SocialButtons";
+import { friendState } from "@/lib/db/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -72,6 +74,10 @@ export default async function PlayerPage({
           <h2>Your account</h2>
           <RenameForm current={user.username} />
         </div>
+      )}
+
+      {viewer && !isMe && user.bot_strength === null && (
+        <SocialButtons userId={user.id} state={friendState(viewer.id, user.id)} />
       )}
 
       {/* Against people. This is the record — the one the leaderboard ranks. */}

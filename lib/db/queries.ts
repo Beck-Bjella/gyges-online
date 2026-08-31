@@ -112,6 +112,8 @@ export interface Game {
   /** When the game ended. Null until finished. */
   finished_at: number | null;
   updated_at: number;
+  /** Reserved second seat: only this user may join. Null for a public game. */
+  invited_id: string | null;
 }
 
 export interface MoveRow {
@@ -402,7 +404,7 @@ export function purgeExpiredSessions(): number {
 const GAME_COLUMNS = `
   g.id, g.player1_id, g.player2_id, g.status, g.turn, g.result, g.result_reason,
   g.start_board, g.board, g.ply, g.move_seconds, g.deadline_at,
-  g.created_at, g.started_at, g.finished_at, g.updated_at,
+  g.created_at, g.started_at, g.finished_at, g.updated_at, g.invited_id,
   p1.username AS player1_name, p2.username AS player2_name
 `;
 
@@ -447,6 +449,7 @@ export function createGame(
     started_at: null,
     finished_at: null,
     updated_at: now(),
+    invited_id: null,
   };
 
   getDb()
@@ -488,7 +491,7 @@ export function listOpenGames(): GameWithPlayers[] {
   return getDb()
     .prepare(
       `SELECT ${GAME_COLUMNS} ${GAME_JOINS}
-        WHERE g.status = 'open' ORDER BY g.created_at DESC LIMIT 50`,
+        WHERE g.status = 'open' AND g.invited_id IS NULL ORDER BY g.created_at DESC LIMIT 50`,
     )
     .all() as GameWithPlayers[];
 }
@@ -614,6 +617,9 @@ export function joinGame(gameId: string, userId: string): Game {
     if (game.status !== "open") throw new GameError("That game is no longer open.");
     if (game.player1_id === userId) throw new GameError("You cannot join your own game.");
     if (game.player2_id) throw new GameError("That game already has two players.");
+    if (game.invited_id && game.invited_id !== userId) {
+      throw new GameError("That game is reserved for someone else.", 403);
+    }
 
     const deadline = now() + game.move_seconds;
     const startedAt = now();
@@ -632,6 +638,158 @@ export function joinGame(gameId: string, userId: string): Game {
       started_at: startedAt,
     };
   });
+}
+
+/**
+ * An open game reserved for one opponent.
+ *
+ * A challenge is an ordinary open game with the second seat held, so joining,
+ * setup, deadlines and everything downstream are the code that already exists.
+ * It does not appear in the public lobby; the invited player sees it on their
+ * dashboard and accepts by joining.
+ */
+export function createChallenge(
+  creatorId: string,
+  invitedId: string,
+  moveSeconds = 259200,
+): Game {
+  return transaction(() => {
+    const other = getUser(invitedId);
+    if (!other || other.deleted_at) throw new GameError("No such player.", 404);
+    if (other.bot_strength !== null) {
+      throw new GameError("Challenge a bot by starting a game from the lobby.");
+    }
+    if (other.id === creatorId) throw new GameError("You cannot challenge yourself.");
+
+    const game = createGame(creatorId, moveSeconds);
+    getDb()
+      .prepare("UPDATE games SET invited_id = ?, updated_at = ? WHERE id = ?")
+      .run(invitedId, now(), game.id);
+    return { ...game, invited_id: invitedId };
+  });
+}
+
+/** Challenges waiting for this player to accept. */
+export function listIncomingChallenges(userId: string): GameWithPlayers[] {
+  return getDb()
+    .prepare(
+      `SELECT ${GAME_COLUMNS} ${GAME_JOINS}
+        WHERE g.status = 'open' AND g.invited_id = ?
+        ORDER BY g.created_at DESC`,
+    )
+    .all(userId) as GameWithPlayers[];
+}
+
+/** Challenges this player has sent that nobody has answered. */
+export function listOutgoingChallenges(
+  userId: string,
+): (GameWithPlayers & { invited_name: string })[] {
+  return getDb()
+    .prepare(
+      `SELECT ${GAME_COLUMNS}, inv.username AS invited_name ${GAME_JOINS}
+         LEFT JOIN users inv ON inv.id = g.invited_id
+        WHERE g.status = 'open' AND g.player1_id = ? AND g.invited_id IS NOT NULL
+        ORDER BY g.created_at DESC`,
+    )
+    .all(userId) as (GameWithPlayers & { invited_name: string })[];
+}
+
+// --- friends ---------------------------------------------------------------
+
+export type FriendState = "none" | "sent" | "received" | "friends";
+
+/** Where two people stand, from `userId`'s side. */
+export function friendState(userId: string, otherId: string): FriendState {
+  const row = getDb()
+    .prepare(
+      `SELECT requester_id, status FROM friends
+        WHERE (requester_id = ? AND addressee_id = ?)
+           OR (requester_id = ? AND addressee_id = ?)`,
+    )
+    .get(userId, otherId, otherId, userId) as
+    | { requester_id: string; status: string }
+    | undefined;
+  if (!row) return "none";
+  if (row.status === "accepted") return "friends";
+  return row.requester_id === userId ? "sent" : "received";
+}
+
+/**
+ * Ask to be friends. Asking someone who has already asked you accepts —
+ * two people who both reached out should not be left waiting on a formality.
+ */
+export function sendFriendRequest(userId: string, otherId: string): FriendState {
+  return transaction(() => {
+    const other = getUser(otherId);
+    if (!other || other.deleted_at) throw new GameError("No such player.", 404);
+    if (other.bot_strength !== null) throw new GameError("Bots have no friends list.");
+    if (other.id === userId) throw new GameError("That would be you.");
+
+    const state = friendState(userId, otherId);
+    if (state === "friends" || state === "sent") return state;
+    const db = getDb();
+    if (state === "received") {
+      db.prepare(
+        `UPDATE friends SET status = 'accepted'
+          WHERE requester_id = ? AND addressee_id = ?`,
+      ).run(otherId, userId);
+      return "friends";
+    }
+    db.prepare(
+      `INSERT INTO friends (requester_id, addressee_id, status, created_at)
+       VALUES (?, ?, 'pending', ?)`,
+    ).run(userId, otherId, now());
+    return "sent";
+  });
+}
+
+/** Answer a request addressed to you. Declining deletes it — no list of rejections. */
+export function respondToFriendRequest(
+  userId: string,
+  requesterId: string,
+  accept: boolean,
+): void {
+  const db = getDb();
+  const done = accept
+    ? db
+        .prepare(
+          `UPDATE friends SET status = 'accepted'
+            WHERE requester_id = ? AND addressee_id = ? AND status = 'pending'`,
+        )
+        .run(requesterId, userId)
+    : db
+        .prepare(
+          `DELETE FROM friends
+            WHERE requester_id = ? AND addressee_id = ? AND status = 'pending'`,
+        )
+        .run(requesterId, userId);
+  if (done.changes === 0) throw new GameError("No such request.", 404);
+}
+
+/** Everyone this player is friends with. */
+export function listFriends(userId: string): User[] {
+  return getDb()
+    .prepare(
+      `SELECT u.* FROM friends f
+         JOIN users u ON u.id = CASE WHEN f.requester_id = ? THEN f.addressee_id
+                                     ELSE f.requester_id END
+        WHERE (f.requester_id = ? OR f.addressee_id = ?) AND f.status = 'accepted'
+          AND u.deleted_at IS NULL
+        ORDER BY u.username`,
+    )
+    .all(userId, userId, userId) as User[];
+}
+
+/** Requests waiting for this player's answer. */
+export function listFriendRequests(userId: string): User[] {
+  return getDb()
+    .prepare(
+      `SELECT u.* FROM friends f
+         JOIN users u ON u.id = f.requester_id
+        WHERE f.addressee_id = ? AND f.status = 'pending' AND u.deleted_at IS NULL
+        ORDER BY f.created_at`,
+    )
+    .all(userId) as User[];
 }
 
 /**

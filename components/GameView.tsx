@@ -505,6 +505,26 @@ export default function GameView({
     }
   }, [game.id, game.botSide, router]);
 
+  /**
+   * The same opponent again. Against the engine the game starts at once;
+   * against a person this creates a challenge they accept from their
+   * dashboard, and lands you on the new game's page to wait.
+   */
+  const playAgain = useCallback(async () => {
+    setPending(true);
+    try {
+      const res = await fetch(`/api/games/${game.id}/rematch`, { method: "POST" });
+      const body = (await res.json().catch(() => ({}))) as { id?: string; error?: string };
+      if (!res.ok || !body.id) {
+        setError(body.error ?? "Could not start a new game.");
+        return;
+      }
+      router.push(`/game/${body.id}`);
+    } finally {
+      setPending(false);
+    }
+  }, [game.id, router]);
+
   const resign = useCallback(async () => {
     if (!confirm("Resign this game?")) return;
     setPending(true);
@@ -732,6 +752,13 @@ export default function GameView({
             yourTurn={yourTurnOrPlacement}
             signedIn={signedIn}
           />
+          {game.status === "finished" && viewerSide !== null && signedIn && (
+            <div className="row" style={{ marginTop: 14 }}>
+              <button className="btn btn-primary" onClick={playAgain} disabled={pending}>
+                {game.botSide !== null ? "Play again" : "Offer a rematch"}
+              </button>
+            </div>
+          )}
           {game.status === "active" && viewerSide !== null && (
             <div className="row" style={{ marginTop: 14 }}>
               {canGiveBack && (

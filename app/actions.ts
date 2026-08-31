@@ -9,6 +9,9 @@ import {
   joinGame,
   renameUser,
   GameError,
+  createChallenge,
+  respondToFriendRequest,
+  sendFriendRequest,
 } from "@/lib/db/queries";
 
 export interface ActionState {
@@ -169,4 +172,52 @@ export async function renameAction(
 
   revalidatePath("/", "layout");
   redirect(`/player/${encodeURIComponent(username.trim())}`);
+}
+
+/**
+ * Send, accept or decline a friend request. One action for the three verbs,
+ * because they are one button in three states.
+ */
+export async function friendAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const user = await currentUser();
+  if (!user) return { error: "Sign in first." };
+
+  const otherId = String(formData.get("user_id") ?? "");
+  const op = String(formData.get("op") ?? "");
+  try {
+    if (op === "send") sendFriendRequest(user.id, otherId);
+    else if (op === "accept") respondToFriendRequest(user.id, otherId, true);
+    else if (op === "decline") respondToFriendRequest(user.id, otherId, false);
+    else return { error: "Unknown request." };
+  } catch (err) {
+    if (err instanceof GameError) return { error: err.message };
+    return { error: "Could not update friends." };
+  }
+  revalidatePath("/dashboard");
+  // The profile the button lives on, so its label catches up immediately.
+  const path = String(formData.get("path") ?? "");
+  if (path.startsWith("/player/")) revalidatePath(path);
+  return {};
+}
+
+/** Challenge a specific player: an open game reserved for them. */
+export async function challengeAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const user = await currentUser();
+  if (!user) return { error: "Sign in first." };
+
+  const otherId = String(formData.get("user_id") ?? "");
+  let id: string;
+  try {
+    id = createChallenge(user.id, otherId).id;
+  } catch (err) {
+    if (err instanceof GameError) return { error: err.message };
+    return { error: "Could not send that challenge." };
+  }
+  redirect(`/game/${id}`);
 }
