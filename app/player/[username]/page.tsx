@@ -86,7 +86,7 @@ export default async function PlayerPage({
       )}
 
       {/* Against people. This is the record — the one the leaderboard ranks. */}
-      <div className="statcards" style={{ marginBottom: stats.vsBots.played ? 14 : 26 }}>
+      <div className="statcards" style={{ marginBottom: 26 }}>
         <Stat label="Played" value={stats.played} />
         <Stat label="Won" value={stats.wins} accent="var(--accent-mint)" />
         <Stat label="Lost" value={stats.losses} />
@@ -124,24 +124,6 @@ export default async function PlayerPage({
             {recordLine(h2h)} across {h2h.played} game{h2h.played === 1 ? "" : "s"}.
           </p>
         </div>
-      )}
-
-      {/* Against the engine, kept apart rather than hidden. A bot plays a fixed
-          published strength and will play a thousand games, so these numbers
-          say something different — worth showing, not worth ranking. */}
-      {stats.vsBots.played > 0 && (
-        <>
-          <p className="hint" style={{ margin: "0 0 8px" }}>
-            Against the engine — not counted in the record above or on the
-            leaderboard.
-          </p>
-          <div className="statcards" style={{ marginBottom: 26 }}>
-            <Stat label="Played" value={stats.vsBots.played} />
-            <Stat label="Won" value={stats.vsBots.wins} accent="var(--accent-mint)" />
-            <Stat label="Lost" value={stats.vsBots.losses} />
-            <Stat label="Drawn" value={stats.vsBots.draws} />
-          </div>
-        </>
       )}
 
       {waiting.length > 0 && (

@@ -156,12 +156,21 @@ export default async function DashboardPage() {
 
           <div className="panel">
             <h2>Account</h2>
-            <p className="muted" style={{ margin: "0 0 14px", lineHeight: 1.6 }}>
-              Member since {relativeTime(user.created_at)}. Tables in use:{" "}
-              <strong style={seats >= MAX_OPEN_GAMES ? { color: "var(--accent-amber)" } : undefined}>
+            <p className="muted" style={{ margin: "0 0 10px", lineHeight: 1.6 }}>
+              Member since {relativeTime(user.created_at)}.
+            </p>
+            <p style={{ margin: "0 0 14px", fontSize: 15 }}>
+              Tables in use:{" "}
+              <strong
+                style={{
+                  color:
+                    seats >= MAX_OPEN_GAMES
+                      ? "var(--accent-amber)"
+                      : "var(--accent-mint)",
+                }}
+              >
                 {seats}/{MAX_OPEN_GAMES}
               </strong>
-              .
             </p>
             <Link
               href={`/player/${encodeURIComponent(user.username)}`}
