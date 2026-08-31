@@ -277,13 +277,16 @@ export default function GameView({
   /**
    * How hurried a replay step is, by how many plies are still to come.
    *
-   * One move on its own plays at full length; a jump across a whole game
-   * compresses, but never past about double speed — a replay nobody can
-   * follow is not a replay. The same pace scales the pause between moves,
-   * so short trips keep their beat of stillness and long ones tighten up.
+   * One move on its own plays at full length; deep in a long jump it runs at
+   * a fifth. What keeps that comprehensible is not the floor but the shape:
+   * pace is recomputed from the REMAINING distance every step, so a long run
+   * blurs through its middle and eases out as it approaches the target — the
+   * last few moves, the ones being travelled to, play near full length. The
+   * same pace scales the pause between moves, so short trips keep their beat
+   * of stillness and long ones tighten up.
    */
   const paceFor = (remaining: number) =>
-    Math.max(0.45, 1 / (1 + (remaining - 1) * 0.2));
+    Math.max(0.2, 1 / (1 + (remaining - 1) * 0.35));
 
   /**
    * Every way of moving through history funnels through here.
@@ -348,7 +351,7 @@ export default function GameView({
         const aheadPace = paceFor(Math.abs(walkTarget.current - cur));
         run.current = setTimeout(
           step,
-          Math.max(200, 620 * aheadPace) + Math.max(90, 260 * aheadPace),
+          Math.max(150, 620 * aheadPace) + Math.max(60, 260 * aheadPace),
         );
       };
 
