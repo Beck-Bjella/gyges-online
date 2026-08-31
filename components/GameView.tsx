@@ -865,7 +865,6 @@ export default function GameView({
               the board was not saying better. */}
           {staged && viewingPly === null && !exploring && (
             <div className="review-banner">
-              <span>Not sent yet</span>
               <button
                 className="btn btn-primary"
                 onClick={() => submit(staged)}
