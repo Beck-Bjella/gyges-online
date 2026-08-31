@@ -20,7 +20,7 @@
  * the authority either way.
  */
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   BOARD_SIZE,
   GRID_SIZE,
@@ -154,6 +154,7 @@ export default function Board({
   onSetupMove,
 }: Props) {
   const svgRef = useRef<SVGSVGElement | null>(null);
+  const raf = useRef(0);
   const [drag, setDrag] = useState<Drag>({ kind: "none" });
 
   // Everything below works in view space. When flipped, the view is the
@@ -167,6 +168,59 @@ export default function Board({
     () => (flipped ? flipMove(lastMove) : lastMove),
     [lastMove, flipped],
   );
+
+  /**
+   * Slide the pieces a move touched, instead of teleporting them.
+   *
+   * Driven by the move rather than by diffing boards, because two pieces of the
+   * same size are interchangeable and a diff cannot say which one travelled —
+   * it would animate whichever happened to be nearest in the array.
+   *
+   * The trick is two frames. First the piece is drawn offset back to where it
+   * started, with no transition, so nothing is seen to move. Then the offset is
+   * released with the transition on, and it slides to the square it is already
+   * recorded on. The board is never in a wrong state; only the drawing lags.
+   */
+  const [slide, setSlide] = useState<{
+    offsets: Map<number, { x: number; y: number }>;
+    settled: boolean;
+  }>({
+    offsets: new Map(),
+    settled: true,
+  });
+  const lastAnimated = useRef<string | null>(null);
+
+  useEffect(() => {
+    const key = viewLastMove.join("|");
+    const first = lastAnimated.current === null;
+    if (key === lastAnimated.current) return;
+    lastAnimated.current = key;
+    // Nothing to slide from on the first paint — the position is simply what it
+    // is when the page opens.
+    if (first || viewLastMove.length < 2) return;
+
+    const [from, to, dropped] = viewLastMove;
+    const a = idxToCenter(from);
+    const b = idxToCenter(to);
+    const offsets = new Map<number, { x: number; y: number }>();
+    offsets.set(to, { x: a.cx - b.cx, y: a.cy - b.cy });
+    if (dropped !== undefined) {
+      // The displaced piece travels from where it was struck to where it landed.
+      const c = idxToCenter(dropped);
+      offsets.set(dropped, { x: b.cx - c.cx, y: b.cy - c.cy });
+    }
+    setSlide({ offsets, settled: false });
+
+    // Two frames: one to paint the offset, one to release it.
+    const outer = requestAnimationFrame(() => {
+      const inner = requestAnimationFrame(() =>
+        setSlide((s) => ({ ...s, settled: true })),
+      );
+      raf.current = inner;
+    });
+    raf.current = outer;
+    return () => cancelAnimationFrame(raf.current);
+  }, [viewLastMove]);
 
   /**
    * A line between two squares, pulled back at both ends so it starts and stops
@@ -719,12 +773,22 @@ export default function Board({
         />
       )}
 
-      {pieces.map((p) => (
+      {pieces.map((p) => {
+        // A piece in hand follows the cursor and must never be animated as well.
+        const offset = p.lifted ? undefined : slide.offsets.get(p.idx);
+        return (
         <g
           key={p.key}
           transform={`translate(${p.cx} ${p.cy})`}
           filter={p.lifted ? "url(#lifted-shadow)" : "url(#piece-shadow)"}
-          style={{ pointerEvents: "none" }}
+          style={{
+            pointerEvents: "none",
+            transform:
+              offset && !slide.settled
+                ? `translate(${offset.x}px, ${offset.y}px)`
+                : undefined,
+            transition: offset && slide.settled ? "transform 200ms ease-out" : undefined,
+          }}
         >
           {/* A piece is its rings and nothing else — the middle is the board
               showing through. So the rings are drawn in the pale piece colour
@@ -749,7 +813,8 @@ export default function Board({
             );
           })()}
         </g>
-      ))}
+        );
+      })}
       {/* Dots that belong on a piece — one the piece in hand may land on and
           displace. Drawn after the pieces so they are not hidden beneath them,
           and ringed in the board's dark tone so a mint dot stays legible
