@@ -79,12 +79,7 @@ body {
   margin: 0;
   padding: 0;
   min-height: 100%;
-  /* A floor glow under everything: warm light rising from below the fold,
-     like the board's own palette leaking into the room. Subtle on purpose —
-     at readable contrast it is felt as depth, not seen as a gradient. */
-  background:
-    radial-gradient(120% 90% at 50% 112%, #29200f 0%, rgba(41, 32, 15, 0) 58%),
-    var(--bg-deepest);
+  background: var(--bg-deepest);
   color: var(--text-primary);
   font-family: var(--font-sans);
   font-size: 15px;
