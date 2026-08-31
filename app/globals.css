@@ -79,7 +79,12 @@ body {
   margin: 0;
   padding: 0;
   min-height: 100%;
-  background: var(--bg-deepest);
+  /* A floor glow under everything: warm light rising from below the fold,
+     like the board's own palette leaking into the room. Subtle on purpose —
+     at readable contrast it is felt as depth, not seen as a gradient. */
+  background:
+    radial-gradient(120% 90% at 50% 112%, #29200f 0%, rgba(41, 32, 15, 0) 58%),
+    var(--bg-deepest);
   color: var(--text-primary);
   font-family: var(--font-sans);
   font-size: 15px;
@@ -697,10 +702,18 @@ td.num {
 
 .landing {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 340px;
-  gap: 44px;
-  align-items: start;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: 52px;
+  /* Centred against each other: the board-and-signin column runs taller than
+     the hero text, and top-aligning left the text floating awkwardly high. */
+  align-items: center;
   padding-top: 22px;
+}
+
+/* The decorative board above the sign-in form. Not for playing with. */
+.landing-board {
+  pointer-events: none;
+  margin-bottom: 18px;
 }
 
 @media (max-width: 900px) {

@@ -2,6 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { currentUser } from "@/lib/auth";
 import SignInForm from "@/components/SignInForm";
+import Board from "@/components/Board";
+import { STARTING_BOARD } from "@/lib/game/board";
 
 export const dynamic = "force-dynamic";
 
@@ -53,6 +55,11 @@ export default async function HomePage() {
       </section>
 
       <section className="landing-side">
+        {/* The best-looking thing the site owns, doing the talking. Purely
+            decorative: the standard opening, not interactive. */}
+        <div className="landing-board" aria-hidden="true">
+          <Board board={[...STARTING_BOARD]} />
+        </div>
         <SignInForm />
       </section>
     </div>
