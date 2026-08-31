@@ -295,14 +295,15 @@ function MyGame({
   // waiting. The distinctions underneath — placing, moving, joining — are
   // visible the moment the game is opened, and the list reads faster without
   // them.
+  // Whenever the person being waited on has a name, the label uses it — the
+  // generic "opponent" is only for a public table nobody has claimed yet.
+  const waitingOn = opponent ?? game.invited_name;
+  const waitingLabel = waitingOn ? `waiting for ${waitingOn}` : "waiting for opponent";
+
   let label: string;
-  if (open) {
-    // A challenge waits for someone in particular, and saying who is the
-    // difference between a table and an invitation.
-    label = game.invited_name ? `waiting for ${game.invited_name}` : "waiting for opponent";
-  }
+  if (open) label = waitingLabel;
   else if (game.status === "setup") {
-    label = yourTurn ? "your turn" : "waiting for opponent";
+    label = yourTurn ? "your turn" : waitingLabel;
   } else if (game.status === "finished") {
     label = takebackForYou
       ? "takeback offered — your call"
@@ -310,7 +311,7 @@ function MyGame({
         endingSuffix(game.result_reason) +
         (game.takeback_offered === 1 ? " · takeback offered" : "");
   } else {
-    label = yourTurn ? "your turn" : "waiting for opponent";
+    label = yourTurn ? "your turn" : waitingLabel;
   }
 
   const avatarClass = yourTurn

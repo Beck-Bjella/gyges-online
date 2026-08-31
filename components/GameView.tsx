@@ -1122,12 +1122,8 @@ function Status({
       <p style={{ margin: "0 0 8px" }}>
         {yourTurn ? (
           <strong style={{ color: "var(--accent-mint)" }}>Your turn</strong>
-        ) : viewerSide !== null ? (
-          <span>Waiting for your opponent</span>
         ) : (
-          <span>
-            {game.turn === 1 ? p1 : p2} to move
-          </span>
+          <span>Waiting for {game.turn === 1 ? p1 : p2}</span>
         )}
       </p>
       <p className="muted" style={{ margin: 0, lineHeight: 1.6 }}>
