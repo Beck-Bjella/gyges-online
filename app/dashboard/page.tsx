@@ -52,7 +52,7 @@ export default async function DashboardPage() {
     (g) => sideOf(g, user.id) === g.turn,
   ).length;
 
-  const waiting = games.filter((g) => g.status === "open" && !g.invited_id);
+  const waiting = games.filter((g) => g.status === "open");
   const friends = listFriends(user.id).map((u) => ({ id: u.id, username: u.username }));
   const requests = listFriendRequests(user.id).map((u) => ({
     id: u.id,
@@ -64,7 +64,7 @@ export default async function DashboardPage() {
   }));
   const outgoing = listOutgoingChallenges(user.id).map((g) => ({
     id: g.id,
-    name: g.invited_name,
+    name: g.invited_name ?? "someone",
   }));
   const finished = games.filter((g) => g.status === "finished");
 
@@ -263,14 +263,17 @@ function MyGame({
   userId: string;
 }) {
   const side = sideOf(game, userId);
-  const opponent = side === 1 ? game.player2_name : game.player1_name;
+  // On an open challenge nobody sits opposite yet, but everyone knows who
+  // will: the reserved seat's name is the honest label.
+  const opponent =
+    (side === 1 ? game.player2_name : game.player1_name) ?? game.invited_name;
 
   const inPlay = game.status === "active" || game.status === "setup";
   const yourTurn = inPlay && side === game.turn;
   const open = game.status === "open";
 
   let label: string;
-  if (open) label = "waiting for a challenger";
+  if (open) label = game.invited_id ? "waiting for them to accept" : "waiting for a challenger";
   else if (game.status === "setup") {
     label = yourTurn ? "place your pieces" : "opponent is placing";
   } else if (game.status === "finished") {

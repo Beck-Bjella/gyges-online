@@ -43,7 +43,11 @@ export default async function PlayerPage({
   }
 
   const finished = finishedGamesForUser(user.id);
-  const active = listGamesForUser(user.id).filter((g) => g.status === "active");
+  const all = listGamesForUser(user.id);
+  const active = all.filter((g) => g.status === "active");
+  // Games with an empty seat: public tables and challenges waiting on an
+  // answer. Named by whoever the seat is held for, when it is held.
+  const waiting = all.filter((g) => g.status === "open");
 
   // The viewer's own record against this player. Only worth a panel when
   // there is one — most profiles a player looks at are strangers.
@@ -136,6 +140,29 @@ export default async function PlayerPage({
             <Stat label="Lost" value={stats.vsBots.losses} />
             <Stat label="Drawn" value={stats.vsBots.draws} />
           </div>
+        </>
+      )}
+
+      {waiting.length > 0 && (
+        <>
+          <h2>Waiting</h2>
+          <ul className="list" style={{ marginBottom: 28 }}>
+            {waiting.map((g) => (
+              <li key={g.id} className="list-item">
+                <span style={{ flex: 1 }}>
+                  <Link href={`/game/${g.id}`}>
+                    {g.invited_name ? `vs ${g.invited_name}` : "Open game"}
+                  </Link>
+                  <span className="muted">
+                    {g.invited_name
+                      ? " · challenge sent"
+                      : " · anyone may join"}
+                  </span>
+                </span>
+                <span className="muted">{relativeTime(g.created_at)}</span>
+              </li>
+            ))}
+          </ul>
         </>
       )}
 

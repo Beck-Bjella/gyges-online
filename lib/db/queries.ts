@@ -131,6 +131,8 @@ export interface MoveRow {
 }
 
 export interface GameWithPlayers extends Game {
+  /** Who the reserved seat is for, when this is a challenge. */
+  invited_name: string | null;
   player1_name: string | null;
   player2_name: string | null;
 }
@@ -405,13 +407,15 @@ const GAME_COLUMNS = `
   g.id, g.player1_id, g.player2_id, g.status, g.turn, g.result, g.result_reason,
   g.start_board, g.board, g.ply, g.move_seconds, g.deadline_at,
   g.created_at, g.started_at, g.finished_at, g.updated_at, g.invited_id,
-  p1.username AS player1_name, p2.username AS player2_name
+  p1.username AS player1_name, p2.username AS player2_name,
+  inv.username AS invited_name
 `;
 
 const GAME_JOINS = `
   FROM games g
   LEFT JOIN users p1 ON p1.id = g.player1_id
   LEFT JOIN users p2 ON p2.id = g.player2_id
+  LEFT JOIN users inv ON inv.id = g.invited_id
 `;
 
 /**
@@ -681,17 +685,14 @@ export function listIncomingChallenges(userId: string): GameWithPlayers[] {
 }
 
 /** Challenges this player has sent that nobody has answered. */
-export function listOutgoingChallenges(
-  userId: string,
-): (GameWithPlayers & { invited_name: string })[] {
+export function listOutgoingChallenges(userId: string): GameWithPlayers[] {
   return getDb()
     .prepare(
-      `SELECT ${GAME_COLUMNS}, inv.username AS invited_name ${GAME_JOINS}
-         LEFT JOIN users inv ON inv.id = g.invited_id
+      `SELECT ${GAME_COLUMNS} ${GAME_JOINS}
         WHERE g.status = 'open' AND g.player1_id = ? AND g.invited_id IS NOT NULL
         ORDER BY g.created_at DESC`,
     )
-    .all(userId) as (GameWithPlayers & { invited_name: string })[];
+    .all(userId) as GameWithPlayers[];
 }
 
 // --- friends ---------------------------------------------------------------
