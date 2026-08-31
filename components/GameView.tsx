@@ -9,7 +9,7 @@
  * returns.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Board from "./Board";
@@ -237,8 +237,13 @@ export default function GameView({
     speed?: number;
   } | null>(null);
 
-  // The opponent's move, when it lands.
-  useEffect(() => {
+  // The opponent's move, when it lands. A LAYOUT effect, deliberately: a
+  // plain effect runs after the browser paints, so the new position — arrows
+  // and all — was visible for a frame before the animation request landed and
+  // pulled the piece back to its starting square. Layout effects run between
+  // commit and paint, so the request, the hidden arrows and the offset piece
+  // all reach the screen together.
+  useLayoutEffect(() => {
     if (reviewing || staged || justPlayed) return;
     if (!lastPlayed || lastPlayed.kind !== "move") return;
     if (viewerSide !== null && lastPlayed.player === viewerSide) return;
