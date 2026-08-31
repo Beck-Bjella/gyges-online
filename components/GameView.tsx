@@ -275,18 +275,17 @@ export default function GameView({
   useEffect(() => stopRun, [stopRun]);
 
   /**
-   * How hurried a replay step is, by how many plies are still to come.
-   *
-   * One move on its own plays at full length; deep in a long jump it runs at
-   * a fifth. What keeps that comprehensible is not the floor but the shape:
-   * pace is recomputed from the REMAINING distance every step, so a long run
-   * blurs through its middle and eases out as it approaches the target — the
-   * last few moves, the ones being travelled to, play near full length. The
-   * same pace scales the pause between moves, so short trips keep their beat
-   * of stillness and long ones tighten up.
+   * How many moves of the approach are animated. Anything further out is
+   * leapt in one silent jump — see the walk below.
    */
-  const paceFor = (remaining: number) =>
-    Math.max(0.12, 1 / (1 + (remaining - 1) * 0.5));
+  const SHOW = 3;
+
+  /**
+   * How hurried an animated step is, by how many plies are still to come.
+   * Only ever sees the approach: the landing move plays at full length, the
+   * two before it briskly. The same pace scales the pause between moves.
+   */
+  const paceFor = (remaining: number) => 1 / (1 + (remaining - 1) * 0.75);
 
   /**
    * Every way of moving through history funnels through here.
@@ -321,6 +320,19 @@ export default function GameView({
         const tgt = walkTarget.current;
         if (cur === tgt) {
           stopRun();
+          return;
+        }
+        // Anything beyond the last few plies is leapt, not replayed. Animating
+        // a whole game even briskly means seconds of waiting to arrive; what a
+        // jump is FOR is the destination, so the walk lands three out in one
+        // silent hop and animates only the approach. However far the target,
+        // arriving costs the same second and a half.
+        if (Math.abs(tgt - cur) > SHOW) {
+          cur = tgt - Math.sign(tgt - cur) * SHOW;
+          setViewingPly(cur === game.ply ? null : cur);
+          // One tick of stillness so the leap's position is seen to exist
+          // before the approach sets off from it.
+          run.current = setTimeout(step, 60);
           return;
         }
         const next = cur + Math.sign(tgt - cur);
