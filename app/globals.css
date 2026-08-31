@@ -619,7 +619,12 @@ input::placeholder {
  * element wider than its parent, so this needs no wrapper class and no change
  * to the layout.
  */
-.game-grid {
+/*
+ * Doubled selectors on purpose: the element carries grid-2 as well, whose
+ * two-column rule appears later in this file and would otherwise win the tie
+ * — which put the chat in the wide column and the board in the 296px one.
+ */
+.grid-2.game-grid {
   width: min(1500px, calc(100vw - 48px));
   gap: 32px;
   position: relative;
@@ -628,26 +633,20 @@ input::placeholder {
   grid-template-columns: 280px minmax(0, 1fr) 296px;
 }
 
-/* Without a chat column — spectators, bot games — the board takes its space. */
-.game-grid.no-chat {
+/* Without a chat column — bot games — the board takes its space. */
+.grid-2.game-grid.no-chat {
   grid-template-columns: minmax(0, 1fr) 296px;
 }
 
 @media (max-width: 1150px) {
-  .game-grid {
+  .grid-2.game-grid {
     grid-template-columns: minmax(0, 1fr);
-  }
-  .game-grid .chat-rail {
-    order: 9;
-  }
-}
-
-@media (max-width: 900px) {
-  /* Single column here anyway, so the breakout would only add overflow. */
-  .game-grid {
     width: 100%;
     left: 0;
     transform: none;
+  }
+  .grid-2.game-grid .chat-rail {
+    order: 9;
   }
 }
 
