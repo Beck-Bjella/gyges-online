@@ -206,33 +206,46 @@ export default function Board({
   const pieceEls = useRef(new Map<number, SVGGElement>());
   const running = useRef<Animation[]>([]);
   const lastAnimated = useRef<string | null>(null);
+  const seeded = useRef(false);
   // The move belonging to the current key, read at fire time rather than
-  // captured, so the effect needs no other dependencies.
+  // captured, so the animation effect needs no other dependencies. Written
+  // from an effect, not during render — a render is not obliged to commit.
   const moveRef = useRef<{ move: Move; flipped: boolean }>({ move: lastMove, flipped });
-  moveRef.current = { move: lastMove, flipped };
+  useLayoutEffect(() => {
+    moveRef.current = { move: lastMove, flipped };
+  });
 
   useLayoutEffect(() => {
-    if (animateKey === null) return;
-    const first = lastAnimated.current === null;
-    if (animateKey === lastAnimated.current) return;
+    // Whatever key the board mounts with describes a position already on
+    // screen, not one arriving — including null, which is what a player who
+    // moved last sees. Seeding must therefore be its own flag: treating "no
+    // key yet" as the mount test made the opponent's next move look like a
+    // first paint, and it silently failed to animate.
+    if (!seeded.current) {
+      seeded.current = true;
+      lastAnimated.current = animateKey;
+      return;
+    }
+    if (animateKey === null || animateKey === lastAnimated.current) return;
     lastAnimated.current = animateKey;
-    // Nothing to slide from on the first paint: the position is simply what it
-    // is when the page opens.
-    if (first) return;
 
     const { move, flipped: flip } = moveRef.current;
     if (move.length < 2) return;
     const [from, to, dropped] = move;
     const inView = (i: number) => (flip ? flipMove([i])[0] : i);
 
+    // Everything from here works in view space — the element being moved sits
+    // at the view-space centre of its square. Board-space centres were used at
+    // first, and on a flipped board every slide came in from the mirrored
+    // direction.
     const legs: { idx: number; from: number; to: number }[] = [
-      { idx: inView(to), from, to },
+      { idx: inView(to), from: inView(from), to: inView(to) },
     ];
     if (dropped !== undefined) {
       // The displaced piece moves after the mover arrives, not alongside it —
       // shown together they read as two unrelated pieces drifting rather than
       // as one piece striking another.
-      legs.push({ idx: inView(dropped), from: to, to: dropped });
+      legs.push({ idx: inView(dropped), from: inView(to), to: inView(dropped) });
     }
 
     for (const a of running.current) a.cancel();
@@ -831,21 +844,28 @@ export default function Board({
         return (
         <g
           key={p.key}
-          transform={`translate(${p.cx} ${p.cy})`}
-          filter={p.lifted ? "url(#lifted-shadow)" : "url(#piece-shadow)"}
-          style={{ pointerEvents: "none" }}
+          ref={(el) => {
+            // Only pieces that sit on a real square. A piece in hand follows
+            // the cursor, and tray pieces share idx -1 — neither is ever
+            // animated, and letting them into the map would overwrite and
+            // delete each other's entries under that shared key.
+            if (p.lifted || p.idx < 0) return;
+            if (el) pieceEls.current.set(p.idx, el);
+            else pieceEls.current.delete(p.idx);
+          }}
         >
-          {/* The offset lives on an inner group. A CSS transform REPLACES the
-              transform attribute rather than composing with it, so setting one
-              on the group above would discard its translate to the square and
-              fling the piece to the top-left of the board. */}
+          {/* The animated wrapper is OUTSIDE the filtered group, and carries no
+              transform attribute of its own (a CSS transform would replace one
+              rather than compose). Both facts matter: an SVG filter clips to a
+              region computed from static layout, and the travel animation runs
+              on the compositor without re-running layout — so animating a child
+              of the filtered group let the piece slide out of that stale region
+              and vanish mid-move, reappearing when the animation finished. The
+              filtered subtree has to move as one unit. */}
           <g
-            ref={(el) => {
-              // A piece in hand follows the cursor and must never be animated
-              // as well, so it is kept out of the map entirely.
-              if (el && !p.lifted) pieceEls.current.set(p.idx, el);
-              else pieceEls.current.delete(p.idx);
-            }}
+            transform={`translate(${p.cx} ${p.cy})`}
+            filter={p.lifted ? "url(#lifted-shadow)" : "url(#piece-shadow)"}
+            style={{ pointerEvents: "none" }}
           >
           {/* A piece is its rings and nothing else — the middle is the board
               showing through. So the rings are drawn in the pale piece colour
