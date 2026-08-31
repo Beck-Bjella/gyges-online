@@ -724,7 +724,7 @@ export default function GameView({
               controls. */}
           {exploring && (
             <div className="review-banner">
-              <span>Exploring — nothing here is played</span>
+              <span>Exploring — will not affect the game</span>
               <button className="btn" onClick={resetExplore}>
                 Reset
               </button>
