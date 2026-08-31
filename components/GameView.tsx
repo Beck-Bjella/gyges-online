@@ -858,6 +858,7 @@ export default function GameView({
 
       <aside style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         <div className="panel">
+          <h2>Tools</h2>
           <div className="row">
             <button className="btn" onClick={() => setFlipped((f) => !f)}>
               Flip board
@@ -1071,17 +1072,6 @@ export default function GameView({
           )}
         </div>
 
-        <div className="panel">
-          <h2>How to move</h2>
-          <p className="muted" style={{ margin: 0, lineHeight: 1.6 }}>
-            Drag a piece to an empty space. Drop it on an occupied space to
-            displace that piece, then click an empty space to place it.
-          </p>
-          <p className="muted" style={{ marginBottom: 0, lineHeight: 1.6 }}>
-            Legality is not checked yet, so follow the{" "}
-            <Link href="/rules">rules</Link> yourself.
-          </p>
-        </div>
       </aside>
     </div>
   );
