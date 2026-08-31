@@ -182,6 +182,7 @@ export default async function PlayerPage({
                   <th style={{ textAlign: "right" }}>Lost</th>
                   <th style={{ textAlign: "right" }}>Drawn</th>
                   <th style={{ textAlign: "right" }}>Played</th>
+                  <th style={{ textAlign: "right" }}>Win %</th>
                 </tr>
               </thead>
               <tbody>
@@ -197,6 +198,9 @@ export default async function PlayerPage({
                     <td className="num">{o.losses}</td>
                     <td className="num">{o.draws}</td>
                     <td className="num">{o.played}</td>
+                    <td className="num">
+                      {o.played ? `${Math.round((100 * o.wins) / o.played)}%` : "—"}
+                    </td>
                   </tr>
                 ))}
               </tbody>

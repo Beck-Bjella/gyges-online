@@ -94,6 +94,10 @@ export default async function DashboardPage() {
         <StatCard label="Played" value={stats.played} />
         <StatCard label="Won" value={stats.wins} accent="mint" />
         <StatCard label="Lost" value={stats.losses} />
+        <StatCard
+          label="Win rate"
+          value={stats.played ? `${Math.round((100 * stats.wins) / stats.played)}%` : "—"}
+        />
         <StatCard label="In progress" value={stats.active} accent="amber" />
         <StatCard
           label="Median reply"
