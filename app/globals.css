@@ -872,24 +872,32 @@ td.num {
 }
 
 /*
- * The board's one control spot: staged Submit/Reset, Explore's Reset/Done and
- * review's Back to live all float here, centered over the empty lower band
- * the setup tray occupies before play. One place, one size, whatever the
- * mode — the hint in the rail says which mode it is.
+ * The board's one banner: explore, review and the staged move all speak from
+ * this pill over the board's lower edge — same place, same shape, different
+ * words and buttons per mode.
  */
-.board-float {
+.review-banner {
   position: absolute;
   left: 50%;
-  bottom: 4.5%;
+  bottom: 16px;
   transform: translateX(-50%);
   display: flex;
+  align-items: center;
   gap: 12px;
+  white-space: nowrap;
+  padding: 9px 13px;
+  border-radius: var(--radius);
+  background: rgba(18, 16, 14, 0.95);
+  border: 1px solid rgba(232, 167, 92, 0.5);
+  color: var(--accent-amber);
+  font-size: 13px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.6);
   z-index: 2;
 }
 
-.btn-large {
-  padding: 12px 26px;
-  font-size: 16px;
+.review-banner .btn {
+  padding: 5px 11px;
+  font-size: 13px;
 }
 
 /* --- chat ---------------------------------------------------------------- */

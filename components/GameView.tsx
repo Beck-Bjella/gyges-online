@@ -718,16 +718,17 @@ export default function GameView({
             onSetupDrop={setup.dropAt}
             onSetupMove={setup.moveSlot}
           />
-          {/* Explore, review and the staged move all present their controls in
-              the same spot at the same size — one place on the board where
-              decisions are made, whatever the mode. What each mode means is
-              narrated by the hint in the rail, not by a banner over the board. */}
+          {/* Explore, review and the staged move all speak from the same
+              banner in the same spot — the pill over the board's lower edge.
+              One place where the current mode explains itself and offers its
+              controls. */}
           {exploring && (
-            <div className="board-float">
-              <button className="btn btn-large" onClick={resetExplore}>
+            <div className="review-banner">
+              <span>Exploring — nothing here is played</span>
+              <button className="btn" onClick={resetExplore}>
                 Reset
               </button>
-              <button className="btn btn-primary btn-large" onClick={exitExplore}>
+              <button className="btn btn-primary" onClick={exitExplore}>
                 Done
               </button>
             </div>
@@ -737,29 +738,29 @@ export default function GameView({
               already drawn as an arrow; repeating its notation said nothing
               the board was not saying better. */}
           {staged && viewingPly === null && !exploring && (
-            <div className="board-float">
+            <div className="review-banner">
+              <span>Not sent yet</span>
               <button
-                className="btn btn-primary btn-large"
+                className="btn btn-primary"
                 onClick={() => submit(staged)}
                 disabled={pending}
               >
                 {pending ? "…" : "Submit move"}
               </button>
-              <button
-                className="btn btn-large"
-                onClick={resetStaged}
-                disabled={pending}
-              >
+              <button className="btn" onClick={resetStaged} disabled={pending}>
                 Reset
               </button>
             </div>
           )}
           {!exploring && reviewing && (
-            <div className="board-float">
-              <button
-                className="btn btn-primary btn-large"
-                onClick={() => goToPly(null)}
-              >
+            <div className="review-banner">
+              <span>
+                {viewingPly === 0
+                  ? "Empty board"
+                  : describePly(history, viewingPly!, game.ply)}{" "}
+                — you cannot play from here
+              </span>
+              <button className="btn btn-primary" onClick={() => goToPly(null)}>
                 Back to live
               </button>
             </div>
@@ -803,11 +804,9 @@ export default function GameView({
             </button>
           </div>
           <p className="hint" style={{ margin: "10px 0 0" }}>
-            {exploring
-              ? "Exploring — nothing here is played"
-              : reviewing
-                ? `Reviewing move ${viewingPly} of ${game.ply} — you cannot play from here`
-                : "← → to review history"}
+            {reviewing
+              ? `Reviewing move ${viewingPly} of ${game.ply}`
+              : "← → to review history"}
           </p>
           {error && <p className="error" style={{ margin: "10px 0 0" }}>{error}</p>}
         </div>
@@ -996,6 +995,20 @@ export default function GameView({
   );
 }
 
+
+/** How a reviewed ply is described in the banner: setup, or move N of M. */
+function describePly(
+  history: HistoryEntry[],
+  ply: number,
+  total: number,
+): string {
+  const entry = history.find((h) => h.ply === ply);
+  if (entry?.kind === "setup") {
+    return `Setup — player ${entry.player === 1 ? "1" : "2"} places`;
+  }
+  const setupPlies = history.filter((h) => h.kind === "setup").length;
+  return `Move ${ply - setupPlies} of ${total - setupPlies}`;
+}
 
 function PlayerBar({
   name,
