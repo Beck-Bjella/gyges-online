@@ -9,7 +9,7 @@
  * returns.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Board from "./Board";
@@ -223,21 +223,102 @@ export default function GameView({
             : [];
 
   /**
-   * When the board should play `shownMove` as motion.
+   * What the board should play as motion.
    *
    * Your own moves never animate — you just made them, and the board already
    * showed the result while you were staging. What animates is what you did
-   * not do yourself: the opponent's move arriving, and history as you step
-   * through it. Null while a move of ours is staged or in flight, so nothing
-   * replays when the preview comes and goes.
+   * not do yourself: the opponent's move arriving (the effect below), and
+   * history as you navigate it (goToPly).
    */
-  const animateKey = useMemo(() => {
-    if (reviewing) return `h${viewingPly}`;
-    if (staged || justPlayed) return null;
-    if (!lastPlayed || lastPlayed.kind !== "move") return null;
-    if (viewerSide !== null && lastPlayed.player === viewerSide) return null;
-    return `p${game.ply}`;
-  }, [reviewing, viewingPly, staged, justPlayed, lastPlayed, viewerSide, game.ply]);
+  const [anim, setAnim] = useState<{
+    key: string;
+    move: Move;
+    reverse?: boolean;
+    speed?: number;
+  } | null>(null);
+
+  // The opponent's move, when it lands.
+  useEffect(() => {
+    if (reviewing || staged || justPlayed) return;
+    if (!lastPlayed || lastPlayed.kind !== "move") return;
+    if (viewerSide !== null && lastPlayed.player === viewerSide) return;
+    setAnim({ key: `p${game.ply}`, move: lastPlayed.move });
+  }, [reviewing, staged, justPlayed, lastPlayed, viewerSide, game.ply]);
+
+  /**
+   * A replay run in progress: walking viewingPly one step at a time toward a
+   * target, so a jump across many plies animates every move on the way.
+   *
+   * Each step lands on a real intermediate position and plays that one move —
+   * there is no faked composite. The run is a timer rather than a chain of
+   * animation callbacks so a step that has nothing to animate (a setup ply)
+   * costs one tick rather than stalling the walk.
+   */
+  const run = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const stopRun = useCallback(() => {
+    if (run.current !== null) clearTimeout(run.current);
+    run.current = null;
+  }, []);
+  useEffect(() => stopRun, [stopRun]);
+
+  /**
+   * How hurried a replay step is, by how many plies are still to come.
+   *
+   * One move on its own plays at full length; a short hop is a little quicker;
+   * a jump across a whole game compresses hard. Speed is decided per step from
+   * the REMAINING distance, so a long run starts fast and eases out as it
+   * approaches the target — the last few moves are the ones worth seeing.
+   */
+  const paceFor = (remaining: number) =>
+    Math.max(0.18, 1 / (1 + (remaining - 1) * 0.45));
+
+  /**
+   * Every way of moving through history funnels through here, so direction and
+   * distance are decided in exactly one place.
+   *
+   * A jump of more than one ply walks there a step at a time, each step
+   * landing on a real intermediate position and playing that one move — there
+   * is no faked composite. Any navigation cancels a run already going, so
+   * leaning on a key cannot pile up an animation debt: each press starts
+   * fresh from wherever the walk had got to.
+   */
+  const goToPly = useCallback(
+    (target: number | null) => {
+      stopRun();
+      const resolve = (p: number | null) => p ?? game.ply;
+      const moveAt = (ply: number): Move | null => {
+        const h = history.find((x) => x.ply === ply);
+        return h && h.kind === "move" ? h.move : null;
+      };
+
+      const step = () => {
+        setViewingPly((current) => {
+          const cur = resolve(current);
+          const tgt = resolve(target);
+          if (cur === tgt) return current;
+
+          const next = cur + Math.sign(tgt - cur);
+          const remaining = Math.abs(tgt - cur);
+          const speed = paceFor(remaining);
+          const reverse = next < cur;
+          // Backwards, the move being animated is the one just undone — the
+          // move AT the square we left, not the one we land on.
+          const mv = moveAt(reverse ? cur : next);
+          if (mv) {
+            setAnim({ key: `h${next}:${reverse ? "r" : "f"}`, move: mv, reverse, speed });
+          }
+          if (next !== tgt) {
+            // The next step waits about as long as this one takes to play.
+            run.current = setTimeout(step, Math.max(120, 480 * paceFor(remaining - 1)));
+          }
+          return next === game.ply ? null : next;
+        });
+      };
+
+      if (resolve(target) !== resolve(viewingPly)) step();
+    },
+    [game.ply, history, viewingPly, stopRun],
+  );
 
   /** Choose a move without sending it. Replaces any move already staged. */
   const stage = useCallback((mv: Move) => {
@@ -356,23 +437,16 @@ export default function GameView({
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === "ArrowLeft") {
-        setViewingPly((p) => {
-          const cur = p ?? game.ply;
-          return Math.max(0, cur - 1);
-        });
+        goToPly(Math.max(0, (viewingPly ?? game.ply) - 1));
       } else if (e.key === "ArrowRight") {
-        setViewingPly((p) => {
-          if (p === null) return null;
-          const next = p + 1;
-          return next >= game.ply ? null : next;
-        });
+        if (viewingPly !== null) goToPly(Math.min(game.ply, viewingPly + 1));
       } else if (e.key === "ArrowUp") {
-        setViewingPly(null);
+        goToPly(null);
       }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [game.ply]);
+  }, [game.ply, viewingPly, goToPly]);
 
   // Which side sits at the bottom of the screen.
   //
@@ -410,7 +484,7 @@ export default function GameView({
             setupSide={yourPlacement ? viewerSide! : undefined}
             onSetupSquare={setup.placeAt}
             setupRemaining={setup.remaining}
-            animateKey={animateKey}
+            animate={anim}
             onSetupDrop={setup.dropAt}
             onSetupMove={setup.moveSlot}
           />
@@ -422,7 +496,7 @@ export default function GameView({
                   : describePly(history, viewingPly!, game.ply)}{" "}
                 — you cannot play from here
               </span>
-              <button className="btn btn-primary" onClick={() => setViewingPly(null)}>
+              <button className="btn btn-primary" onClick={() => goToPly(null)}>
                 Back to live
               </button>
             </div>
@@ -461,7 +535,7 @@ export default function GameView({
           <span className="control-divider" aria-hidden="true" />
           <button
             className="btn"
-            onClick={() => setViewingPly(openingPly)}
+            onClick={() => goToPly(openingPly)}
             disabled={openingPly === null || viewingPly === openingPly}
             title="Both home rows placed, before the first move"
           >
@@ -469,7 +543,7 @@ export default function GameView({
           </button>
           <button
             className="btn"
-            onClick={() => setViewingPly(null)}
+            onClick={() => goToPly(null)}
             disabled={!reviewing}
           >
             Latest
@@ -559,7 +633,7 @@ export default function GameView({
                   <li key={h.ply}>
                     <button
                       onClick={() =>
-                        setViewingPly(h.ply === game.ply ? null : h.ply)
+                        goToPly(h.ply === game.ply ? null : h.ply)
                       }
                       style={{
                         display: "flex",

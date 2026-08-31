@@ -83,11 +83,17 @@ interface Props {
   /** A placed piece moved to another square, or off the row when null. */
   onSetupMove?: (fromSlot: number, toSlot: number | null) => void;
   /**
-   * When to play `lastMove` as motion. Null never animates; a value the board
-   * has not seen before plays the move once. The caller owns the policy — a
-   * player's own moves are not animated, since they just made them.
+   * A move to play as motion, or null for none. A `key` the board has not seen
+   * before plays it once; the caller owns the policy — a player's own moves
+   * are not animated, since they just made them.
+   *
+   * `reverse` plays the move backwards, for stepping back through history: the
+   * displaced piece returns first and the mover walks home after it, which is
+   * the forward motion time-reversed. `speed` scales duration — 1 for a move
+   * watched on its own, less for a step in a replay run, where the caller
+   * shortens each move by how many are still to come.
    */
-  animateKey?: string | null;
+  animate?: { key: string; move: Move; reverse?: boolean; speed?: number } | null;
 }
 
 type Drag =
@@ -122,7 +128,7 @@ const trayCx = (i: number) => VIEWBOX / 2 + (i - 2.5) * TRAY_PITCH;
 const MAX_RINGS = 3;
 
 /** Travel time per square of distance, before the per-leg floor. */
-const STEP_MS = 90;
+const STEP_MS = 130;
 
 /** A drawing offset from the square a piece is recorded on. */
 type Offset = { x: number; y: number };
@@ -165,7 +171,7 @@ export default function Board({
   setupRemaining = [],
   onSetupDrop,
   onSetupMove,
-  animateKey = null,
+  animate = null,
 }: Props) {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const raf = useRef(0);
@@ -207,12 +213,12 @@ export default function Board({
   const running = useRef<Animation[]>([]);
   const lastAnimated = useRef<string | null>(null);
   const seeded = useRef(false);
-  // The move belonging to the current key, read at fire time rather than
-  // captured, so the animation effect needs no other dependencies. Written
-  // from an effect, not during render — a render is not obliged to commit.
-  const moveRef = useRef<{ move: Move; flipped: boolean }>({ move: lastMove, flipped });
+  // The full request, read at fire time rather than captured, so the animation
+  // effect needs no dependency beyond the key. Written from an effect, not
+  // during render — a render is not obliged to commit.
+  const animRef = useRef(animate);
   useLayoutEffect(() => {
-    moveRef.current = { move: lastMove, flipped };
+    animRef.current = animate;
   });
 
   useLayoutEffect(() => {
@@ -223,29 +229,37 @@ export default function Board({
     // first paint, and it silently failed to animate.
     if (!seeded.current) {
       seeded.current = true;
-      lastAnimated.current = animateKey;
+      lastAnimated.current = animate?.key ?? null;
       return;
     }
-    if (animateKey === null || animateKey === lastAnimated.current) return;
-    lastAnimated.current = animateKey;
+    const req = animRef.current;
+    if (!req || req.key === lastAnimated.current) return;
+    lastAnimated.current = req.key;
 
-    const { move, flipped: flip } = moveRef.current;
+    const { move, reverse = false, speed = 1 } = req;
     if (move.length < 2) return;
     const [from, to, dropped] = move;
-    const inView = (i: number) => (flip ? flipMove([i])[0] : i);
+    const inView = (i: number) => (flipped ? flipMove([i])[0] : i);
 
     // Everything from here works in view space — the element being moved sits
-    // at the view-space centre of its square. Board-space centres were used at
-    // first, and on a flipped board every slide came in from the mirrored
-    // direction.
-    const legs: { idx: number; from: number; to: number }[] = [
-      { idx: inView(to), from: inView(from), to: inView(to) },
-    ];
-    if (dropped !== undefined) {
-      // The displaced piece moves after the mover arrives, not alongside it —
-      // shown together they read as two unrelated pieces drifting rather than
-      // as one piece striking another.
-      legs.push({ idx: inView(dropped), from: inView(to), to: inView(dropped) });
+    // at the view-space centre of its square.
+    //
+    // Forward, the mover travels and then the piece it struck is set aside.
+    // Reverse is that run backwards: the displaced piece returns to the square
+    // it was pushed from, then the mover walks home. Either way the offsets
+    // are relative to where each piece is drawn on the CURRENT board, which is
+    // the position after the move going forward and before it in reverse.
+    const legs: { idx: number; from: number; to: number }[] = [];
+    if (reverse) {
+      if (dropped !== undefined) {
+        legs.push({ idx: inView(to), from: inView(dropped), to: inView(to) });
+      }
+      legs.push({ idx: inView(from), from: inView(to), to: inView(from) });
+    } else {
+      legs.push({ idx: inView(to), from: inView(from), to: inView(to) });
+      if (dropped !== undefined) {
+        legs.push({ idx: inView(dropped), from: inView(to), to: inView(dropped) });
+      }
     }
 
     for (const a of running.current) a.cancel();
@@ -260,7 +274,10 @@ export default function Board({
       const len = Math.hypot(b.cx - a.cx, b.cy - a.cy);
       // Longer moves take longer, so everything travels at about the same
       // speed, with a floor so a one-square nudge is still visible.
-      const duration = Math.max(160, (len / GRID_PITCH) * STEP_MS);
+      const duration = Math.max(
+        Math.max(80, 220 * speed),
+        (len / GRID_PITCH) * STEP_MS * speed,
+      );
       running.current.push(
         el.animate(
           [
@@ -272,7 +289,7 @@ export default function Board({
       );
       delay += duration;
     }
-  }, [animateKey]);
+  }, [animate?.key]);
 
   // Unmount is the only cleanup. Cancelling from the animation effect itself
   // would tear the animation down whenever the effect re-ran.
