@@ -255,37 +255,41 @@ export default function GameView({
    * costs one tick rather than stalling the walk.
    */
   const run = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const walkTarget = useRef(0);
+  const walking = useRef(false);
   const stopRun = useCallback(() => {
     if (run.current !== null) clearTimeout(run.current);
     run.current = null;
+    walking.current = false;
   }, []);
   useEffect(() => stopRun, [stopRun]);
 
   /**
    * How hurried a replay step is, by how many plies are still to come.
    *
-   * One move on its own plays at full length; a short hop is a little quicker;
-   * a jump across a whole game compresses hard. Speed is decided per step from
-   * the REMAINING distance, so a long run starts fast and eases out as it
-   * approaches the target — the last few moves are the ones worth seeing.
+   * One move on its own plays at full length; a jump across a whole game
+   * compresses, but never past about double speed — a replay nobody can
+   * follow is not a replay. The same pace scales the pause between moves,
+   * so short trips keep their beat of stillness and long ones tighten up.
    */
   const paceFor = (remaining: number) =>
     Math.max(0.45, 1 / (1 + (remaining - 1) * 0.2));
 
   /**
-   * Every way of moving through history funnels through here, so direction and
-   * distance are decided in exactly one place.
+   * Every way of moving through history funnels through here.
    *
-   * A jump of more than one ply walks there a step at a time, each step
-   * landing on a real intermediate position and playing that one move — there
-   * is no faked composite. Any navigation cancels a run already going, so
-   * leaning on a key cannot pile up an animation debt: each press starts
-   * fresh from wherever the walk had got to.
+   * Navigation RETARGETS the walk rather than restarting it. There is one walk
+   * at a time, stepping from wherever it has got to toward walkTarget; a key
+   * pressed while it runs just moves the target, and the pacing responds on
+   * its own because it is computed from the remaining distance each tick. So
+   * leaning on an arrow key stretches one walk rather than piling up separate
+   * animations — the board simply takes the path to wherever you have pointed
+   * it, and pointing somewhere nearer while it travels turns it around.
    */
   const goToPly = useCallback(
     (target: number | null) => {
-      stopRun();
-      const tgt = target ?? game.ply;
+      walkTarget.current = target ?? game.ply;
+      if (walking.current) return; // the running walk picks the new target up
       const moveAt = (ply: number): Move | null => {
         const h = history.find((x) => x.ply === ply);
         return h && h.kind === "move" ? h.move : null;
@@ -296,11 +300,18 @@ export default function GameView({
       // twice in dev to enforce it, and side effects there ran every step
       // twice — the walk skipped plies and animations trampled each other.
       let cur = viewingPly ?? game.ply;
+      if (cur === walkTarget.current) return;
+      walking.current = true;
 
       const step = () => {
-        if (cur === tgt) return;
+        const tgt = walkTarget.current;
+        if (cur === tgt) {
+          stopRun();
+          return;
+        }
         const next = cur + Math.sign(tgt - cur);
         const remaining = Math.abs(tgt - cur);
+        const pace = paceFor(remaining);
         const reverse = next < cur;
         // Backwards, the move being animated is the one just undone — the
         // move AT the square we left, not the one we land on.
@@ -313,21 +324,24 @@ export default function GameView({
             key: `h${next}:${reverse ? "r" : "f"}`,
             move: mv,
             reverse,
-            speed: paceFor(remaining),
+            speed: pace,
           });
         }
-        if (cur !== tgt) {
-          // The next step waits for this one to play out, plus a beat of
-          // stillness — moves running into each other with no pause read as
-          // one long scramble rather than a sequence of moves.
-          run.current = setTimeout(
-            step,
-            Math.max(200, 620 * paceFor(remaining - 1)) + 240,
-          );
+        if (cur === walkTarget.current) {
+          stopRun();
+          return;
         }
+        // Wait for this move to play out, plus a beat of stillness scaled the
+        // same way the moves are — moves running into each other with no
+        // pause read as one long scramble rather than a sequence.
+        const aheadPace = paceFor(Math.abs(walkTarget.current - cur));
+        run.current = setTimeout(
+          step,
+          Math.max(200, 620 * aheadPace) + Math.max(90, 260 * aheadPace),
+        );
       };
 
-      if (cur !== tgt) step();
+      step();
     },
     [game.ply, history, viewingPly, stopRun],
   );
@@ -448,10 +462,14 @@ export default function GameView({
   // Arrow keys step through history, as the desktop versions did.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
+      // Steps extend from the walk's target, not from the ply on screen —
+      // the screen lags a running walk, and stepping from it would pin the
+      // target one ahead of the display forever instead of building distance.
+      const base = walking.current ? walkTarget.current : (viewingPly ?? game.ply);
       if (e.key === "ArrowLeft") {
-        goToPly(Math.max(0, (viewingPly ?? game.ply) - 1));
+        goToPly(Math.max(0, base - 1));
       } else if (e.key === "ArrowRight") {
-        if (viewingPly !== null) goToPly(Math.min(game.ply, viewingPly + 1));
+        if (base < game.ply) goToPly(Math.min(game.ply, base + 1));
       } else if (e.key === "ArrowUp") {
         goToPly(null);
       }
