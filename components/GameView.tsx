@@ -270,7 +270,7 @@ export default function GameView({
    * approaches the target — the last few moves are the ones worth seeing.
    */
   const paceFor = (remaining: number) =>
-    Math.max(0.3, 1 / (1 + (remaining - 1) * 0.35));
+    Math.max(0.45, 1 / (1 + (remaining - 1) * 0.2));
 
   /**
    * Every way of moving through history funnels through here, so direction and

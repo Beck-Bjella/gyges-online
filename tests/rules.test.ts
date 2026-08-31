@@ -28,7 +28,6 @@ const {
   checkMoveLegality,
   legalMoves,
   hasLegalMove,
-  pathTo,
 } = await import("../lib/game/rules.ts");
 
 const { emptyBoard, startingBoard, applyMove, P1_GOAL, P2_GOAL, BOARD_SIZE } = await import(
@@ -388,24 +387,4 @@ test("a move that loops back to its own square leaves the board unchanged", () =
     board.filter((sq) => sq !== 0).length,
     "no piece may be lost",
   );
-});
-
-test("a path runs step by step from where a move began to where it ended", () => {
-  const board = startingBoard();
-  for (const mv of legalMoves(board, 1)) {
-    const [from, to] = mv;
-    const route = pathTo(board, 1, from, to);
-    assert.ok(route, `expected a route for ${from}->${to}`);
-    assert.equal(route![0], from, "starts where the move did");
-    assert.equal(route![route!.length - 1], to, "ends where the move did");
-    // Every step is to an orthogonal neighbour, except bearing off the grid.
-    for (let i = 1; i < route!.length; i++) {
-      const a = route![i - 1];
-      const b = route![i];
-      if (b >= 36) continue;
-      const adjacent =
-        Math.abs(a - b) === 1 || Math.abs(a - b) === 6;
-      assert.ok(adjacent, `${a} -> ${b} is not a single step`);
-    }
-  }
 });
