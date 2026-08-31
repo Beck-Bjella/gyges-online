@@ -698,6 +698,19 @@ export function createChallenge(
   });
 }
 
+/**
+ * Turn a challenge down. The game is deleted, exactly as if its creator had
+ * cancelled: it never started, so there is nothing a record would keep, and
+ * leaving it to rot in the sender's waiting list would be worse than an
+ * answer.
+ */
+export function declineChallenge(gameId: string, userId: string): void {
+  const done = getDb()
+    .prepare(`DELETE FROM games WHERE id = ? AND invited_id = ? AND status = 'open'`)
+    .run(gameId, userId);
+  if (done.changes === 0) throw new GameError("No such challenge.", 404);
+}
+
 /** Challenges waiting for this player to accept. */
 export function listIncomingChallenges(userId: string): GameWithPlayers[] {
   return getDb()

@@ -1,30 +1,17 @@
 "use client";
 
 /**
- * The social corner of the dashboard: requests to answer, friends to
- * challenge, and challenges travelling in each direction.
- *
- * A challenge is an open game reserved for one player, so accepting one IS
- * joining a game — the same action the lobby uses.
+ * Requests to answer and friends to challenge. Challenges themselves live in
+ * their own panel — this is where they are sent FROM, not where they arrive.
  */
 
 import Link from "next/link";
 import { useActionState } from "react";
-import {
-  challengeAction,
-  friendAction,
-  joinGameAction,
-  type ActionState,
-} from "@/app/actions";
+import { challengeAction, friendAction, type ActionState } from "@/app/actions";
 
 interface Person {
   id: string;
   username: string;
-}
-
-interface Challenge {
-  id: string;
-  name: string;
 }
 
 const initial: ActionState = {};
@@ -32,38 +19,17 @@ const initial: ActionState = {};
 export default function FriendsPanel({
   requests,
   friends,
-  incoming,
-  outgoing,
 }: {
   requests: Person[];
   friends: Person[];
-  incoming: Challenge[];
-  outgoing: Challenge[];
 }) {
   const [friendResult, submitFriend] = useActionState(friendAction, initial);
   const [challengeResult, submitChallenge] = useActionState(challengeAction, initial);
-  const [joinResult, submitJoin] = useActionState(joinGameAction, initial);
-  const error = friendResult.error ?? challengeResult.error ?? joinResult.error;
+  const error = friendResult.error ?? challengeResult.error;
 
   return (
     <div className="panel">
       <h2>Friends</h2>
-
-      {incoming.length > 0 && (
-        <ul className="list" style={{ marginBottom: 12 }}>
-          {incoming.map((c) => (
-            <li key={c.id} className="list-item">
-              <span style={{ flex: 1 }}>
-                <strong>{c.name}</strong> challenged you
-              </span>
-              <form action={submitJoin}>
-                <input type="hidden" name="game_id" value={c.id} />
-                <button className="btn btn-primary">Accept</button>
-              </form>
-            </li>
-          ))}
-        </ul>
-      )}
 
       {requests.length > 0 && (
         <ul className="list" style={{ marginBottom: 12 }}>
@@ -102,18 +68,6 @@ export default function FriendsPanel({
             </li>
           ))}
         </ul>
-      )}
-
-      {outgoing.length > 0 && (
-        <p className="hint" style={{ margin: "12px 0 0" }}>
-          Waiting on:{" "}
-          {outgoing.map((c, i) => (
-            <span key={c.id}>
-              {i > 0 && ", "}
-              <Link href={`/game/${c.id}`}>{c.name}</Link>
-            </span>
-          ))}
-        </p>
       )}
 
       {error && <p className="error">{error}</p>}

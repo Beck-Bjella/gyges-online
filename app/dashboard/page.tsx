@@ -17,6 +17,7 @@ import {
   MAX_OPEN_GAMES,
 } from "@/lib/db/queries";
 import FriendsPanel from "@/components/FriendsPanel";
+import ChallengesPanel from "@/components/ChallengesPanel";
 import { relativeTime, describeThinkTime, endingSuffix } from "@/lib/format";
 import AutoRefresh from "@/components/AutoRefresh";
 
@@ -151,12 +152,8 @@ export default async function DashboardPage() {
         </section>
 
         <aside className="rail">
-          <FriendsPanel
-            requests={requests}
-            friends={friends}
-            incoming={incoming}
-            outgoing={outgoing}
-          />
+          <ChallengesPanel incoming={incoming} outgoing={outgoing} />
+          <FriendsPanel requests={requests} friends={friends} />
 
           <div className="panel">
             <h2>Account</h2>

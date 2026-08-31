@@ -10,6 +10,7 @@ import {
   renameUser,
   GameError,
   createChallenge,
+  declineChallenge,
   respondToFriendRequest,
   sendFriendRequest,
 } from "@/lib/db/queries";
@@ -220,4 +221,21 @@ export async function challengeAction(
     return { error: "Could not send that challenge." };
   }
   redirect(`/game/${id}`);
+}
+
+/** Turn a challenge down; the reserved game is deleted. */
+export async function declineChallengeAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const user = await currentUser();
+  if (!user) return { error: "Sign in first." };
+  try {
+    declineChallenge(String(formData.get("game_id") ?? ""), user.id);
+  } catch (err) {
+    if (err instanceof GameError) return { error: err.message };
+    return { error: "Could not decline." };
+  }
+  revalidatePath("/dashboard");
+  return {};
 }
