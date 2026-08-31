@@ -139,7 +139,7 @@ export default async function DashboardPage() {
           />
 
           <GameSection
-            title="Complete Games"
+            title="Completed games"
             games={finished}
             userId={user.id}
             empty={
