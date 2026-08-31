@@ -211,6 +211,11 @@ export default function Board({
    */
   const pieceEls = useRef(new Map<number, SVGGElement>());
   const running = useRef<Animation[]>([]);
+  // Whether the current animation has played out. The move's arrows wait for
+  // this: an arrow is the record of a move, and showing it while the piece is
+  // still travelling announces the ending mid-story.
+  const [animDone, setAnimDone] = useState(true);
+  const animGen = useRef(0);
   const lastAnimated = useRef<string | null>(null);
   const seeded = useRef(false);
   // The full request, read at fire time rather than captured, so the animation
@@ -288,6 +293,16 @@ export default function Board({
         ),
       );
       delay += duration;
+    }
+
+    if (running.current.length > 0) {
+      // Hide the arrows until the last leg lands. Generation-counted, so a
+      // settle from an animation this one replaced cannot reveal them early.
+      const gen = ++animGen.current;
+      setAnimDone(false);
+      void Promise.allSettled(running.current.map((a) => a.finished)).then(() => {
+        if (animGen.current === gen) setAnimDone(true);
+      });
     }
   }, [animate?.key]);
 
@@ -939,6 +954,7 @@ export default function Board({
           The board is warm brown and the pieces are pale, so a single-colour
           line washes out against one or the other wherever it happens to pass. */}
       {viewLastMove.length >= 2 &&
+        animDone &&
         (() => {
           const travel = arrow(viewLastMove[0], viewLastMove[1]);
           const push =

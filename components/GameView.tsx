@@ -257,10 +257,15 @@ export default function GameView({
   const run = useRef<ReturnType<typeof setTimeout> | null>(null);
   const walkTarget = useRef(0);
   const walking = useRef(false);
+  // Mirrors `walking` for rendering: mid-walk the arrows are hidden outright,
+  // or every step would flash its own pair in passing. They return with the
+  // final position, once its animation lands.
+  const [isWalking, setIsWalking] = useState(false);
   const stopRun = useCallback(() => {
     if (run.current !== null) clearTimeout(run.current);
     run.current = null;
     walking.current = false;
+    setIsWalking(false);
   }, []);
   useEffect(() => stopRun, [stopRun]);
 
@@ -302,6 +307,7 @@ export default function GameView({
       let cur = viewingPly ?? game.ply;
       if (cur === walkTarget.current) return;
       walking.current = true;
+      setIsWalking(true);
 
       const step = () => {
         const tgt = walkTarget.current;
@@ -505,7 +511,7 @@ export default function GameView({
             flipped={flipped}
             onMove={stage}
             highlight={highlight}
-            lastMove={shownMove}
+            lastMove={isWalking ? [] : shownMove}
             // Marks legal destinations while dragging. A convenience only —
             // the server validates every move regardless. Passing undefined
             // rather than null when there is no viewer keeps the hint off for
