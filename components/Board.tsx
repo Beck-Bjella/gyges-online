@@ -136,8 +136,6 @@ const MAX_RINGS = 3;
 /** Travel time per square of distance, before the per-leg floor. */
 const STEP_MS = 170;
 
-/** A drawing offset from the square a piece is recorded on. */
-type Offset = { x: number; y: number };
 
 /** How thick each ring is drawn. */
 const RING_WIDTH = 6;
@@ -181,7 +179,6 @@ export default function Board({
   animate = null,
 }: Props) {
   const svgRef = useRef<SVGSVGElement | null>(null);
-  const raf = useRef(0);
   const [drag, setDrag] = useState<Drag>({ kind: "none" });
 
   // Everything below works in view space. When flipped, the view is the
