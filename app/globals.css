@@ -900,6 +900,45 @@ td.num {
   font-size: 13px;
 }
 
+/*
+ * The verdict, once per game: a card over the middle of the board that has to
+ * be dismissed. Dark scrim behind it so the board reads as background.
+ */
+.result-splash {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 8, 6, 0.55);
+  border-radius: var(--radius);
+  z-index: 3;
+}
+
+.result-card {
+  text-align: center;
+  padding: 28px 44px;
+  border-radius: var(--radius);
+  background: rgba(18, 16, 14, 0.97);
+  border: 1px solid var(--border-strong);
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.7);
+}
+
+.result-word {
+  font-size: 40px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-bottom: 4px;
+}
+
+.result-card.won .result-word {
+  color: var(--accent-mint);
+}
+
+.result-card.lost .result-word {
+  color: var(--accent-amber);
+}
+
 /* --- chat ---------------------------------------------------------------- */
 
 .chat-panel {

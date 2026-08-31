@@ -601,6 +601,35 @@ export default function GameView({
   }, [game.id, router]);
 
   /**
+   * The big verdict, shown once per game per browser.
+   *
+   * A game ending is easy to miss — the board just stops. So the first time a
+   * finished game is seen, the result takes the middle of the board and has
+   * to be dismissed; after that the status panel is enough. localStorage
+   * remembers the dismissal, and failing storage means showing it again,
+   * which errs the right way.
+   */
+  const [splash, setSplash] = useState(false);
+  const splashKey = `result-seen:${game.id}`;
+  useEffect(() => {
+    if (game.status !== "finished" || viewerSide === null) return;
+    try {
+      if (!localStorage.getItem(splashKey)) setSplash(true);
+    } catch {
+      setSplash(true);
+    }
+  }, [game.status, viewerSide, splashKey]);
+
+  const dismissSplash = useCallback(() => {
+    setSplash(false);
+    try {
+      localStorage.setItem(splashKey, "1");
+    } catch {
+      /* shown again next time; fine */
+    }
+  }, [splashKey]);
+
+  /**
    * Walk away during setup. Distinct from resigning: nothing has happened yet,
    * so the game is deleted and no result is recorded for either player.
    */
@@ -743,6 +772,41 @@ export default function GameView({
               banner in the same spot — the pill over the board's lower edge.
               One place where the current mode explains itself and offers its
               controls. */}
+          {splash && game.status === "finished" && viewerSide !== null && (
+            <div className="result-splash" role="alertdialog" aria-live="assertive">
+              <div
+                className={
+                  game.result === 0
+                    ? "result-card"
+                    : game.result === viewerSide
+                      ? "result-card won"
+                      : "result-card lost"
+                }
+              >
+                <div className="result-word">
+                  {game.result === 0
+                    ? "Drawn"
+                    : game.result === viewerSide
+                      ? "You won"
+                      : "You lost"}
+                </div>
+                <div className="muted">
+                  {game.resultReason === "resign"
+                    ? "by resignation"
+                    : game.resultReason === "timeout"
+                      ? "on time"
+                      : "at the goal"}
+                </div>
+                <button
+                  className="btn btn-primary"
+                  style={{ marginTop: 14 }}
+                  onClick={dismissSplash}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          )}
           {exploring && (
             <div className="review-banner">
               <span>Exploring — will not affect the game</span>
