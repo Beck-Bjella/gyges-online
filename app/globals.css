@@ -630,7 +630,7 @@ input::placeholder {
   position: relative;
   left: 50%;
   transform: translateX(-50%);
-  grid-template-columns: 280px minmax(0, 1fr) 296px;
+  grid-template-columns: 320px minmax(0, 1fr) 296px;
 }
 
 /* Without a chat column — bot games — the board takes its space. */
@@ -894,11 +894,12 @@ td.num {
 }
 
 /*
- * The staged move's controls, floated over the board's empty lower band —
- * the region the setup tray occupies before play, unused once it starts.
- * Centered and oversized: this is the one decision on screen.
+ * The board's one control spot: staged Submit/Reset, Explore's Reset/Done and
+ * review's Back to live all float here, centered over the empty lower band
+ * the setup tray occupies before play. One place, one size, whatever the
+ * mode — the hint in the rail says which mode it is.
  */
-.staged-float {
+.board-float {
   position: absolute;
   left: 50%;
   bottom: 4.5%;
@@ -928,8 +929,10 @@ td.num {
  */
 .chat-messages {
   flex: 1;
-  min-height: 120px;
-  max-height: 420px;
+  /* Tall by default — a conversation is read vertically, and the column it
+     lives in has the height to spend. */
+  min-height: 320px;
+  max-height: 640px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -986,7 +989,7 @@ td.num {
  */
 .grid-chat {
   display: grid;
-  grid-template-columns: 280px minmax(0, 1fr) 296px;
+  grid-template-columns: 320px minmax(0, 1fr) 296px;
   gap: 26px;
   align-items: start;
 }

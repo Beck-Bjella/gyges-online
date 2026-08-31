@@ -718,13 +718,16 @@ export default function GameView({
             onSetupDrop={setup.dropAt}
             onSetupMove={setup.moveSlot}
           />
+          {/* Explore, review and the staged move all present their controls in
+              the same spot at the same size — one place on the board where
+              decisions are made, whatever the mode. What each mode means is
+              narrated by the hint in the rail, not by a banner over the board. */}
           {exploring && (
-            <div className="review-banner">
-              <span>Exploring — nothing here is played</span>
-              <button className="btn" onClick={resetExplore}>
+            <div className="board-float">
+              <button className="btn btn-large" onClick={resetExplore}>
                 Reset
               </button>
-              <button className="btn btn-primary" onClick={exitExplore}>
+              <button className="btn btn-primary btn-large" onClick={exitExplore}>
                 Done
               </button>
             </div>
@@ -734,7 +737,7 @@ export default function GameView({
               already drawn as an arrow; repeating its notation said nothing
               the board was not saying better. */}
           {staged && viewingPly === null && !exploring && (
-            <div className="staged-float">
+            <div className="board-float">
               <button
                 className="btn btn-primary btn-large"
                 onClick={() => submit(staged)}
@@ -752,14 +755,11 @@ export default function GameView({
             </div>
           )}
           {!exploring && reviewing && (
-            <div className="review-banner">
-              <span>
-                {viewingPly === 0
-                  ? "Empty board"
-                  : describePly(history, viewingPly!, game.ply)}{" "}
-                — you cannot play from here
-              </span>
-              <button className="btn btn-primary" onClick={() => goToPly(null)}>
+            <div className="board-float">
+              <button
+                className="btn btn-primary btn-large"
+                onClick={() => goToPly(null)}
+              >
                 Back to live
               </button>
             </div>
@@ -803,9 +803,11 @@ export default function GameView({
             </button>
           </div>
           <p className="hint" style={{ margin: "10px 0 0" }}>
-            {reviewing
-              ? `Reviewing move ${viewingPly} of ${game.ply}`
-              : "← → to review history"}
+            {exploring
+              ? "Exploring — nothing here is played"
+              : reviewing
+                ? `Reviewing move ${viewingPly} of ${game.ply} — you cannot play from here`
+                : "← → to review history"}
           </p>
           {error && <p className="error" style={{ margin: "10px 0 0" }}>{error}</p>}
         </div>
@@ -994,19 +996,6 @@ export default function GameView({
   );
 }
 
-/** How to describe a point in the history: a placement, or a move number. */
-function describePly(
-  history: HistoryEntry[],
-  ply: number,
-  total: number,
-): string {
-  const entry = history.find((h) => h.ply === ply);
-  if (entry?.kind === "setup") {
-    return `Setup — player ${entry.player === 1 ? "1" : "2"} places`;
-  }
-  const setupPlies = history.filter((h) => h.kind === "setup").length;
-  return `Move ${ply - setupPlies} of ${total - setupPlies}`;
-}
 
 function PlayerBar({
   name,
