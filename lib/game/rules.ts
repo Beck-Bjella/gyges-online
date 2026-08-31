@@ -421,6 +421,79 @@ export function checkMoveLegality(
  * occupied square may relocate the occupant to *any* empty square, so one
  * landing produces as many moves as there are empty squares.
  */
+/**
+ * One route a piece could have taken from `from` to `to`, square by square.
+ *
+ * Returned for animation, not for rules: the stored move records only where a
+ * piece started and finished, and several different routes usually reach the
+ * same square, so there is no such thing as *the* path. This walks the same
+ * rules as reachableFrom and stops at the first route it finds.
+ *
+ * Kept separate from reachableFrom rather than folded into it because the
+ * control flow genuinely differs — that one explores everything and collects
+ * endpoints, this one carries a route and unwinds the moment it arrives.
+ *
+ * Null when no route exists, which callers should treat as "do not animate"
+ * rather than as "illegal": the move may have been legal from a position this
+ * board no longer shows.
+ */
+export function pathTo(
+  board: BoardState,
+  player: Player,
+  from: number,
+  to: number,
+): number[] | null {
+  const goal = goalFor(player);
+  if (from < 0 || from >= GRID_SIZE || board[from] === 0) return null;
+
+  const lifted = [...board];
+  lifted[from] = 0;
+  const farRow = player === 1 ? ROWS - 1 : 0;
+
+  const walk = (
+    at: number,
+    remaining: number,
+    usedEdges: Set<number>,
+    bounced: Set<number>,
+    route: number[],
+  ): number[] | null => {
+    for (const next of neighbours(at)) {
+      const edge = edgeId(at, next);
+      if (usedEdges.has(edge)) continue;
+
+      const stepsLeft = remaining - 1;
+      const branch = new Set(usedEdges);
+      branch.add(edge);
+      const onward = [...route, next];
+
+      if (lifted[next] !== 0) {
+        if (stepsLeft !== 0) continue;
+        if (next === to) return onward;
+        if (bounced.has(next)) continue;
+        const nextBounced = new Set(bounced);
+        nextBounced.add(next);
+        const found = walk(next, lifted[next], branch, nextBounced, onward);
+        if (found) return found;
+        continue;
+      }
+
+      if (stepsLeft === 0) {
+        if (next === to) return onward;
+        continue;
+      }
+      const found = walk(next, stepsLeft, branch, bounced, onward);
+      if (found) return found;
+    }
+
+    if (remaining === 1 && Math.floor(at / COLS) === farRow && to === goal) {
+      return [...route, goal];
+    }
+    return null;
+  };
+
+  return walk(from, board[from], new Set(), new Set(), [from]);
+}
+
 export function legalMoves(board: BoardState, player: Player): Move[] {
   const line = activeLine(board, player);
   if (!line) return [];

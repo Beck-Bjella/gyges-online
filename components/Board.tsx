@@ -38,7 +38,7 @@ import {
   type Move,
   type Player,
 } from "@/lib/game/board";
-import { canMoveFrom, dropSquares, reachableFrom } from "@/lib/game/rules";
+import { canMoveFrom, dropSquares, pathTo, reachableFrom } from "@/lib/game/rules";
 
 interface Props {
   board: BoardState;
@@ -114,6 +114,12 @@ const trayCx = (i: number) => VIEWBOX / 2 + (i - 2.5) * TRAY_PITCH;
 /** The most rings any piece carries, which fixes where every ring sits. */
 const MAX_RINGS = 3;
 
+/** How long a piece spends crossing one square. */
+const STEP_MS = 90;
+
+/** A drawing offset from the square a piece is recorded on. */
+type Offset = { x: number; y: number };
+
 /** How thick each ring is drawn. */
 const RING_WIDTH = 6;
 
@@ -170,62 +176,95 @@ export default function Board({
   );
 
   /**
-   * Slide the pieces a move touched, instead of teleporting them.
+   * Walk the pieces a move touched along the route they actually took.
    *
-   * Driven by the move rather than by diffing boards, because two pieces of the
-   * same size are interchangeable and a diff cannot say which one travelled —
-   * it would animate whichever happened to be nearest in the array.
+   * Driven by the move rather than by diffing boards: two pieces of the same
+   * size are interchangeable, so a diff cannot say which one travelled.
    *
-   * The trick is two frames. First the piece is drawn offset back to where it
-   * started, with no transition, so nothing is seen to move. Then the offset is
-   * released with the transition on, and it slides to the square it is already
-   * recorded on. The board is never in a wrong state; only the drawing lags.
+   * The route comes from pathTo, which re-walks the rules over the position as
+   * it was *before* the move — hence prevBoard. A straight line between the two
+   * squares was tried first and read as the piece cutting across the board
+   * through squares it never touched; stepping shows why the move was legal,
+   * which is the part of Gyges hardest to read off a static board.
+   *
+   * Offsets are relative to the square the piece already occupies, so the board
+   * is never in a wrong state — only the drawing lags behind it.
    */
-  const [slide, setSlide] = useState<{
-    offsets: Map<number, { x: number; y: number }>;
-    settled: boolean;
-  }>({
-    offsets: new Map(),
-    settled: true,
-  });
+  const [walk, setWalk] = useState<{ idx: number; pts: Offset[]; step: number } | null>(
+    null,
+  );
+  const legs = useRef<{ idx: number; pts: Offset[] }[]>([]);
+  const prevBoard = useRef<BoardState | null>(null);
   const lastAnimated = useRef<string | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => {
-    const key = viewLastMove.join("|");
+    const key = lastMove.join("|");
     const first = lastAnimated.current === null;
+    const before = prevBoard.current;
+    prevBoard.current = board;
     if (key === lastAnimated.current) return;
     lastAnimated.current = key;
-    // Nothing to slide from on the first paint — the position is simply what it
+    // Nothing to walk from on the first paint: the position is simply what it
     // is when the page opens.
-    if (first || viewLastMove.length < 2) return;
+    if (first || before === null || lastMove.length < 2) return;
 
-    const [from, to, dropped] = viewLastMove;
-    const a = idxToCenter(from);
-    const b = idxToCenter(to);
-    const offsets = new Map<number, { x: number; y: number }>();
-    offsets.set(to, { x: a.cx - b.cx, y: a.cy - b.cy });
-    if (dropped !== undefined) {
-      // The displaced piece travels from where it was struck to where it landed.
-      const c = idxToCenter(dropped);
-      offsets.set(dropped, { x: b.cx - c.cx, y: b.cy - c.cy });
+    const [from, to, dropped] = lastMove;
+    // Only the goal squares tell us whose move it was, and only bearing off
+    // depends on knowing. Every other route is the same for either side.
+    const mover: Player = to === P1_GOAL ? 1 : to === P2_GOAL ? -1 : 1;
+    const route = pathTo(before, mover, from, to);
+
+    // flipMove rather than the toView helper below, only so this effect does
+    // not have to be ordered after it.
+    const inView = (i: number) => (flipped ? flipMove([i])[0] : i);
+
+    const built: { idx: number; pts: Offset[] }[] = [];
+    if (route && route.length >= 2) {
+      const end = idxToCenter(to);
+      built.push({
+        idx: inView(to),
+        pts: route.map((sq) => {
+          const c = idxToCenter(sq);
+          return { x: c.cx - end.cx, y: c.cy - end.cy };
+        }),
+      });
     }
-    setSlide({ offsets, settled: false });
+    if (dropped !== undefined) {
+      // The displaced piece moves after the mover arrives, not alongside it —
+      // they are two halves of one move, and shown together they read as two
+      // unrelated pieces drifting.
+      const struck = idxToCenter(to);
+      const landed = idxToCenter(dropped);
+      built.push({
+        idx: inView(dropped),
+        pts: [{ x: struck.cx - landed.cx, y: struck.cy - landed.cy }, { x: 0, y: 0 }],
+      });
+    }
+    if (built.length === 0) return;
 
-    // Two frames: one to paint the offset, one to release it.
-    const outer = requestAnimationFrame(() => {
-      const inner = requestAnimationFrame(() =>
-        setSlide((s) => ({ ...s, settled: true })),
+    legs.current = built.slice(1);
+    setWalk({ ...built[0], step: 0 });
+  }, [lastMove, board, flipped]);
+
+  // Advance one square at a time, then hand over to the next leg.
+  useEffect(() => {
+    if (!walk) return;
+    if (walk.step < walk.pts.length - 1) {
+      timer.current = setTimeout(
+        () => setWalk((w) => (w ? { ...w, step: w.step + 1 } : w)),
+        walk.step === 0 ? 0 : STEP_MS,
       );
-      raf.current = inner;
-    });
-    raf.current = outer;
-    return () => cancelAnimationFrame(raf.current);
-  }, [viewLastMove]);
+    } else {
+      const next = legs.current.shift();
+      timer.current = setTimeout(
+        () => setWalk(next ? { ...next, step: 0 } : null),
+        STEP_MS,
+      );
+    }
+    return () => clearTimeout(timer.current);
+  }, [walk]);
 
-  /**
-   * A line between two squares, pulled back at both ends so it starts and stops
-   * clear of the pieces rather than disappearing beneath them.
-   */
   const arrow = useCallback((fromIdx: number, toIdx: number) => {
     const a = idxToCenter(fromIdx);
     const b = idxToCenter(toIdx);
@@ -774,22 +813,25 @@ export default function Board({
       )}
 
       {pieces.map((p) => {
-        // A piece in hand follows the cursor and must never be animated as well.
-        const offset = p.lifted ? undefined : slide.offsets.get(p.idx);
+        // A piece in hand follows the cursor and must never be animated too.
+        const at = p.lifted || !walk || walk.idx !== p.idx ? null : walk.pts[walk.step];
         return (
         <g
           key={p.key}
           transform={`translate(${p.cx} ${p.cy})`}
           filter={p.lifted ? "url(#lifted-shadow)" : "url(#piece-shadow)"}
-          style={{
-            pointerEvents: "none",
-            transform:
-              offset && !slide.settled
-                ? `translate(${offset.x}px, ${offset.y}px)`
-                : undefined,
-            transition: offset && slide.settled ? "transform 200ms ease-out" : undefined,
-          }}
+          style={{ pointerEvents: "none" }}
         >
+          {/* The offset lives on an inner group. A CSS transform REPLACES the
+              transform attribute rather than composing with it, so setting one
+              on the group above would discard its translate to the square and
+              fling the piece to the top-left of the board. */}
+          <g
+            style={{
+              transform: at ? `translate(${at.x}px, ${at.y}px)` : undefined,
+              transition: walk && walk.step > 0 ? `transform ${STEP_MS}ms linear` : "none",
+            }}
+          >
           {/* A piece is its rings and nothing else — the middle is the board
               showing through. So the rings are drawn in the pale piece colour
               rather than the dark one, which only ever worked as an inlay on a
@@ -812,6 +854,7 @@ export default function Board({
               ),
             );
           })()}
+          </g>
         </g>
         );
       })}
