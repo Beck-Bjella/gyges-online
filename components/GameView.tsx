@@ -270,7 +270,7 @@ export default function GameView({
    * approaches the target — the last few moves are the ones worth seeing.
    */
   const paceFor = (remaining: number) =>
-    Math.max(0.18, 1 / (1 + (remaining - 1) * 0.45));
+    Math.max(0.3, 1 / (1 + (remaining - 1) * 0.35));
 
   /**
    * Every way of moving through history funnels through here, so direction and
@@ -308,8 +308,13 @@ export default function GameView({
             setAnim({ key: `h${next}:${reverse ? "r" : "f"}`, move: mv, reverse, speed });
           }
           if (next !== tgt) {
-            // The next step waits about as long as this one takes to play.
-            run.current = setTimeout(step, Math.max(120, 480 * paceFor(remaining - 1)));
+            // The next step waits for this one to play out, plus a beat of
+            // stillness — moves running into each other with no pause read as
+            // one long scramble rather than a sequence of moves.
+            run.current = setTimeout(
+              step,
+              Math.max(200, 620 * paceFor(remaining - 1)) + 240,
+            );
           }
           return next === game.ply ? null : next;
         });

@@ -128,7 +128,7 @@ const trayCx = (i: number) => VIEWBOX / 2 + (i - 2.5) * TRAY_PITCH;
 const MAX_RINGS = 3;
 
 /** Travel time per square of distance, before the per-leg floor. */
-const STEP_MS = 130;
+const STEP_MS = 170;
 
 /** A drawing offset from the square a piece is recorded on. */
 type Offset = { x: number; y: number };
@@ -275,7 +275,7 @@ export default function Board({
       // Longer moves take longer, so everything travels at about the same
       // speed, with a floor so a one-square nudge is still visible.
       const duration = Math.max(
-        Math.max(80, 220 * speed),
+        Math.max(100, 280 * speed),
         (len / GRID_PITCH) * STEP_MS * speed,
       );
       running.current.push(
