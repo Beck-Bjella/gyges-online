@@ -18,6 +18,7 @@ import {
 } from "@/lib/db/queries";
 import FriendsPanel from "@/components/FriendsPanel";
 import ChallengesPanel from "@/components/ChallengesPanel";
+import CancelGameButton from "@/components/CancelGameButton";
 import { relativeTime, describeThinkTime, endingSuffix } from "@/lib/format";
 import AutoRefresh from "@/components/AutoRefresh";
 
@@ -40,22 +41,30 @@ export default async function DashboardPage() {
   const timing = timingStats(user.id);
   const games = listGamesForUser(user.id);
 
-  // One list of games in play, ordered so the ones needing you come first.
-  // Whose turn it is is shown by colour rather than by splitting the list in
-  // two — a game does not change category when your opponent moves.
+  // One list of games, ordered so the ones needing you come first, then play
+  // in progress, then open tables with nothing to do but wait. A game does not
+  // change section when your opponent moves, joins, or was never there — the
+  // row's colour and label carry the state instead.
+  //
+  // Outgoing challenges are open games too, but they render under Challenges
+  // with the incoming ones; only public tables belong here.
   const active = games
-    .filter((g) => g.status === "active" || g.status === "setup")
+    .filter(
+      (g) =>
+        g.status === "active" ||
+        g.status === "setup" ||
+        (g.status === "open" && !g.invited_id),
+    )
     .sort((a, b) => {
-      const aYours = sideOf(a, user.id) === a.turn ? 0 : 1;
-      const bYours = sideOf(b, user.id) === b.turn ? 0 : 1;
-      return aYours - bYours || b.updated_at - a.updated_at;
+      const rank = (g: GameWithPlayers) =>
+        g.status === "open" ? 2 : sideOf(g, user.id) === g.turn ? 0 : 1;
+      return rank(a) - rank(b) || b.updated_at - a.updated_at;
     });
 
   const yourMoveCount = active.filter(
     (g) => sideOf(g, user.id) === g.turn,
   ).length;
 
-  const waiting = games.filter((g) => g.status === "open");
   const seats = openSeatCount(user.id);
   const friends = listFriends(user.id).map((u) => ({ id: u.id, username: u.username }));
   const requests = listFriendRequests(user.id).map((u) => ({
@@ -65,10 +74,12 @@ export default async function DashboardPage() {
   const incoming = listIncomingChallenges(user.id).map((g) => ({
     id: g.id,
     name: g.player1_name ?? "someone",
+    at: g.updated_at,
   }));
   const outgoing = listOutgoingChallenges(user.id).map((g) => ({
     id: g.id,
     name: g.invited_name ?? "someone",
+    at: g.updated_at,
   }));
 
   const finished = games.filter((g) => g.status === "finished");
@@ -118,26 +129,13 @@ export default async function DashboardPage() {
           <ChallengesPanel incoming={incoming} outgoing={outgoing} />
 
           <GameSection
-            title="Active games"
+            title="Games"
             games={active}
             userId={user.id}
             accent={yourMoveCount > 0 ? "mint" : undefined}
             empty={
               <>
                 No games in play. <Link href="/games">Find an opponent.</Link>
-              </>
-            }
-          />
-
-          <GameSection
-            title="Waiting for opponent"
-            games={waiting}
-            userId={user.id}
-            accent="amber"
-            empty={
-              <>
-                None open. <Link href="/games">Host a game</Link> and see who
-                turns up.
               </>
             }
           />
@@ -349,6 +347,7 @@ function MyGame({
         </span>
       </span>
       {yourTurn && <span className="tag tag-turn">play</span>}
+      {open && <CancelGameButton gameId={game.id} />}
     </li>
   );
 }

@@ -15,10 +15,13 @@
 import Link from "next/link";
 import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
+import { relativeTime } from "@/lib/format";
 
 interface Challenge {
   id: string;
   name: string;
+  /** When it was last touched, for the same "· moments ago" the game rows carry. */
+  at: number;
 }
 
 export default function ChallengesPanel({
@@ -65,18 +68,19 @@ export default function ChallengesPanel({
         </p>
       )}
 
-      {incoming.length > 0 && (
+      {(incoming.length > 0 || outgoing.length > 0) && (
         <ul className="list" style={{ margin: 0 }}>
           {incoming.map((c) => (
             <li key={c.id} className="list-item urgent">
               <span className="avatar avatar-mint">
                 {c.name.charAt(0).toUpperCase()}
               </span>
-              <span style={{ flex: 1 }}>
-                <Link href={`/player/${encodeURIComponent(c.name)}`}>
-                  <strong>{c.name}</strong>
-                </Link>{" "}
-                challenged you · <Link href={`/game/${c.id}`}>view</Link>
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <Link href={`/game/${c.id}`}>vs {c.name}</Link>
+                <br />
+                <span className="muted" style={{ color: "var(--accent-mint)" }}>
+                  challenged you · {relativeTime(c.at)}
+                </span>
               </span>
               <button
                 className="btn btn-primary"
@@ -94,18 +98,17 @@ export default function ChallengesPanel({
               </button>
             </li>
           ))}
-        </ul>
-      )}
-
-      {outgoing.length > 0 && (
-        <ul className="list" style={{ margin: incoming.length ? "8px 0 0" : 0 }}>
           {outgoing.map((c) => (
             <li key={c.id} className="list-item">
               <span className="avatar avatar-amber">
                 {c.name.charAt(0).toUpperCase()}
               </span>
-              <span style={{ flex: 1 }}>
-                <Link href={`/game/${c.id}`}>waiting for {c.name}</Link>
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <Link href={`/game/${c.id}`}>vs {c.name}</Link>
+                <br />
+                <span className="muted" style={{ color: "var(--accent-amber)" }}>
+                  waiting for {c.name} · {relativeTime(c.at)}
+                </span>
               </span>
               <button
                 className="btn"
