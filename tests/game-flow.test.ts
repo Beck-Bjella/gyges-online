@@ -27,6 +27,8 @@ const {
   submitSetup,
   submitMove,
   undoTurn,
+  createBot,
+  createBotGame,
   createChallenge,
   friendState,
   sendFriendRequest,
@@ -828,4 +830,21 @@ test("nobody holds more than ten unfinished games", () => {
   const host = createUser(uniqueName("host"));
   const g = createGame(host.id);
   assert.throws(() => joinGame(g.id, a.id), /10 games/i);
+});
+
+test("the game cap never applies to a bot's own seat", () => {
+  // A bot plays everyone at once; capping it would break every eleventh game
+  // against the ladder. The humans are fresh, so only the bot's count could
+  // possibly object here.
+  const bot = createBot({
+    username: uniqueName("CapBot"),
+    strength: 1,
+    engineBuild: "test",
+    options: { maxNodes: 1 },
+  });
+  for (let i = 0; i < 12; i++) {
+    const human = createUser(uniqueName("capfan"));
+    const g = createBotGame(human.id, bot.id);
+    assert.equal(g.status, "setup");
+  }
 });

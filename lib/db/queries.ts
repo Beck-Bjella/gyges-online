@@ -434,21 +434,16 @@ export const MAX_OPEN_GAMES = 10;
 /**
  * Refuse a new seat for someone already holding MAX_OPEN_GAMES.
  *
- * Counted on seats actually taken, so a challenge counts against its sender
- * from the moment it is sent, but against the invited player only once they
- * accept. Bots are never checked — their whole purpose is to be available.
+ * A spam guard, so the cap counts EVERYTHING unfinished, bot games included —
+ * ten cheap engine games fill the server as surely as ten human ones. The one
+ * exemption is the bot accounts themselves: a bot plays everyone at once, and
+ * capping it would break every eleventh game against the ladder. A challenge
+ * counts against its sender from the moment it is sent, but against the
+ * invited player only once they accept.
  */
 function assertRoomForGame(userId: string): void {
-  if (getUser(userId)?.bot_strength !== null) return;
-  const n = (
-    getDb()
-      .prepare(
-        `SELECT COUNT(*) AS n FROM games
-          WHERE (player1_id = ? OR player2_id = ?) AND status != 'finished'`,
-      )
-      .get(userId, userId) as { n: number }
-  ).n;
-  if (n >= MAX_OPEN_GAMES) {
+  if (getUser(userId)?.bot_strength != null) return;
+  if (openSeatCount(userId) >= MAX_OPEN_GAMES) {
     throw new GameError(
       `You already have ${MAX_OPEN_GAMES} games going. Finish one first.`,
     );
