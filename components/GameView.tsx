@@ -275,17 +275,17 @@ export default function GameView({
   useEffect(() => stopRun, [stopRun]);
 
   /**
-   * How many moves of the approach are animated. Anything further out is
-   * leapt in one silent jump — see the walk below.
+   * How long to hold each replay step, by how many plies are still to come.
+   *
+   * Every move is played — a jump never skips, it accelerates. The curve is
+   * 1/r^1.5, which converges: however long the run, the waits sum to under
+   * about two seconds, most of it spent on the last few moves. Deep in a jump
+   * the steps overlap into a continuous blur; the run then eases out and the
+   * landing move plays at full length. Skipping the middle was tried instead
+   * and rejected — the point is a game played very fast, not a cut.
    */
-  const SHOW = 3;
-
-  /**
-   * How hurried an animated step is, by how many plies are still to come.
-   * Only ever sees the approach: the landing move plays at full length, the
-   * two before it briskly. The same pace scales the pause between moves.
-   */
-  const paceFor = (remaining: number) => 1 / (1 + (remaining - 1) * 0.75);
+  const tickFor = (remaining: number) =>
+    Math.min(480, Math.max(28, 520 / Math.pow(remaining, 1.5)));
 
   /**
    * Every way of moving through history funnels through here.
@@ -322,22 +322,13 @@ export default function GameView({
           stopRun();
           return;
         }
-        // Anything beyond the last few plies is leapt, not replayed. Animating
-        // a whole game even briskly means seconds of waiting to arrive; what a
-        // jump is FOR is the destination, so the walk lands three out in one
-        // silent hop and animates only the approach. However far the target,
-        // arriving costs the same second and a half.
-        if (Math.abs(tgt - cur) > SHOW) {
-          cur = tgt - Math.sign(tgt - cur) * SHOW;
-          setViewingPly(cur === game.ply ? null : cur);
-          // One tick of stillness so the leap's position is seen to exist
-          // before the approach sets off from it.
-          run.current = setTimeout(step, 60);
-          return;
-        }
         const next = cur + Math.sign(tgt - cur);
         const remaining = Math.abs(tgt - cur);
-        const pace = paceFor(remaining);
+        // The animation should fill its slot: scale it to the tick, full
+        // length for the landing move. The board's own duration floor lets
+        // deep-blur steps overlap slightly, which is what makes the run read
+        // as continuous motion rather than a slideshow.
+        const pace = remaining === 1 ? 1 : Math.max(0.1, tickFor(remaining) / 520);
         const reverse = next < cur;
         // Backwards, the move being animated is the one just undone — the
         // move AT the square we left, not the one we land on.
@@ -357,14 +348,7 @@ export default function GameView({
           stopRun();
           return;
         }
-        // Wait for this move to play out, plus a beat of stillness scaled the
-        // same way the moves are — moves running into each other with no
-        // pause read as one long scramble rather than a sequence.
-        const aheadPace = paceFor(Math.abs(walkTarget.current - cur));
-        run.current = setTimeout(
-          step,
-          Math.max(110, 620 * aheadPace) + Math.max(45, 260 * aheadPace),
-        );
+        run.current = setTimeout(step, tickFor(Math.abs(walkTarget.current - cur)));
       };
 
       step();
