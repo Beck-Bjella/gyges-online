@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { gameVersion, settleExpiredGames } from "@/lib/db/queries";
+import { gameVersion } from "@/lib/db/queries";
 
 /**
  * "Has this game changed?"
@@ -18,7 +18,6 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  settleExpiredGames();
 
   const version = gameVersion(id);
   if (!version) {

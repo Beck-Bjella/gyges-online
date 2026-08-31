@@ -5,7 +5,6 @@ import {
   playerStats,
   finishedGamesForUser,
   listGamesForUser,
-  settleExpiredGames,
   sideOf,
   type Record_,
 } from "@/lib/db/queries";
@@ -23,7 +22,6 @@ export default async function PlayerPage({
   params: Promise<{ username: string }>;
 }) {
   const { username } = await params;
-  settleExpiredGames();
 
   const stats = playerStats(decodeURIComponent(username));
   if (!stats) notFound();

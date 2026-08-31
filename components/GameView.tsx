@@ -601,6 +601,44 @@ export default function GameView({
   }, [game.id, router]);
 
   /**
+   * A slow clock for everything that depends on wall time — the deadline
+   * line, and whether an expired clock has armed the timeout claim. Thirty
+   * seconds is plenty against deadlines measured in days.
+   */
+  const [nowTick, setNowTick] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNowTick(Date.now()), 30_000);
+    return () => clearInterval(t);
+  }, []);
+
+  /**
+   * The opponent's clock has run out and the win is there to take. Armed,
+   * never automatic — the server enforces the same rule.
+   */
+  const canClaim =
+    game.status === "active" &&
+    viewerSide !== null &&
+    viewerSide !== game.turn &&
+    game.deadlineAt !== null &&
+    game.deadlineAt * 1000 < nowTick;
+
+  const claim = useCallback(async () => {
+    if (!confirm("End the game and take the win on time?")) return;
+    setPending(true);
+    try {
+      const res = await fetch(`/api/games/${game.id}/claim`, { method: "POST" });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        setError(body.error ?? "Could not claim.");
+        return;
+      }
+      router.refresh();
+    } finally {
+      setPending(false);
+    }
+  }, [game.id, router]);
+
+  /**
    * The big verdict, shown once per game per browser.
    *
    * A game ending is easy to miss — the board just stops. So the first time a
@@ -991,6 +1029,13 @@ export default function GameView({
             <div className="row" style={{ marginTop: 14 }}>
               <button className="btn btn-danger" onClick={abandon} disabled={pending}>
                 Abandon game
+              </button>
+            </div>
+          )}
+          {canClaim && (
+            <div className="row" style={{ marginTop: 14 }}>
+              <button className="btn btn-primary" onClick={claim} disabled={pending}>
+                Claim win on time
               </button>
             </div>
           )}

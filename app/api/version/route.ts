@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { settleExpiredGames, siteVersion } from "@/lib/db/queries";
+import { siteVersion } from "@/lib/db/queries";
 
 /**
  * "Has anything changed on the site?"
@@ -13,7 +13,6 @@ import { settleExpiredGames, siteVersion } from "@/lib/db/queries";
  * makes while idle.
  */
 export async function GET() {
-  settleExpiredGames();
   return NextResponse.json({ v: siteVersion() }, {
     headers: { "Cache-Control": "no-store" },
   });

@@ -3,7 +3,6 @@ import { currentUser } from "@/lib/auth";
 import {
   getGame,
   getMoves,
-  settleExpiredGames,
   botInGame,
   sideOf,
   decodeBoard,
@@ -19,7 +18,6 @@ export default async function GamePage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  settleExpiredGames();
 
   const game = getGame(id);
   if (!game) notFound();

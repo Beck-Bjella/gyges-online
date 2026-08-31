@@ -5,7 +5,6 @@ import {
   listGamesForUser,
   playerStats,
   timingStats,
-  settleExpiredGames,
   sideOf,
   siteVersion,
   type GameWithPlayers,
@@ -32,7 +31,6 @@ export const metadata = { title: "Dashboard · Gygès" };
  * yours.
  */
 export default async function DashboardPage() {
-  settleExpiredGames();
 
   const user = await currentUser();
   if (!user) redirect("/");

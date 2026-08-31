@@ -5,7 +5,6 @@ import {
   listActiveGames,
   listOpenGames,
   listRecentFinishedGames,
-  settleExpiredGames,
   siteVersion,
   type GameWithPlayers,
 } from "@/lib/db/queries";
@@ -27,7 +26,6 @@ export const metadata = { title: "Games · Gygès" };
  * worth looking at before signing up.
  */
 export default async function GamesPage() {
-  settleExpiredGames();
 
   const user = await currentUser();
   const openGames = listOpenGames();

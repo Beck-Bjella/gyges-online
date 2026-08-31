@@ -4,12 +4,10 @@ import {
   createBotGame,
   createGame,
   listOpenGames,
-  settleExpiredGames,
   GameError,
 } from "@/lib/db/queries";
 
 export async function GET() {
-  settleExpiredGames();
   return NextResponse.json({ games: listOpenGames() });
 }
 

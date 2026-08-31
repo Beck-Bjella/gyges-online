@@ -393,7 +393,7 @@ export function deleteSessionsForUser(userId: string, except?: string): number {
  * ever ran the delete, so the table grew without bound.
  *
  * Called opportunistically on sign-in rather than from a scheduled job, for the
- * same reason settleExpiredGames() is — Vercel's free tier runs cron once a
+ * same reason lazy settling once was — Vercel's free tier runs cron once a
  * day. Sign-in is a good moment: it is not a hot path, and it already writes.
  */
 export function purgeExpiredSessions(): number {
@@ -1475,42 +1475,40 @@ export function answerTakeback(
 }
 
 /**
- * Settle games whose move deadline has passed.
+ * Claim a win from an opponent whose clock has run out.
  *
- * Called opportunistically whenever games are listed or loaded, rather than
- * relying on a scheduled job. Vercel's free tier only runs cron once a day, so
- * resolving lazily keeps deadlines accurate without one; a periodic job can be
- * added later as a backstop for games nobody opens.
+ * Deliberately a choice, never automatic. A correspondence deadline going by
+ * usually means life happened, and many players would rather wait than take a
+ * game on time — so the clock expiring only ARMS this, and the game stands
+ * until the waiting player decides. Active games only: a game stuck in setup
+ * is walked away from with abandonGame, which records nothing against anyone.
  */
-export function settleExpiredGames(): number {
-  const db = getDb();
-
-  // Check with a plain read first. This runs on every page load, and almost
-  // always finds nothing — opening a write transaction each time would
-  // serialise every reader behind a writer for no reason.
-  const expired = db
-    .prepare(
-      `SELECT id, turn FROM games
-        WHERE status IN ('active', 'setup')
-          AND deadline_at IS NOT NULL AND deadline_at <= ?`,
-    )
-    .all(now()) as { id: string; turn: Player }[];
-
-  if (expired.length === 0) return 0;
-
+export function claimTimeout(gameId: string, userId: string): GameWithPlayers {
   return transaction(() => {
-    const update = db.prepare(
+    const db = getDb();
+    const game = db.prepare("SELECT * FROM games WHERE id = ?").get(gameId) as
+      | Game
+      | undefined;
+    if (!game) throw new GameError("Game not found.", 404);
+    if (game.status !== "active") throw new GameError("That game is not in progress.");
+
+    const side = sideOf(game, userId);
+    if (side === null) throw new GameError("You are not a player in this game.", 403);
+    if (side === game.turn) {
+      throw new GameError("It is your move — the clock is yours.", 409);
+    }
+    if (game.deadline_at === null || game.deadline_at > now()) {
+      throw new GameError("Their time has not run out.", 409);
+    }
+
+    db.prepare(
       `UPDATE games
           SET status = 'finished', result = ?, result_reason = 'timeout',
               deadline_at = NULL, finished_at = ?, updated_at = ?
-        WHERE id = ? AND status IN ('active', 'setup') AND deadline_at <= ?`,
-    );
-    let settled = 0;
-    for (const g of expired) {
-      // Re-check inside the transaction: a player may have moved in between.
-      settled += update.run(-g.turn, now(), now(), g.id, now()).changes;
-    }
-    return settled;
+        WHERE id = ? AND status = 'active'`,
+    ).run(side, now(), now(), gameId);
+
+    return getGame(gameId)!;
   });
 }
 

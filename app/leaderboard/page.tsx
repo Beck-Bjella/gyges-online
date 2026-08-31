@@ -1,10 +1,9 @@
 import Link from "next/link";
-import { botLeaderboard, leaderboard, settleExpiredGames } from "@/lib/db/queries";
+import { botLeaderboard, leaderboard } from "@/lib/db/queries";
 
 export const dynamic = "force-dynamic";
 
 export default function LeaderboardPage() {
-  settleExpiredGames();
   const rows = leaderboard();
   const bots = botLeaderboard();
 

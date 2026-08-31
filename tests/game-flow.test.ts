@@ -45,7 +45,7 @@ const {
   listOpenGames,
   listActiveGames,
   listGamesForUser,
-  settleExpiredGames,
+  claimTimeout,
   sideOf,
   leaderboard,
   timingStats,
@@ -483,28 +483,27 @@ test("a non-participant cannot resign", () => {
 
 // --- deadlines -------------------------------------------------------------
 
-test("a game past its deadline is forfeited by the player to move", () => {
-  const { a, gameId } = twoPlayerGame();
+test("an expired clock arms a claim; nothing happens on its own", () => {
+  const { a, b, gameId } = twoPlayerGame();
   submitMove(gameId, a.id, P1_OPENING); // now player 2 is to move
+
+  // Inside the deadline there is nothing to claim.
+  assert.throws(() => claimTimeout(gameId, a.id), /not run out/i);
 
   // Reach past the deadline without waiting.
   getDb()
     .prepare("UPDATE games SET deadline_at = ? WHERE id = ?")
     .run(Math.floor(Date.now() / 1000) - 1, gameId);
 
-  const settled = settleExpiredGames();
-  assert.ok(settled >= 1);
+  // The game still stands — no settling happens behind anyone's back — and
+  // the player whose clock ran out cannot claim their own lateness.
+  assert.equal(getGame(gameId)!.status, "active");
+  assert.throws(() => claimTimeout(gameId, b.id), /your move/i);
 
-  const g = getGame(gameId)!;
+  const g = claimTimeout(gameId, a.id);
   assert.equal(g.status, "finished");
   assert.equal(g.result_reason, "timeout");
   assert.equal(g.result, 1, "player 2 ran out of time, so player 1 wins");
-});
-
-test("settling leaves games inside their deadline alone", () => {
-  const { gameId } = twoPlayerGame();
-  settleExpiredGames();
-  assert.equal(getGame(gameId)!.status, "active");
 });
 
 // --- the starting position --------------------------------------------------
