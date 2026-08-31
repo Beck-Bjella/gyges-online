@@ -59,6 +59,12 @@ interface Props {
   /** The move to draw, as arrows. Empty or absent draws nothing. */
   lastMove?: Move;
   /**
+   * Sandbox: any piece may be picked up and put anywhere, either side's,
+   * with no legality applied. The rule hints are suppressed rather than drawn
+   * on every square — when everything is legal, dots say nothing.
+   */
+  free?: boolean;
+  /**
    * Which side the viewer is playing.
    *
    * Supplied only to mark legal destinations. Omit it and no rule hints are
@@ -165,6 +171,7 @@ export default function Board({
   onMove,
   highlight = [],
   lastMove = [],
+  free = false,
   player,
   setupSide,
   onSetupSquare,
@@ -460,7 +467,10 @@ export default function Board({
         // piece — it is empty by the time the move resolves, and dropTargets
         // already marks it. Excluding it here made clicking a highlighted
         // square silently cancel the move instead.
-        if (target !== null && dropTargets.has(target)) {
+        if (
+          target !== null &&
+          (dropTargets.has(target) || (free && (view[target] === 0 || target === drag.from)))
+        ) {
           emit([drag.from, drag.landedOn, target]);
         }
         setDrag({ kind: "none" });
@@ -525,13 +535,15 @@ export default function Board({
           // its own square, so this is a move rather than a cancelled drag —
           // but only where the path actually allows it, which legalTargets
           // knows. Where it does not, dropping a piece back is how a player
-          // changes their mind, and that still works.
+          // changes their mind, and that still works. In the sandbox it is
+          // always just a cancel: a move to your own square changes nothing
+          // worth recording there.
           //
           // Checked before the emptiness test below, because the square is not
           // empty in `view`: the piece is still recorded there, so it would
           // otherwise read as a displacement onto itself.
           if (target === drag.from) {
-            if (legalTargets.has(target)) emit([drag.from, target]);
+            if (!free && legalTargets.has(target)) emit([drag.from, target]);
             setDrag({ kind: "none" });
             return;
           }
@@ -657,8 +669,13 @@ export default function Board({
    * clutter — the question "where can this go" is worth answering, "which
    * pieces are mine" is one the player should be reading off the board.
    */
-  const marked =
-    drag.kind === "displaced" ? dropTargets : drag.kind === "piece" ? legalTargets : new Set<number>();
+  const marked = free
+    ? new Set<number>()
+    : drag.kind === "displaced"
+      ? dropTargets
+      : drag.kind === "piece"
+        ? legalTargets
+        : new Set<number>();
 
   /** Split by what is there: a bare square gets a dot, a piece gets one on top. */
   const markedEmpty = [...marked].filter((i) => view[i] === 0);

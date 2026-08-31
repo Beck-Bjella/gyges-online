@@ -136,6 +136,18 @@ export default function GameView({
     return applySetup(displayBoard, viewerSide, filled);
   }, [setupPreview, viewerSide, displayBoard]);
 
+  /**
+   * Explore: a sandbox copied from whatever position was being looked at.
+   *
+   * Purely client state. Nothing here is a move — pieces are pushed around
+   * freely, both sides', to test an idea, then Done drops back to the game
+   * exactly as it was. Entering from a reviewed position works, which is the
+   * point: step back to where it went wrong and try the other line.
+   */
+  const [exploreBoard, setExploreBoard] = useState<BoardState | null>(null);
+  const exploreBase = useRef<BoardState | null>(null);
+  const exploring = exploreBoard !== null;
+
   // A staged move is shown as though played, so the player judges the position
   // they would actually get. Not applied while reviewing history, where the
   // board is showing some earlier position instead.
@@ -144,13 +156,32 @@ export default function GameView({
     return applyMove(displayBoard, staged);
   }, [staged, viewingPly, displayBoard]);
 
-  const shownBoard = previewBoard ?? stagedBoard ?? displayBoard;
+  const shownBoard = exploreBoard ?? previewBoard ?? stagedBoard ?? displayBoard;
 
   const reviewing = viewingPly !== null && viewingPly !== game.ply;
 
+  const enterExplore = useCallback(() => {
+    // Captured from the board on screen — including a reviewed position.
+    exploreBase.current = shownBoard;
+    setExploreBoard(shownBoard);
+  }, [shownBoard]);
+
+  const exploreMove = useCallback((mv: Move) => {
+    setExploreBoard((b) => (b ? applyMove(b, mv) : b));
+  }, []);
+
+  const resetExplore = useCallback(() => {
+    if (exploreBase.current) setExploreBoard(exploreBase.current);
+  }, []);
+
+  const exitExplore = useCallback(() => {
+    exploreBase.current = null;
+    setExploreBoard(null);
+  }, []);
+
   const yourTurn =
     game.status === "active" && viewerSide !== null && viewerSide === game.turn;
-  const canMove = yourTurn && !pending && !reviewing && staged === null;
+  const canMove = yourTurn && !pending && !reviewing && staged === null && !exploring;
 
   // The engine's turn. Only a participant's browser runs the search — a
   // spectator watching the game should not be made to do the work, and the
@@ -300,6 +331,10 @@ export default function GameView({
    */
   const goToPly = useCallback(
     (target: number | null) => {
+      // The sandbox sits on top of whatever was shown; navigating under it
+      // would change nothing visible and desynchronise the exit. The base ref
+      // doubles as the flag so this callback needs no state in its closure.
+      if (exploreBase.current !== null) return;
       walkTarget.current = target ?? game.ply;
       if (walking.current) return; // the running walk picks the new target up
       const moveAt = (ply: number): Move | null => {
@@ -551,11 +586,12 @@ export default function GameView({
         <div className={reviewing ? "board-wrap reviewing" : "board-wrap"}>
           <Board
             board={shownBoard}
-            interactive={canMove}
+            interactive={canMove || exploring}
             flipped={flipped}
-            onMove={stage}
+            onMove={exploring ? exploreMove : stage}
             highlight={highlight}
-            lastMove={isWalking ? [] : shownMove}
+            lastMove={isWalking || exploring ? [] : shownMove}
+            free={exploring}
             // Marks legal destinations while dragging. A convenience only —
             // the server validates every move regardless. Passing undefined
             // rather than null when there is no viewer keeps the hint off for
@@ -564,11 +600,22 @@ export default function GameView({
             setupSide={yourPlacement ? viewerSide! : undefined}
             onSetupSquare={setup.placeAt}
             setupRemaining={setup.remaining}
-            animate={anim}
+            animate={exploring ? null : anim}
             onSetupDrop={setup.dropAt}
             onSetupMove={setup.moveSlot}
           />
-          {reviewing && (
+          {exploring && (
+            <div className="review-banner">
+              <span>Exploring — nothing here is played</span>
+              <button className="btn" onClick={resetExplore}>
+                Reset
+              </button>
+              <button className="btn btn-primary" onClick={exitExplore}>
+                Done
+              </button>
+            </div>
+          )}
+          {!exploring && reviewing && (
             <div className="review-banner">
               <span>
                 {viewingPly === 0
@@ -612,6 +659,15 @@ export default function GameView({
           <button className="btn" onClick={() => setFlipped((f) => !f)}>
             Flip board
           </button>
+          {(game.status === "active" || game.status === "finished") && !exploring && (
+            <button
+              className="btn"
+              onClick={enterExplore}
+              title="Push pieces around freely to test an idea, then come back"
+            >
+              Explore
+            </button>
+          )}
           <span className="control-divider" aria-hidden="true" />
           <button
             className="btn"
