@@ -168,8 +168,11 @@ export default function GameView({
   const reviewing = viewingPly !== null && viewingPly !== game.ply;
 
   // The table's private chat: the two players, nobody else. A bot game has
-  // nobody to talk to, and a spectator has the lobby.
-  const hasChat = game.botSide === null && viewerSide !== null && signedIn;
+  // nobody to talk to at all, so it gets no column; a spectator on a human
+  // game sees the panel's shell saying so — an absent column reads as a bug,
+  // a present one that explains itself reads as a rule.
+  const chatColumn = game.botSide === null;
+  const canChat = chatColumn && viewerSide !== null && signedIn;
 
   const enterExplore = useCallback(() => {
     // Captured from the board on screen — including a reviewed position.
@@ -675,15 +678,20 @@ export default function GameView({
   });
 
   return (
-    <div className={hasChat ? "grid-2 game-grid" : "grid-2 game-grid no-chat"}>
-      {hasChat && (
+    <div className={chatColumn ? "grid-2 game-grid" : "grid-2 game-grid no-chat"}>
+      {chatColumn && (
         <aside className="chat-rail">
-          <ChatPanel
-            gameId={game.id}
-            title="Table talk"
-            canPost
-            postHint=""
-          />
+          {canChat ? (
+            <ChatPanel gameId={game.id} title="Table talk" canPost />
+          ) : (
+            <div className="panel chat-panel">
+              <h2>Table talk</h2>
+              <p className="muted" style={{ margin: 0 }}>
+                The table talk is private to the players.
+                {signedIn ? "" : " Sign in to chat in your own games."}
+              </p>
+            </div>
+          )}
         </aside>
       )}
       <div>
