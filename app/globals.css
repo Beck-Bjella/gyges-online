@@ -625,7 +625,11 @@ input::placeholder {
  * — which put the chat in the wide column and the board in the 296px one.
  */
 .grid-2.game-grid {
-  width: min(1500px, calc(100vw - 48px));
+  /* The full viewport, not a reading-width cap: the board is sized by screen
+     HEIGHT, and capping the page width was what stopped it getting there —
+     the middle column ran out of room while empty space pooled underneath.
+     The side columns go to the actual sides; the board fills the middle. */
+  width: calc(100vw - 48px);
   gap: 32px;
   position: relative;
   left: 50%;
