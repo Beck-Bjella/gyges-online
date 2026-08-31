@@ -899,6 +899,83 @@ export function resignGame(gameId: string, userId: string): GameWithPlayers {
 }
 
 /**
+ * Give the last move back, so it can be played again.
+ *
+ * Granted by the player whose turn it is — the one the mistake HELPED. Against
+ * a person that undoes the opponent's last move and hands them the turn.
+ * Against the engine it undoes two plies, the bot's reply and your own move:
+ * undoing only the bot's would have it immediately replay the same move, since
+ * a bot's choice is a function of the position.
+ *
+ * History is genuinely rewritten — the rows are deleted, not marked. A
+ * correspondence takeback is a courtesy between the players, and keeping the
+ * retracted move around would make every consumer of history reason about
+ * whether a ply "really happened".
+ */
+export function undoTurn(gameId: string, userId: string): GameWithPlayers {
+  return transaction(() => {
+    const db = getDb();
+    const game = db.prepare("SELECT * FROM games WHERE id = ?").get(gameId) as
+      | Game
+      | undefined;
+    if (!game) throw new GameError("Game not found.", 404);
+    if (game.status !== "active") throw new GameError("That game is not in progress.");
+
+    const side = sideOf(game, userId);
+    if (side === null) throw new GameError("You are not a player in this game.", 403);
+    if (side !== game.turn) {
+      throw new GameError("Only the player to move can give a turn back.", 409);
+    }
+
+    const last = db
+      .prepare(
+        `SELECT ply, player, kind FROM moves
+          WHERE game_id = ? ORDER BY ply DESC LIMIT 2`,
+      )
+      .all(gameId) as { ply: number; player: Player; kind: string }[];
+
+    const bot = botInGame(game);
+    const removed = bot === null ? 1 : 2;
+
+    // Every removed row must be an ordinary move by the expected side; setup
+    // cannot be taken back. Against a person: the opponent's move. Against the
+    // engine: its reply and then your own move underneath.
+    if (last.length < removed) throw new GameError("Nothing to take back.");
+    if (last[0].kind !== "move" || last[0].player !== -side) {
+      throw new GameError("Nothing to take back.");
+    }
+    if (removed === 2 && (last[1].kind !== "move" || last[1].player !== side)) {
+      throw new GameError("Nothing to take back.");
+    }
+
+    const cutoff = game.ply - removed;
+    const before = db
+      .prepare("SELECT board_after FROM moves WHERE game_id = ? AND ply = ?")
+      .get(gameId, cutoff) as { board_after: string } | undefined;
+    // The setup plies always exist beneath any move, so this cannot miss.
+    if (!before) throw new GameError("Nothing to take back.");
+
+    db.prepare("DELETE FROM moves WHERE game_id = ? AND ply > ?").run(gameId, cutoff);
+    db.prepare(
+      `UPDATE games
+          SET board = ?, ply = ?, turn = ?, deadline_at = ?, updated_at = ?
+        WHERE id = ?`,
+    ).run(
+      before.board_after,
+      cutoff,
+      // The side whose move was removed plays again: the opponent against a
+      // person, yourself against the engine.
+      bot === null ? -side : side,
+      now() + game.move_seconds,
+      now(),
+      gameId,
+    );
+
+    return getGame(gameId)!;
+  });
+}
+
+/**
  * Settle games whose move deadline has passed.
  *
  * Called opportunistically whenever games are listed or loaded, rather than

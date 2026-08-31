@@ -26,6 +26,7 @@ const {
   joinGame,
   submitSetup,
   submitMove,
+  undoTurn,
   resignGame,
   getGame,
   getMoves,
@@ -747,4 +748,27 @@ test("the first move goes to a random side", () => {
     starters.add(submitSetup(gameId, b.id, STANDARD).turn);
   }
   assert.deepEqual([...starters].sort(), [-1, 1], "both sides should start some games");
+});
+
+test("the player to move can give the last move back", () => {
+  const { a, b, gameId } = twoPlayerGame();
+  submitMove(gameId, a.id, [0, 13]);
+
+  // Only b, whose turn it is, may return a's move — and a cannot grab it back.
+  assert.throws(() => undoTurn(gameId, a.id), /player to move/i);
+
+  const before = getGame(gameId)!;
+  const undone = undoTurn(gameId, b.id);
+  assert.equal(undone.ply, before.ply - 1, "one ply removed");
+  assert.equal(undone.turn, 1, "the move returns to the player who made it");
+  const remaining = getMoves(gameId);
+  assert.equal(remaining.length, 2, "only the setups remain");
+  assert.equal(
+    undone.board,
+    remaining[1].board_after,
+    "the board returns to the position after both setups",
+  );
+
+  // Nothing left to take back: the remaining plies are setup.
+  assert.throws(() => undoTurn(gameId, a.id), /nothing to take back/i);
 });

@@ -430,6 +430,46 @@ export default function GameView({
     [game.id, router],
   );
 
+  /**
+   * Whether the player to move can hand the last move back.
+   *
+   * Against a person that returns the opponent's move to them; against the
+   * engine it takes back your own move (with the bot's reply on top). The
+   * server re-checks all of this — the condition here only decides whether
+   * the button is worth showing.
+   */
+  const canGiveBack =
+    game.status === "active" &&
+    viewerSide !== null &&
+    viewerSide === game.turn &&
+    history.length > 0 &&
+    history[history.length - 1].kind === "move" &&
+    history[history.length - 1].player !== viewerSide &&
+    (game.botSide === null ||
+      (history.length > 1 &&
+        history[history.length - 2].kind === "move" &&
+        history[history.length - 2].player === viewerSide));
+
+  const giveBack = useCallback(async () => {
+    const ask =
+      game.botSide === null
+        ? "Return your opponent's last move so they can play a different one?"
+        : "Take back your last move and the engine's reply?";
+    if (!confirm(ask)) return;
+    setPending(true);
+    try {
+      const res = await fetch(`/api/games/${game.id}/undo`, { method: "POST" });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        setError(body.error ?? "Could not take that back.");
+      } else {
+        router.refresh();
+      }
+    } finally {
+      setPending(false);
+    }
+  }, [game.id, game.botSide, router]);
+
   const resign = useCallback(async () => {
     if (!confirm("Resign this game?")) return;
     setPending(true);
@@ -638,6 +678,11 @@ export default function GameView({
           />
           {game.status === "active" && viewerSide !== null && (
             <div className="row" style={{ marginTop: 14 }}>
+              {canGiveBack && (
+                <button className="btn" onClick={giveBack} disabled={pending}>
+                  {game.botSide === null ? "Give back their turn" : "Take back move"}
+                </button>
+              )}
               <button
                 className="btn btn-danger"
                 onClick={resign}
