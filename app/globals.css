@@ -833,28 +833,6 @@ td.num {
   pointer-events: none;
 }
 
-.review-banner {
-  position: absolute;
-  left: 50%;
-  bottom: 16px;
-  transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  white-space: nowrap;
-  padding: 9px 13px;
-  border-radius: var(--radius);
-  background: rgba(18, 16, 14, 0.95);
-  border: 1px solid rgba(232, 167, 92, 0.5);
-  color: var(--accent-amber);
-  font-size: 13px;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.6);
-}
-.review-banner .btn {
-  padding: 5px 11px;
-  font-size: 13px;
-}
-
 /*
  * Separates a view toggle from the history controls beside it. Without it the
  * row reads as one undifferentiated set of buttons, and "Flip board" looks
@@ -1139,11 +1117,6 @@ td.num {
     border-right: none;
   }
 
-  .review-banner {
-    font-size: 12px;
-    padding: 8px 10px;
-    gap: 8px;
-  }
 }
 
 /* --- landing points ------------------------------------------------------ */
