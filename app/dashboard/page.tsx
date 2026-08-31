@@ -329,9 +329,21 @@ function MyGame({
         {(opponent ?? "?").charAt(0).toUpperCase()}
       </span>
       <span style={{ flex: 1, minWidth: 0 }}>
-        <Link className="stretch-link" href={`/game/${game.id}`}>
-          {opponent ? `vs ${opponent}` : "Open game"}
-        </Link>
+        <Link
+          className="stretch-link"
+          href={`/game/${game.id}`}
+          aria-label="Open game"
+        />
+        {opponent ? (
+          <>
+            vs{" "}
+            <Link href={`/player/${encodeURIComponent(opponent)}`}>
+              <strong>{opponent}</strong>
+            </Link>
+          </>
+        ) : (
+          "Open game"
+        )}
         <br />
         <span
           className="muted"

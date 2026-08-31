@@ -97,11 +97,16 @@ export default async function GamesPage() {
             <ul className="list">
               {openGames.map((g) => (
                 <li key={g.id} className="list-item">
+                  <Link
+                    className="stretch-link"
+                    href={`/game/${g.id}`}
+                    aria-label="Open game"
+                  />
                   <span className="avatar avatar-amber">
                     {initial(g.player1_name)}
                   </span>
                   <span style={{ flex: 1, minWidth: 0 }}>
-                    <strong>{g.player1_name ?? "—"}</strong>
+                    <strong>{nameLink(g.player1_name)}</strong>
                     <span className="muted">
                       {" "}
                       · {describeTimeControl(g.move_seconds)}
@@ -226,6 +231,12 @@ function initial(name: string | null): string {
   return (name ?? "?").charAt(0).toUpperCase();
 }
 
+/** A player's name as a link to their profile, or a dash for an empty seat. */
+function nameLink(name: string | null) {
+  if (!name) return "—";
+  return <Link href={`/player/${encodeURIComponent(name)}`}>{name}</Link>;
+}
+
 function GameLine({
   game,
   kind,
@@ -244,12 +255,11 @@ function GameLine({
       <span className={kind === "active" ? "avatar avatar-mint" : "avatar"}>
         {kind === "active" ? game.ply : "✓"}
       </span>
+      <Link className="stretch-link" href={`/game/${game.id}`} aria-label="Open game" />
       <span style={{ flex: 1, minWidth: 0 }}>
-        <Link href={`/game/${game.id}`}>
-          <strong>{game.player1_name ?? "—"}</strong>
-          <span className="muted"> vs </span>
-          <strong>{game.player2_name ?? "—"}</strong>
-        </Link>
+        <strong>{nameLink(game.player1_name)}</strong>
+        <span className="muted"> vs </span>
+        <strong>{nameLink(game.player2_name)}</strong>
         {yours && <span className="tag tag-turn" style={{ marginLeft: 8 }}>yours</span>}
         <br />
         <span className="muted">
