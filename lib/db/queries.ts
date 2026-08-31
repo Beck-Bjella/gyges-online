@@ -727,6 +727,17 @@ export function listIncomingChallenges(userId: string): GameWithPlayers[] {
 }
 
 
+/** Challenges this player has sent that nobody has answered. */
+export function listOutgoingChallenges(userId: string): GameWithPlayers[] {
+  return getDb()
+    .prepare(
+      `SELECT ${GAME_COLUMNS} ${GAME_JOINS}
+        WHERE g.status = 'open' AND g.player1_id = ? AND g.invited_id IS NOT NULL
+        ORDER BY g.created_at DESC`,
+    )
+    .all(userId) as GameWithPlayers[];
+}
+
 // --- friends ---------------------------------------------------------------
 
 export type FriendState = "none" | "sent" | "received" | "friends";

@@ -12,6 +12,7 @@ import {
   listFriends,
   listFriendRequests,
   listIncomingChallenges,
+  listOutgoingChallenges,
   openSeatCount,
   MAX_OPEN_GAMES,
 } from "@/lib/db/queries";
@@ -65,6 +66,10 @@ export default async function DashboardPage() {
     id: g.id,
     name: g.player1_name ?? "someone",
   }));
+  const outgoing = listOutgoingChallenges(user.id).map((g) => ({
+    id: g.id,
+    name: g.invited_name ?? "someone",
+  }));
 
   const finished = games.filter((g) => g.status === "finished");
 
@@ -110,7 +115,7 @@ export default async function DashboardPage() {
             learn where anything lives, and an absent section is
             indistinguishable from a section you have scrolled past.
           */}
-          <ChallengesPanel incoming={incoming} />
+          <ChallengesPanel incoming={incoming} outgoing={outgoing} />
 
           <GameSection
             title="Active games"
