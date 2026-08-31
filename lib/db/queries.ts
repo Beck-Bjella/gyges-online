@@ -824,6 +824,72 @@ export function listFriendRequests(userId: string): User[] {
 }
 
 /**
+ * Withdraw a table nobody has sat down at.
+ *
+ * Only the creator, and only while the game is still open — the moment an
+ * opponent joins there is a second person with a stake in it, and ending it
+ * then is what resigning is for. Deleted outright rather than marked: an open
+ * game has no moves, no result and no history, so there is nothing a record
+ * would preserve.
+ */
+export function cancelGame(gameId: string, userId: string): void {
+  const done = getDb()
+    .prepare(`DELETE FROM games WHERE id = ? AND player1_id = ? AND status = 'open'`)
+    .run(gameId, userId);
+  if (done.changes === 0) {
+    throw new GameError("Only the creator can cancel, and only before anyone joins.", 409);
+  }
+}
+
+/** How many unfinished games this player is seated at, against MAX_OPEN_GAMES. */
+export function openSeatCount(userId: string): number {
+  return (
+    getDb()
+      .prepare(
+        `SELECT COUNT(*) AS n FROM games
+          WHERE (player1_id = ? OR player2_id = ?) AND status != 'finished'`,
+      )
+      .get(userId, userId) as { n: number }
+  ).n;
+}
+
+/** One row per opponent this player has finished a game against. */
+export interface OpponentRecord extends Record_ {
+  id: string;
+  username: string;
+  isBot: boolean;
+}
+
+/**
+ * The player's record broken out by opponent, most-played first.
+ *
+ * Bots included and marked — a per-opponent record is exactly what a fixed
+ * opponent makes meaningful — so the profile can render them apart.
+ */
+export function opponentRecords(userId: string): OpponentRecord[] {
+  return getDb()
+    .prepare(
+      `SELECT u.id, u.username,
+              u.bot_strength IS NOT NULL AS isBot,
+              SUM(CASE WHEN (g.player1_id = @id AND g.result = 1)
+                         OR (g.player2_id = @id AND g.result = -1) THEN 1 ELSE 0 END) AS wins,
+              SUM(CASE WHEN (g.player1_id = @id AND g.result = -1)
+                         OR (g.player2_id = @id AND g.result = 1) THEN 1 ELSE 0 END) AS losses,
+              SUM(CASE WHEN g.result = 0 THEN 1 ELSE 0 END) AS draws,
+              COUNT(g.id) AS played
+         FROM games g
+         JOIN users u
+           ON u.id = CASE WHEN g.player1_id = @id THEN g.player2_id
+                          ELSE g.player1_id END
+        WHERE (g.player1_id = @id OR g.player2_id = @id)
+          AND g.status = 'finished'
+        GROUP BY u.id, u.username
+        ORDER BY played DESC, u.username ASC`,
+    )
+    .all({ id: userId }) as OpponentRecord[];
+}
+
+/**
  * Create a game against a bot, already past the join step.
  *
  * An ordinary game in every respect — same table, same rules, same validation.

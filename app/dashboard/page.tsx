@@ -13,6 +13,8 @@ import {
   listFriendRequests,
   listIncomingChallenges,
   listOutgoingChallenges,
+  openSeatCount,
+  MAX_OPEN_GAMES,
 } from "@/lib/db/queries";
 import FriendsPanel from "@/components/FriendsPanel";
 import { relativeTime, describeThinkTime, endingSuffix } from "@/lib/format";
@@ -53,6 +55,7 @@ export default async function DashboardPage() {
   ).length;
 
   const waiting = games.filter((g) => g.status === "open");
+  const seats = openSeatCount(user.id);
   const friends = listFriends(user.id).map((u) => ({ id: u.id, username: u.username }));
   const requests = listFriendRequests(user.id).map((u) => ({
     id: u.id,
@@ -154,7 +157,11 @@ export default async function DashboardPage() {
           <div className="panel">
             <h2>Account</h2>
             <p className="muted" style={{ margin: "0 0 14px", lineHeight: 1.6 }}>
-              Member since {relativeTime(user.created_at)}.
+              Member since {relativeTime(user.created_at)}. Tables in use:{" "}
+              <strong style={seats >= MAX_OPEN_GAMES ? { color: "var(--accent-amber)" } : undefined}>
+                {seats}/{MAX_OPEN_GAMES}
+              </strong>
+              .
             </p>
             <Link
               href={`/player/${encodeURIComponent(user.username)}`}

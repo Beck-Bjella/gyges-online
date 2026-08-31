@@ -13,7 +13,7 @@ import { relativeTime, endingSuffix } from "@/lib/format";
 import { currentUser } from "@/lib/auth";
 import RenameForm from "@/components/RenameForm";
 import SocialButtons from "@/components/SocialButtons";
-import { friendState } from "@/lib/db/queries";
+import { friendState, opponentRecords } from "@/lib/db/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -48,6 +48,7 @@ export default async function PlayerPage({
   // Games with an empty seat: public tables and challenges waiting on an
   // answer. Named by whoever the seat is held for, when it is held.
   const waiting = all.filter((g) => g.status === "open");
+  const opponents = opponentRecords(user.id);
 
   // The viewer's own record against this player. Only worth a panel when
   // there is one — most profiles a player looks at are strangers.
@@ -184,6 +185,41 @@ export default async function PlayerPage({
               );
             })}
           </ul>
+        </>
+      )}
+
+      {opponents.length > 0 && (
+        <>
+          <h2>Opponents</h2>
+          <div className="panel" style={{ marginBottom: 28 }}>
+            <table>
+              <thead>
+                <tr>
+                  <th>Opponent</th>
+                  <th style={{ textAlign: "right" }}>Won</th>
+                  <th style={{ textAlign: "right" }}>Lost</th>
+                  <th style={{ textAlign: "right" }}>Drawn</th>
+                  <th style={{ textAlign: "right" }}>Played</th>
+                </tr>
+              </thead>
+              <tbody>
+                {opponents.map((o) => (
+                  <tr key={o.id}>
+                    <td>
+                      <Link href={`/player/${encodeURIComponent(o.username)}`}>
+                        {o.username}
+                      </Link>
+                      {o.isBot ? <span className="muted"> · engine</span> : null}
+                    </td>
+                    <td className="num">{o.wins}</td>
+                    <td className="num">{o.losses}</td>
+                    <td className="num">{o.draws}</td>
+                    <td className="num">{o.played}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </>
       )}
 

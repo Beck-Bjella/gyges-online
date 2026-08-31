@@ -525,6 +525,23 @@ export default function GameView({
     }
   }, [game.id, router]);
 
+  /** Withdraw an open table before anyone joins. The game is deleted. */
+  const cancel = useCallback(async () => {
+    if (!confirm("Cancel this game? It will be removed.")) return;
+    setPending(true);
+    try {
+      const res = await fetch(`/api/games/${game.id}/cancel`, { method: "POST" });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        setError(body.error ?? "Could not cancel.");
+        return;
+      }
+      router.push("/games");
+    } finally {
+      setPending(false);
+    }
+  }, [game.id, router]);
+
   const resign = useCallback(async () => {
     if (!confirm("Resign this game?")) return;
     setPending(true);
@@ -752,6 +769,13 @@ export default function GameView({
             yourTurn={yourTurnOrPlacement}
             signedIn={signedIn}
           />
+          {game.status === "open" && viewerSide === 1 && (
+            <div className="row" style={{ marginTop: 14 }}>
+              <button className="btn btn-danger" onClick={cancel} disabled={pending}>
+                Cancel game
+              </button>
+            </div>
+          )}
           {game.status === "finished" && viewerSide !== null && signedIn && (
             <div className="row" style={{ marginTop: 14 }}>
               <button className="btn btn-primary" onClick={playAgain} disabled={pending}>
