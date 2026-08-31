@@ -625,6 +625,21 @@ input::placeholder {
   position: relative;
   left: 50%;
   transform: translateX(-50%);
+  grid-template-columns: 280px minmax(0, 1fr) 296px;
+}
+
+/* Without a chat column — spectators, bot games — the board takes its space. */
+.game-grid.no-chat {
+  grid-template-columns: minmax(0, 1fr) 296px;
+}
+
+@media (max-width: 1150px) {
+  .game-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .game-grid .chat-rail {
+    order: 9;
+  }
 }
 
 @media (max-width: 900px) {
@@ -877,6 +892,93 @@ td.num {
 .list-item a:not(.stretch-link) {
   position: relative;
   z-index: 1;
+}
+
+/* --- chat ---------------------------------------------------------------- */
+
+.chat-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/*
+ * The message list owns the scrolling. A fixed cap keeps the panel the size
+ * of a sidebar rather than growing with the conversation; inside it, column
+ * layout with the input pinned below.
+ */
+.chat-messages {
+  flex: 1;
+  min-height: 120px;
+  max-height: 420px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding-right: 4px;
+}
+
+.chat-msg {
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.chat-name a {
+  font-weight: 600;
+}
+
+.chat-time {
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+.chat-body {
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.chat-compose {
+  display: flex;
+  gap: 8px;
+}
+
+.chat-input {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg-deepest);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  color: var(--text-primary);
+  padding: 8px 10px;
+  font-size: 13px;
+}
+
+.chat-input:focus {
+  outline: none;
+  border-color: var(--border-strong);
+}
+
+/*
+ * Three columns when there is room: chat, the main content, the rail. The
+ * chat collapses under everything on narrow screens — order 9 in the
+ * single-column flow — because the board or the list is why anyone came.
+ */
+.grid-chat {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr) 296px;
+  gap: 26px;
+  align-items: start;
+}
+
+@media (max-width: 1150px) {
+  .grid-chat {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .grid-chat .chat-rail {
+    order: 9;
+  }
 }
 
 /* --- placing pieces before play ----------------------------------------- */

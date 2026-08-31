@@ -30,6 +30,8 @@ const {
   offerTakeback,
   answerTakeback,
   createBot,
+  postChatMessage,
+  listChatMessages,
   createBotGame,
   createChallenge,
   friendState,
@@ -867,4 +869,38 @@ test("the game cap never applies to a bot's own seat", () => {
     const g = createBotGame(human.id, bot.id);
     assert.equal(g.status, "setup");
   }
+});
+
+test("a game's chat belongs to its players, the lobby to everyone", () => {
+  const { a, b, gameId } = twoPlayerGame();
+  const stranger = createUser(uniqueName("nosy"));
+
+  postChatMessage(a.id, gameId, "good luck!");
+  postChatMessage(b.id, gameId, "you too");
+  assert.throws(() => postChatMessage(stranger.id, gameId, "hi"), /players/i);
+
+  const talk = listChatMessages(gameId);
+  assert.equal(talk.length, 2);
+  assert.equal(talk[0].body, "good luck!");
+  assert.equal(talk[0].username, a.username);
+
+  // The lobby is scope null, open to any account, and separate from the game.
+  postChatMessage(stranger.id, null, "anyone up for a game?");
+  assert.equal(listChatMessages(null).at(-1)!.body, "anyone up for a game?");
+  assert.equal(listChatMessages(gameId).length, 2);
+});
+
+test("chat refuses the empty, the enormous, and the rapid", () => {
+  const u = createUser(uniqueName("chatty"));
+  assert.throws(() => postChatMessage(u.id, null, "   "), /say something/i);
+  assert.throws(() => postChatMessage(u.id, null, "x".repeat(501)), /capped/i);
+  postChatMessage(u.id, null, "first");
+  assert.throws(() => postChatMessage(u.id, null, "second"), /one message a second/i);
+});
+
+test("the chat cursor returns only what is new", () => {
+  const { a, gameId } = twoPlayerGame();
+  const first = postChatMessage(a.id, gameId, "one");
+  const fresh = listChatMessages(gameId, first.id);
+  assert.equal(fresh.length, 0, "nothing after the latest");
 });

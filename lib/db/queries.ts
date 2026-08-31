@@ -738,6 +738,110 @@ export function listOutgoingChallenges(userId: string): GameWithPlayers[] {
     .all(userId) as GameWithPlayers[];
 }
 
+// --- chat ------------------------------------------------------------------
+
+export interface ChatMessage {
+  id: number;
+  game_id: string | null;
+  user_id: string;
+  username: string;
+  body: string;
+  created_at: number;
+}
+
+/** The longest message anyone may send. Matches the CHECK in the schema. */
+export const CHAT_MAX_LENGTH = 500;
+
+/**
+ * Post to a game's private chat, or to the lobby when gameId is null.
+ *
+ * A game's chat belongs to its two players and nobody else — not spectators,
+ * who can already talk in the lobby. Any game state is fine, finished
+ * included: the conversation about a game outlives it.
+ *
+ * The flood rule is deliberately crude: one message a second per author per
+ * scope. It stops a stuck loop or a paste gone wrong without ever being felt
+ * by a person typing.
+ */
+export function postChatMessage(
+  userId: string,
+  gameId: string | null,
+  body: string,
+): ChatMessage {
+  return transaction(() => {
+    const db = getDb();
+    const text = body.trim();
+    if (text.length === 0) throw new GameError("Say something.");
+    if (text.length > CHAT_MAX_LENGTH) {
+      throw new GameError(`Messages are capped at ${CHAT_MAX_LENGTH} characters.`);
+    }
+
+    if (gameId !== null) {
+      const game = db.prepare("SELECT * FROM games WHERE id = ?").get(gameId) as
+        | Game
+        | undefined;
+      if (!game) throw new GameError("Game not found.", 404);
+      if (sideOf(game, userId) === null) {
+        throw new GameError("This chat belongs to the players.", 403);
+      }
+    }
+
+    const last = db
+      .prepare(
+        `SELECT created_at FROM chat_messages
+          WHERE user_id = ? AND game_id IS ?
+          ORDER BY id DESC LIMIT 1`,
+      )
+      .get(userId, gameId) as { created_at: number } | undefined;
+    if (last && nowMs() - last.created_at < 1000) {
+      throw new GameError("One message a second.", 429);
+    }
+
+    const at = nowMs();
+    const inserted = db
+      .prepare(
+        `INSERT INTO chat_messages (game_id, user_id, body, created_at)
+         VALUES (?, ?, ?, ?)`,
+      )
+      .run(gameId, userId, text, at);
+    return {
+      id: Number(inserted.lastInsertRowid),
+      game_id: gameId,
+      user_id: userId,
+      username: getUser(userId)?.username ?? "—",
+      body: text,
+      created_at: at,
+    };
+  });
+}
+
+/**
+ * Messages in a scope after a cursor, oldest first.
+ *
+ * `after = 0` is the initial load and returns only the most recent `limit`,
+ * so an old lobby does not arrive in its entirety; every later poll passes
+ * the last id it has and receives just what is new. Access is the caller's
+ * responsibility — the route knows who is asking, this function does not.
+ */
+export function listChatMessages(
+  gameId: string | null,
+  after = 0,
+  limit = 100,
+): ChatMessage[] {
+  const rows = getDb()
+    .prepare(
+      `SELECT c.id, c.game_id, c.user_id, c.body, c.created_at,
+              u.username
+         FROM chat_messages c
+         JOIN users u ON u.id = c.user_id
+        WHERE c.game_id IS ? AND c.id > ?
+        ORDER BY c.id DESC
+        LIMIT ?`,
+    )
+    .all(gameId, after, limit) as ChatMessage[];
+  return rows.reverse();
+}
+
 // --- friends ---------------------------------------------------------------
 
 export type FriendState = "none" | "sent" | "received" | "friends";

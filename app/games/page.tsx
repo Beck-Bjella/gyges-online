@@ -13,6 +13,7 @@ import { relativeTime, describeTimeControl, endingSuffix } from "@/lib/format";
 import NewGameForm from "@/components/NewGameForm";
 import NewBotGameForm from "@/components/NewBotGameForm";
 import AutoRefresh from "@/components/AutoRefresh";
+import ChatPanel from "@/components/ChatPanel";
 import JoinGameButton from "@/components/JoinGameButton";
 
 export const dynamic = "force-dynamic";
@@ -77,7 +78,10 @@ export default async function GamesPage() {
         </div>
       </header>
 
-      <div className="grid-2">
+      <div className="grid-chat">
+        <aside className="chat-rail">
+          <ChatPanel title="Lobby" canPost={user !== null} />
+        </aside>
         <section>
           <SectionHead
             title="Waiting for a player"

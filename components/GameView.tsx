@@ -16,6 +16,7 @@ import Board from "./Board";
 import SetupPanel from "./SetupPanel";
 import { useSetupSlots } from "./useSetupSlots";
 import { useBotTurn } from "./useBotTurn";
+import ChatPanel from "./ChatPanel";
 import { useAutoRefresh } from "./useAutoRefresh";
 import {
   applyMove,
@@ -165,6 +166,10 @@ export default function GameView({
   const shownBoard = exploreBoard ?? previewBoard ?? stagedBoard ?? displayBoard;
 
   const reviewing = viewingPly !== null && viewingPly !== game.ply;
+
+  // The table's private chat: the two players, nobody else. A bot game has
+  // nobody to talk to, and a spectator has the lobby.
+  const hasChat = game.botSide === null && viewerSide !== null && signedIn;
 
   const enterExplore = useCallback(() => {
     // Captured from the board on screen — including a reviewed position.
@@ -670,7 +675,17 @@ export default function GameView({
   });
 
   return (
-    <div className="grid-2 game-grid">
+    <div className={hasChat ? "grid-2 game-grid" : "grid-2 game-grid no-chat"}>
+      {hasChat && (
+        <aside className="chat-rail">
+          <ChatPanel
+            gameId={game.id}
+            title="Table talk"
+            canPost
+            postHint=""
+          />
+        </aside>
+      )}
       <div>
         <PlayerBar {...seat(topSide)} />
 
