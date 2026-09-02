@@ -95,37 +95,6 @@ export default async function PlayerPage({
         {isBot && viewer && <ChallengeEngineButton botId={user.id} />}
       </header>
 
-      {isBot && (
-        <div className="panel bot-panel">
-          <div className="section-head">
-            <h2>How this one plays</h2>
-          </div>
-          <div className="botdials">
-            <div className="botdial">
-              <span className="botdial-label">Strength</span>
-              <span className="botdial-value">{user.bot_strength}</span>
-              <span className="botdial-detail">
-                Higher looks further ahead and blunders less.
-              </span>
-            </div>
-            <div className="botdial">
-              <span className="botdial-label">Where it runs</span>
-              <span className="botdial-value">Your browser</span>
-              <span className="botdial-detail">
-                Nothing is sent to a server, and it will wait as long as you
-                do.
-              </span>
-            </div>
-          </div>
-          <p className="hint" style={{ marginTop: 12 }}>
-            It searches a fixed number of positions rather than for a fixed
-            time, so it plays the same move on a slow phone as on a desktop —
-            a weaker device waits longer, it does not face a weaker opponent.
-            {user.bot_engine_build ? ` Engine build ${user.bot_engine_build}.` : ""}
-          </p>
-        </div>
-      )}
-
       {/*
         Your own profile doubles as your account page. The public half is what
         everyone sees; this panel is the half only you get, and it is here
