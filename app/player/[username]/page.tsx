@@ -4,22 +4,19 @@ import {
   headToHead,
   playerStats,
   finishedGamesForUser,
-  listGamesForUser,
   sideOf,
   emailFor,
   openSeatCount,
   MAX_OPEN_GAMES,
   type Record_,
 } from "@/lib/db/queries";
-import { relativeTime, endingSuffix } from "@/lib/format";
+import { relativeTime } from "@/lib/format";
 import { currentUser } from "@/lib/auth";
 import RenameForm from "@/components/RenameForm";
 import EmailForm from "@/components/EmailForm";
 import ChangePasswordForm from "@/components/ChangePasswordForm";
 import SignOutButton from "@/components/SignOutButton";
 import SocialButtons from "@/components/SocialButtons";
-import MiniBoard from "@/components/MiniBoard";
-import { decodeBoard } from "@/lib/db/queries";
 import { friendState, opponentRecords } from "@/lib/db/queries";
 
 export const dynamic = "force-dynamic";
@@ -54,12 +51,9 @@ export default async function PlayerPage({
     );
   }
 
+  // Read for the streak below, not for a list — see the note before the
+  // opponents table.
   const finished = finishedGamesForUser(user.id);
-  const all = listGamesForUser(user.id);
-  const active = all.filter((g) => g.status === "active");
-  // Games with an empty seat: public tables and challenges waiting on an
-  // answer. Named by whoever the seat is held for, when it is held.
-  const waiting = all.filter((g) => g.status === "open");
   const opponents = opponentRecords(user.id);
   // Only meaningful on your own profile, where the account panel prints it.
   const seats = isMe ? openSeatCount(user.id) : 0;
@@ -178,62 +172,18 @@ export default async function PlayerPage({
         </div>
       )}
 
-      {waiting.length > 0 && (
-        <>
-          <SectionHead title="Waiting" count={waiting.length} accent="amber" />
-          <ul className="watch-grid" style={{ marginBottom: 28 }}>
-            {waiting.map((g) => (
-              <li key={g.id} className="game-card list-item waiting">
-                <Link
-                  className="stretch-link"
-                  href={`/game/${g.id}`}
-                  aria-label="Open game"
-                />
-                <MiniBoard board={decodeBoard(g.board)} lastMove={g.last_move} size={150} />
-                <div className="game-card-meta">
-                  <div>{g.invited_name ? `vs ${g.invited_name}` : "Open game"}</div>
-                  <span className="muted">
-                    {g.invited_name ? "challenge sent" : "anyone may join"} ·{" "}
-                    {relativeTime(g.created_at)}
-                  </span>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
-
-      {active.length > 0 && (
-        <>
-          <SectionHead title="In progress" count={active.length} accent="mint" />
-          <ul className="watch-grid" style={{ marginBottom: 28 }}>
-            {active.map((g) => {
-              const side = sideOf(g, user.id);
-              const opponent = side === 1 ? g.player2_name : g.player1_name;
-              return (
-                <li key={g.id} className="game-card list-item">
-                  <Link
-                    className="stretch-link"
-                    href={`/game/${g.id}`}
-                    aria-label="Open game"
-                  />
-                  <MiniBoard board={decodeBoard(g.board)} lastMove={g.last_move} size={150} />
-                  <div className="game-card-meta">
-                    <div>vs {opponent ?? "—"}</div>
-                    <span className="muted">
-                      move {g.ply} · {relativeTime(g.updated_at)}
-                    </span>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        </>
-      )}
-
+      {/*
+        No game lists here. A profile answers "how does this person play" —
+        their record, their form, who they have played. Which games are in
+        progress is a different question, and it is the dashboard's: yours are
+        there, waiting on you, and a list of someone else's games in progress
+        was never something anyone came here to read.
+      */}
       {opponents.length > 0 && (
         <>
-          <SectionHead title="Opponents" count={0} />
+          <div className="section-head">
+            <h2>Opponents</h2>
+          </div>
           <div className="panel" style={{ marginBottom: 28 }}>
             <table>
               <thead>
@@ -253,7 +203,7 @@ export default async function PlayerPage({
                       <Link href={`/player/${encodeURIComponent(o.username)}`}>
                         {o.username}
                       </Link>
-                      {o.isBot ? <span className="muted"> · engine</span> : null}
+                      {o.isBot ? <span className="muted"> · computer</span> : null}
                     </td>
                     <td className="num">{o.wins}</td>
                     <td className="num">{o.losses}</td>
@@ -270,73 +220,7 @@ export default async function PlayerPage({
         </>
       )}
 
-      <SectionHead title="Completed games" count={finished.length} />
-      {finished.length === 0 ? (
-        <p className="muted">No completed games yet.</p>
-      ) : (
-        <ul className="watch-grid">
-          {finished.map((g) => {
-            const side = sideOf(g, user.id);
-            const opponent = side === 1 ? g.player2_name : g.player1_name;
-            const outcome =
-              g.result === 0 ? "Draw" : g.result === side ? "Won" : "Lost";
-            return (
-              <li key={g.id} className="game-card list-item">
-                <Link
-                  className="stretch-link"
-                  href={`/game/${g.id}`}
-                  aria-label="Open game"
-                />
-                <MiniBoard board={decodeBoard(g.board)} lastMove={g.last_move} size={150} />
-                <div className="game-card-meta">
-                  <div>
-                    <span
-                      className="tag"
-                      style={
-                        outcome === "Won"
-                          ? {
-                              borderColor: "var(--accent-mint)",
-                              color: "var(--accent-mint)",
-                            }
-                          : undefined
-                      }
-                    >
-                      {outcome}
-                    </span>{" "}
-                    vs {opponent ?? "—"}
-                  </div>
-                  <span className="muted">
-                    {g.ply} moves{endingSuffix(g.result_reason, " · by ")} ·{" "}
-                    {relativeTime(g.updated_at)}
-                  </span>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      )}
     </>
-  );
-}
-
-/** The same section header the lobby uses: real size, count chip beside. */
-function SectionHead({
-  title,
-  count,
-  accent,
-}: {
-  title: string;
-  /** Omitted where a count would say nothing — a table of one thing. */
-  count?: number;
-  accent?: "mint" | "amber";
-}) {
-  return (
-    <div className="section-head">
-      <h2>{title}</h2>
-      {count !== undefined && count > 0 && (
-        <span className={accent ? `count count-${accent}` : "count"}>{count}</span>
-      )}
-    </div>
   );
 }
 

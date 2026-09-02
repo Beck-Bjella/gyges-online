@@ -1482,7 +1482,7 @@ export function offerTakeback(gameId: string, userId: string): GameWithPlayers {
     if (game.status !== "finished" || game.result_reason !== "goal") {
       throw new GameError("A takeback is offered from a game won at the goal.");
     }
-    if (botInGame(game)) throw new GameError("The engine takes no takebacks.");
+    if (botInGame(game)) throw new GameError("The computer takes no takebacks.");
     const side = sideOf(game, userId);
     if (side === null) throw new GameError("You are not a player in this game.", 403);
     if (side !== game.result) throw new GameError("Only the winner can offer.", 403);
@@ -1514,7 +1514,7 @@ export function offerDraw(gameId: string, userId: string): GameWithPlayers {
       | undefined;
     if (!game) throw new GameError("Game not found.", 404);
     if (game.status !== "active") throw new GameError("This game is not in play.");
-    if (botInGame(game)) throw new GameError("The engine does not agree draws.");
+    if (botInGame(game)) throw new GameError("The computer does not agree draws.");
     const side = sideOf(game, userId);
     if (side === null) throw new GameError("You are not a player in this game.", 403);
     if (game.draw_offered_by === side) {

@@ -501,7 +501,7 @@ export default function GameView({
     history[history.length - 2].player === viewerSide;
 
   const giveBack = useCallback(async () => {
-    if (!confirm("Take back your last move and the engine's reply?")) return;
+    if (!confirm("Take back your last move and the computer's reply?")) return;
     setPending(true);
     try {
       const res = await fetch(`/api/games/${game.id}/undo`, { method: "POST" });
@@ -922,14 +922,14 @@ export default function GameView({
 
           {(bot.thinking || bot.error) && (
             <div className="panel">
-              <h2>{bot.botName ?? game.botName ?? "The engine"}</h2>
+              <h2>{bot.botName ?? game.botName ?? "The computer"}</h2>
               {bot.thinking ? (
                 <>
                   <p className="muted" style={{ margin: 0, lineHeight: 1.6 }}>
                     Thinking… <strong>{bot.elapsed.toFixed(1)}s</strong>
                   </p>
                   <p className="hint" style={{ marginTop: 8 }}>
-                    The engine is running in this tab. Leaving now discards the
+                    The computer is thinking in this tab. Leaving now discards the
                     search — it starts again from the beginning next time, so the
                     move you get is the same either way.
                   </p>
@@ -1159,7 +1159,7 @@ export default function GameView({
             <h2>Table talk</h2>
             <p className="muted" style={{ margin: 0 }}>
               {game.botSide !== null
-                ? "The engine does not chat. It is thinking about other things."
+                ? "The computer does not chat. It is thinking about other things."
                 : signedIn
                   ? "The table talk is private to the players."
                   : "The table talk is private to the players. Sign in to chat in your own games."}

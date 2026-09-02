@@ -62,7 +62,7 @@ export default async function GamesPage() {
         </aside>
         <section>
           {/* Two tabs: starting a game, and looking at games. Finding an
-              opponent — human or engine — is one activity; spectating is
+              opponent — a person or the computer — is one activity; spectating is
               another; mixing them made the page a scroll of everything. */}
           <Tabs
             tabs={[
@@ -88,11 +88,11 @@ export default async function GamesPage() {
             </div>
           )}
 
-          <SectionHead title="Play the engine" />
+          <SectionHead title="Play the computer" />
           <p className="muted" style={{ margin: "0 0 12px", lineHeight: 1.6 }}>
             Each strength is its own account and plays by the same rules as
-            anyone else. The game runs in your browser, and the engine waits as
-            long as you do.
+            anyone else. The game runs in your browser, and the computer waits
+            as long as you do.
           </p>
           <div className="panel">
             <table>

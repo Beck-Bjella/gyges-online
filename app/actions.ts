@@ -126,13 +126,16 @@ export async function createGameAction(
     return { error: "Invalid time control." };
   }
 
-  let id: string;
   try {
-    id = createGame(user.id, seconds).id;
+    createGame(user.id, seconds);
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Could not create the game." };
   }
-  redirect(`/game/${id}`);
+  // To the dashboard, not into the game. There is nothing to do in an empty
+  // game but wait, and being dropped into one reads as though something went
+  // wrong. The dashboard shows it waiting, next to everything else of yours.
+  revalidatePath("/games");
+  redirect("/dashboard");
 }
 
 /**
@@ -243,13 +246,14 @@ export async function challengeAction(
   if (!user) return { error: "Sign in first." };
 
   const otherId = String(formData.get("user_id") ?? "");
-  let id: string;
   try {
-    id = createChallenge(user.id, otherId).id;
+    createChallenge(user.id, otherId);
   } catch (err) {
     if (err instanceof GameError) return { error: err.message };
     return { error: "Could not send that challenge." };
   }
-  redirect(`/game/${id}`);
+  // Same reasoning as hosting: a challenge is sent, not entered. It waits
+  // under Challenges on the dashboard until they answer.
+  redirect("/dashboard");
 }
 
