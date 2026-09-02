@@ -418,33 +418,89 @@ h2 {
 }
 
 /*
- * Rules diagrams: a board and the sentence it is making, as many across as
- * fit. The caption is the point — the board is there because three of these
- * rules are much easier to see than to read.
+ * The rules, one per row, each beside the picture of itself. The page is wide
+ * and the rules are short, so a single reading column left two thirds of the
+ * screen empty while the diagrams sat three paragraphs from the sentences they
+ * illustrate. Paired, the width is what carries the explanation.
  */
-.figures {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-  gap: clamp(14px, 2vw, 22px);
-  margin: 24px 0 6px;
+.rules {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(14px, 1.8vw, 22px);
+  margin-bottom: clamp(14px, 1.8vw, 22px);
 }
-.figures figure {
+
+.rule {
+  display: grid;
+  /* The text takes a readable measure and no more; the boards take what they
+     need. Prose that runs the full width of a wide monitor is unreadable, so
+     spanning the page cannot mean stretching the sentences. */
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: clamp(20px, 3vw, 44px);
+  align-items: center;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  padding: clamp(18px, 2vw, 28px);
+  box-shadow: var(--shadow);
+}
+
+.rule-text {
+  max-width: 62ch;
+}
+.rule-text h2 {
+  font-size: 17px;
+  color: var(--text-primary);
+  letter-spacing: 0.045em;
+  margin-bottom: 10px;
+}
+.rule-text p {
+  margin: 0 0 10px;
+  line-height: 1.65;
+}
+.rule-text p:last-child {
+  margin-bottom: 0;
+}
+.rule-text .muted {
+  line-height: 1.6;
+}
+
+.rule-figures {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.rule-figures figure {
   margin: 0;
-  padding: 14px;
+  width: 176px;
+  padding: 12px;
   background: var(--bg-darkest);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius);
   text-align: center;
 }
-.figures figcaption {
-  margin-top: 10px;
-  font-size: 13px;
-  line-height: 1.55;
+
+.rule-figures figcaption {
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.5;
   color: var(--text-dim);
   text-align: left;
 }
-.figures figcaption strong {
-  color: var(--text-secondary);
+
+/* Stacked, the boards go first: on a phone the picture is the fastest way in,
+   and a rule read before its diagram has to be read twice. */
+@media (max-width: 860px) {
+  .rule {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+  }
+  .rule-figures {
+    order: -1;
+    justify-content: flex-start;
+  }
 }
 
 .lede {

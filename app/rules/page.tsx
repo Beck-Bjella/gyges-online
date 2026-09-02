@@ -7,9 +7,9 @@ export const metadata = { title: "Rules · Gygès" };
  * A position built by naming the squares that hold pieces.
  *
  * Squares run from the near player's left along their home row and upward:
- * 0–5 is the nearest row, 6–11 the one above it. Every diagram below is drawn
- * from the near player's side, the way the board faces whoever is looking at
- * it.
+ * 0–5 is the nearest row, 6–11 the one above it, 37 the far goal. Every
+ * diagram is drawn from the near player's side, the way the board faces
+ * whoever is looking at it.
  */
 function position(pieces: Record<number, number>): BoardState {
   const board = emptyBoard();
@@ -19,6 +19,43 @@ function position(pieces: Record<number, number>): BoardState {
   return board;
 }
 
+/**
+ * One rule: what it says, and what it looks like.
+ *
+ * Paired rather than stacked, because the whole reason the diagrams are here
+ * is that three of these four rules are much easier to see than to read — and
+ * a diagram three paragraphs below its sentence is a diagram you have to hold
+ * two things in your head to use.
+ */
+function Rule({
+  title,
+  children,
+  figures,
+}: {
+  title: string;
+  children: React.ReactNode;
+  figures: React.ReactNode;
+}) {
+  return (
+    <article className="rule">
+      <div className="rule-text">
+        <h2>{title}</h2>
+        {children}
+      </div>
+      <div className="rule-figures">{figures}</div>
+    </article>
+  );
+}
+
+function Figure({ caption, children }: { caption: string; children: React.ReactNode }) {
+  return (
+    <figure>
+      {children}
+      <figcaption>{caption}</figcaption>
+    </figure>
+  );
+}
+
 export default function RulesPage() {
   return (
     <>
@@ -26,111 +63,138 @@ export default function RulesPage() {
         <div>
           <h1>Rules of Gygès</h1>
           <p className="lede" style={{ marginBottom: 0 }}>
-            Gygès is an abstract game for two players. Nobody owns the pieces —
-            you may only move a piece in the row nearest to you.
+            An abstract game for two players. Nobody owns the pieces — you may
+            only move a piece in the row nearest to you, whoever put it there.
           </p>
         </div>
       </header>
 
-      <div className="panel prose">
-        <h2>Object</h2>
-        <p>
-          Move a piece into your opponent&apos;s goal, the space beyond their
-          back row.
-        </p>
+      <div className="rules">
+        <Rule
+          title="The object"
+          figures={
+            <Figure caption="A piece arrives in the far goal. That ends it.">
+              <MiniBoard
+                board={position({ 37: 1, 26: 2, 15: 3, 9: 1 })}
+                lastMove="32|37"
+                size={150}
+              />
+            </Figure>
+          }
+        >
+          <p>
+            Move a piece into your opponent&apos;s goal — the single space
+            beyond their back row. The first player to do it wins, and that is
+            the only way to win at the board.
+          </p>
+          <p className="muted">
+            There is no capturing in Gygès, and no material to count. Every
+            piece stays on the board all game.
+          </p>
+        </Rule>
 
-        <h2>Moving</h2>
-        <ul>
-          <li>
-            You may move any piece in your <strong>active line</strong> — the row
-            nearest you that still contains pieces.
-          </li>
-          <li>
+        <Rule
+          title="Your active line"
+          figures={
+            <Figure caption="Only the two marked pieces may move — the nearest row that still has any.">
+              <MiniBoard
+                board={position({ 1: 1, 3: 2, 8: 3, 10: 1 })}
+                mark={[1, 3]}
+                size={150}
+              />
+            </Figure>
+          }
+        >
+          <p>
+            You may move any piece in your <strong>active line</strong>: the row
+            nearest you that still contains pieces. Not your pieces —{" "}
+            <em>the</em> pieces. Nobody owns them, so the same piece may be
+            moved by you this turn and by your opponent later.
+          </p>
+          <p className="muted">
+            Empty your nearest row and the line falls back to the next one,
+            which changes what you may touch — and what they may.
+          </p>
+        </Rule>
+
+        <Rule
+          title="Rings are distance"
+          figures={
+            <Figure caption="Two rings travels exactly two spaces.">
+              <MiniBoard board={position({ 14: 2 })} lastMove="14|26" size={150} />
+            </Figure>
+          }
+        >
+          <p>
             A piece moves <strong>exactly</strong> as many spaces as it has
-            rings: one, two, or three. Movement is orthogonal, and a move may not
-            revisit a space.
-          </li>
-          <li>
-            If a piece lands on another piece part-way, it continues using{" "}
-            <strong>that</strong> piece&apos;s ring count instead. This can chain
-            several times.
-          </li>
-          <li>
-            If a piece finishes its movement on an occupied space, it may
-            instead <strong>displace</strong> that piece to any empty space on
-            the board.
-          </li>
-        </ul>
+            rings — one, two or three. Not up to that many: exactly that many.
+          </p>
+          <p className="muted">
+            Movement is orthogonal, it may turn corners, and it may never
+            revisit a space it has already crossed during the same move.
+          </p>
+        </Rule>
 
-        {/*
-          Those four sentences are the whole game, and three of them are hard
-          to hold from words — particularly the chain, where a piece finishes
-          its move under a ring count that was never its own. You are the near
-          player in every diagram.
-        */}
-        <div className="figures">
-          <figure>
-            <MiniBoard
-              board={position({ 1: 1, 3: 2, 8: 3, 10: 1 })}
-              mark={[1, 3]}
-              size={148}
-            />
-            <figcaption>
-              <strong>The active line.</strong> The nearest row still holding
-              pieces is the only one you may move from — the two marked here.
-              The pieces behind them are not yours to move yet.
-            </figcaption>
-          </figure>
+        <Rule
+          title="Landing on a piece"
+          figures={
+            <>
+              <Figure caption="The single ring moves its one space, and finds a two-ring piece there.">
+                <MiniBoard
+                  board={position({ 13: 1, 19: 2 })}
+                  lastMove="13|19"
+                  size={150}
+                />
+              </Figure>
+              <Figure caption="So it carries on with that piece's count — two more spaces.">
+                <MiniBoard
+                  board={position({ 19: 2, 13: 1 })}
+                  lastMove="19|31"
+                  size={150}
+                />
+              </Figure>
+            </>
+          }
+        >
+          <p>
+            If a piece lands on another piece part-way through its move, it
+            continues using <strong>that</strong> piece&apos;s ring count
+            instead of its own. This can chain several times in one move.
+          </p>
+          <p className="muted">
+            It is the rule that makes the game: a one-ring piece can cross the
+            whole board if the pieces in its way are generous, and the position
+            you leave behind decides what your opponent can reach.
+          </p>
+        </Rule>
 
-          <figure>
-            <MiniBoard board={position({ 14: 2 })} lastMove="14|26" size={148} />
-            <figcaption>
-              <strong>Rings are distance.</strong> Two rings travels exactly two
-              spaces — never one, never three. Orthogonally, and never back over
-              its own path.
-            </figcaption>
-          </figure>
+        <Rule
+          title="Displacement"
+          figures={
+            <Figure caption="Finishing on an occupied space: the occupant goes anywhere empty — the dashed leg.">
+              <MiniBoard
+                board={position({ 8: 2, 20: 1 })}
+                lastMove="8|20|33"
+                size={150}
+              />
+            </Figure>
+          }
+        >
+          <p>
+            If a piece <em>finishes</em> its movement on an occupied space, it
+            may instead <strong>displace</strong> the piece standing there,
+            sending it to any empty space on the board.
+          </p>
+          <p className="muted">
+            Anywhere at all — which makes it a way of rearranging your
+            opponent&apos;s half of the board as much as your own. Keeping a
+            three-ring piece away from their active line is often worth more
+            than advancing.
+          </p>
+        </Rule>
+      </div>
 
-          <figure>
-            <MiniBoard
-              board={position({ 13: 1, 19: 2 })}
-              lastMove="13|19"
-              size={148}
-            />
-            <figcaption>
-              <strong>Landing on a piece, 1 of 2.</strong> The single ring moves
-              its one space, and finds the two-ring piece standing there.
-            </figcaption>
-          </figure>
-
-          <figure>
-            <MiniBoard
-              board={position({ 19: 2, 13: 1 })}
-              lastMove="19|31"
-              size={148}
-            />
-            <figcaption>
-              <strong>Landing on a piece, 2 of 2.</strong> It carries on with{" "}
-              <em>that</em> piece&apos;s count — two more spaces — and chains
-              again if it lands on another.
-            </figcaption>
-          </figure>
-
-          <figure>
-            <MiniBoard
-              board={position({ 8: 2, 20: 1 })}
-              lastMove="8|20|33"
-              size={148}
-            />
-            <figcaption>
-              <strong>Displacement.</strong> A piece that <em>finishes</em> on an
-              occupied space may send the occupant to any empty space on the
-              board — the dashed leg. A way to move your opponent&apos;s
-              position as well as your own.
-            </figcaption>
-          </figure>
-        </div>
-
+      <div className="panel prose" style={{ marginTop: 8 }}>
         <h2>On this site</h2>
         <p>
           The rules above are <strong>enforced</strong>. The server checks every
@@ -141,6 +205,11 @@ export default function RulesPage() {
           While you drag a piece, the squares it can legally reach are marked.
           That is a convenience; the server checks the move again when you let
           go, and it is the server that decides.
+        </p>
+        <p>
+          Every game begins from an empty board: each player arranges their own
+          back row before play starts, so the first decision of the game is the
+          shape of your own line.
         </p>
       </div>
     </>
