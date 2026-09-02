@@ -1,0 +1,13 @@
+# Template. setup.sh substitutes @DOMAIN@ and @PORT@ and installs the result to
+# /etc/caddy/Caddyfile.
+#
+# This is the whole of the TLS setup. Caddy obtains a certificate from Let's
+# Encrypt on first start and renews it forever after, provided the domain's A
+# record already points at this machine and ports 80 and 443 are open in the
+# Lightsail networking tab. Port 80 carries no traffic of its own — it answers
+# the certificate challenge, and Caddy redirects it to 443.
+
+@DOMAIN@, www.@DOMAIN@ {
+	encode zstd gzip
+	reverse_proxy localhost:@PORT@
+}

@@ -1,0 +1,36 @@
+# Template. setup.sh substitutes the @PLACEHOLDERS@ and installs the result to
+# /etc/systemd/system/gyges.service — edit it there, or edit here and re-run
+# setup.sh.
+
+[Unit]
+Description=Gyges Online
+# The database is a local file, so nothing is waited on but the filesystem.
+After=network.target
+
+[Service]
+Type=simple
+User=@APP_USER@
+WorkingDirectory=@APP_DIR@
+Environment=NODE_ENV=production
+Environment=PORT=@PORT@
+# Outside the working tree: a deploy replaces the tree, and must never be able
+# to take the database with it.
+Environment=GYGES_DB_PATH=@DATA_DIR@/gyges.db
+Environment=GYGES_BACKUP_DIR=@DATA_DIR@/backups
+# NOT set: GYGES_INSECURE_COOKIES. It exists for LAN testing over plain http,
+# and setting it here would stop session cookies being Secure.
+ExecStart=/usr/bin/npm start
+
+# Come back from a crash, and from an OOM kill, without anyone watching.
+Restart=always
+RestartSec=3
+
+# It needs its own directory and the data directory. Nothing else.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=read-only
+ReadWritePaths=@APP_DIR@ @DATA_DIR@
+
+[Install]
+WantedBy=multi-user.target

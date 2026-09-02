@@ -5,9 +5,12 @@
  * to run while the server is using the database, unlike copying the file by
  * hand (which can catch it mid-write).
  *
- * In production this is not the mechanism. Neon keeps continuous point-in-time
- * backups of its own, and a portable copy comes from `pg_dump`. This script is
- * for local development, and for the habit.
+ * This IS the production mechanism, not just a local habit: the site runs on
+ * one machine with the database on its disk, so a backup is a consistent copy
+ * of that file. deploy/backup.sh runs this from cron and sends the result to
+ * S3 — a copy on the same disk is not a backup.
+ *
+ * GYGES_DB_PATH chooses the database, GYGES_BACKUP_DIR where copies land.
  */
 
 import Database from "better-sqlite3";
@@ -16,7 +19,8 @@ import { join, dirname } from "node:path";
 
 const DB_PATH =
   process.env.GYGES_DB_PATH ?? join(process.cwd(), ".data", "gyges.db");
-const BACKUP_DIR = join(process.cwd(), ".data", "backups");
+const BACKUP_DIR =
+  process.env.GYGES_BACKUP_DIR ?? join(process.cwd(), ".data", "backups");
 
 if (!existsSync(DB_PATH)) {
   console.error(`No database at ${DB_PATH}. Nothing to back up.`);
