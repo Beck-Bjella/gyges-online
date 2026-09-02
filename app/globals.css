@@ -217,12 +217,18 @@ input {
   color: var(--accent-mint);
 }
 
+/*
+ * The page shell. Widths and paddings breathe with the viewport via clamp():
+ * a phone gets the compact end, a desktop the generous one, and the media
+ * queries below never have to re-state them. The reading cap rises with it —
+ * 1120px read as cramped once the panels grew this much interior air.
+ */
 main {
   flex: 1;
   width: 100%;
-  max-width: 1120px;
+  max-width: 1280px;
   margin: 0 auto;
-  padding: 34px 24px 72px;
+  padding: clamp(26px, 3.5vh, 48px) clamp(18px, 3vw, 40px) 72px;
 }
 
 .site-foot {
@@ -239,7 +245,7 @@ main {
 /* --- headings ----------------------------------------------------------- */
 
 h1 {
-  font-size: 27px;
+  font-size: clamp(26px, 2.2vw, 32px);
   font-weight: 660;
   letter-spacing: -0.02em;
   margin: 0 0 6px;
@@ -260,14 +266,14 @@ h2 {
   justify-content: space-between;
   gap: 20px;
   flex-wrap: wrap;
-  margin-bottom: 28px;
+  margin-bottom: clamp(26px, 3.2vh, 40px);
 }
 
 .section-head {
   display: flex;
   align-items: center;
   gap: 9px;
-  margin-bottom: 12px;
+  margin-bottom: clamp(12px, 1.4vh, 18px);
 }
 
 .count {
@@ -315,7 +321,7 @@ h2 {
   background: var(--bg-panel);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius);
-  padding: 18px;
+  padding: clamp(16px, 1.6vw, 24px);
   box-shadow: var(--shadow);
 }
 .panel h2 {
@@ -325,7 +331,7 @@ h2 {
 .rail {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: clamp(16px, 1.8vw, 24px);
 }
 
 .btn {
@@ -466,7 +472,7 @@ input::placeholder {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: clamp(7px, 0.8vw, 10px);
 }
 
 .list-item {
@@ -476,7 +482,7 @@ input::placeholder {
   background: var(--bg-panel);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius);
-  padding: 11px 14px;
+  padding: clamp(11px, 1.1vw, 15px) clamp(14px, 1.4vw, 18px);
   transition: border-color 120ms ease, background 120ms ease;
 }
 .list-item:hover {
@@ -555,8 +561,8 @@ input::placeholder {
 
 .statcards {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+  gap: clamp(10px, 1.2vw, 16px);
 }
 
 .statcard {
@@ -659,8 +665,8 @@ input::placeholder {
 
 .grid-2 {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 296px;
-  gap: 26px;
+  grid-template-columns: minmax(0, 1fr) minmax(296px, 330px);
+  gap: clamp(26px, 3vw, 44px);
   align-items: start;
 }
 
@@ -1066,8 +1072,8 @@ td.num {
  */
 .grid-chat {
   display: grid;
-  grid-template-columns: 320px minmax(0, 1fr) 296px;
-  gap: 26px;
+  grid-template-columns: 320px minmax(0, 1fr) minmax(296px, 330px);
+  gap: clamp(26px, 3vw, 44px);
   align-items: start;
 }
 
