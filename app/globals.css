@@ -1396,6 +1396,70 @@ td.num {
 }
 
 /*
+ * The three ways to start a game, side by side. Equal columns because they are
+ * equal choices — the page should not decide for you which one you came for —
+ * and each card is a column of its own so the buttons line up along the bottom
+ * however much the copy above them differs.
+ */
+.start-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: clamp(12px, 1.4vw, 18px);
+  margin-bottom: clamp(26px, 3vh, 38px);
+}
+
+.start-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.start-card h2 {
+  margin-bottom: 0;
+}
+.start-card > .muted {
+  margin: 0;
+  line-height: 1.55;
+}
+/* Pushes the button to the bottom of a card with less to say than its
+   neighbours, so the row of buttons reads as one row. */
+.start-spacer {
+  flex: 1;
+}
+.start-card .btn {
+  align-self: flex-start;
+  margin-top: auto;
+}
+
+.start-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 12.5px;
+  font-weight: 560;
+  color: var(--text-dim);
+  letter-spacing: 0.01em;
+}
+.start-field select {
+  width: 100%;
+}
+
+/* Rated is the default, so the box is the exception and reads as one. */
+.start-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.start-check input {
+  accent-color: var(--accent-mint);
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+}
+
+/*
  * The hosting panel reads left to right: what hosting means, then the two
  * controls that do it. On narrow screens the halves stack instead.
  */

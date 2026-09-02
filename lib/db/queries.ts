@@ -119,6 +119,13 @@ export interface Game {
   /** The side offering a draw, while one is on offer. Null otherwise. */
   draw_offered_by: Player | null;
   /**
+   * Whether this game counts towards ratings. 1 by default.
+   *
+   * A rated game also refuses takebacks against the engine — see undoTurn.
+   * That is the point of the flag: somewhere to experiment that costs nothing.
+   */
+  rated: number;
+  /**
    * How many times this game has been rewound.
    *
    * Against the engine a player may take a move back whenever they like, and
@@ -502,7 +509,7 @@ const GAME_COLUMNS = `
   g.id, g.player1_id, g.player2_id, g.status, g.turn, g.result, g.result_reason,
   g.start_board, g.board, g.ply, g.move_seconds, g.deadline_at,
   g.created_at, g.started_at, g.finished_at, g.updated_at, g.invited_id,
-  g.takeback_offered, g.draw_offered_by, g.takebacks_used,
+  g.takeback_offered, g.draw_offered_by, g.takebacks_used, g.rated,
   p1.username AS player1_name, p2.username AS player2_name,
   inv.username AS invited_name,
   (SELECT m.move FROM moves m
@@ -553,6 +560,7 @@ export function createGame(
   creatorId: string,
   moveSeconds = 259200,
   from: BoardState = emptyBoard(),
+  rated = true,
 ): Game {
   assertRoomForGame(creatorId);
 
@@ -580,14 +588,15 @@ export function createGame(
     takeback_offered: 0,
     draw_offered_by: null,
     takebacks_used: 0,
+    rated: rated ? 1 : 0,
   };
 
   getDb()
     .prepare(
       `INSERT INTO games
          (id, player1_id, player2_id, status, turn, start_board, board, ply,
-          move_seconds, created_at, updated_at)
-       VALUES (?, ?, NULL, 'open', 1, ?, ?, 0, ?, ?, ?)`,
+          move_seconds, created_at, updated_at, rated)
+       VALUES (?, ?, NULL, 'open', 1, ?, ?, 0, ?, ?, ?, ?)`,
     )
     .run(
       game.id,
@@ -597,6 +606,7 @@ export function createGame(
       moveSeconds,
       game.created_at,
       game.updated_at,
+      game.rated,
     );
 
   return game;
@@ -802,6 +812,7 @@ export function createChallenge(
   creatorId: string,
   invitedId: string,
   moveSeconds = 259200,
+  rated = true,
 ): Game {
   return transaction(() => {
     const other = getUser(invitedId);
@@ -1180,6 +1191,7 @@ export function createBotGame(
   userId: string,
   botId: string,
   moveSeconds = 259200,
+  rated = true,
 ): Game {
   return transaction(() => {
     const bot = getUser(botId);
@@ -1189,7 +1201,7 @@ export function createBotGame(
     if (bot.deleted_at) throw new GameError("That bot is retired.", 410);
     if (bot.id === userId) throw new GameError("You cannot play yourself.");
 
-    const game = createGame(userId, moveSeconds);
+    const game = createGame(userId, moveSeconds, emptyBoard(), rated);
     return joinGame(game.id, botId);
   });
 }
@@ -1495,6 +1507,14 @@ export function undoTurn(gameId: string, userId: string): GameWithPlayers {
     const bot = botInGame(game);
     if (bot === null) {
       throw new GameError("Against a person, takebacks are offered — from the winner, when the game ends.", 409);
+    }
+    // A rule you can see before you break it, rather than a game quietly
+    // disqualified from the ladder afterwards.
+    if (game.rated) {
+      throw new GameError(
+        "This game is rated, so moves stand. Start a casual game to experiment.",
+        409,
+      );
     }
     const removed = 2;
 
@@ -2042,9 +2062,11 @@ export interface EngineGameRow {
  *
  * Two exclusions, and both matter:
  *
- * - **Rewound games.** Against the engine a player may take back a move as
- *   often as they like, so a game played with takebacks says nothing about
- *   who would have won — undo until you win and every game is a win.
+ * - **Casual games**, which is what the flag is for: somewhere to try things
+ *   without the ladder watching.
+ * - **Rewound games.** A rated game refuses takebacks now, so this only
+ *   catches games played before that rule existed — but it catches them, and
+ *   a game undone until it was won says nothing about who would have won.
  * - **Games against a retired bot**, filtered by the caller: an anchor it no
  *   longer has is an anchor nobody can rate against.
  *
@@ -2072,6 +2094,7 @@ export function engineGamesForLadder(): EngineGameRow[] {
       WHERE g.status = 'finished'
         AND g.result IS NOT NULL
         AND g.result <> 0
+        AND g.rated = 1
         AND g.takebacks_used = 0
       ORDER BY g.finished_at ASC, g.id ASC`,
     )

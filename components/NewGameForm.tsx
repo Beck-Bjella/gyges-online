@@ -6,37 +6,43 @@ import { createGameAction, type ActionState } from "@/app/actions";
 const initial: ActionState = {};
 
 /**
- * Hosting, spelled out: what a table is, where it appears, when it starts.
- * This sits at the top of the Play tab, so it carries the explanation for
- * the whole flow — the sections below it are what it creates.
+ * Host a table and wait for whoever turns up.
+ *
+ * One of the three ways to start a game, and the only one that does not begin
+ * immediately — which is the thing the copy has to convey, since a table that
+ * sits there looking like nothing happened is the most confusing outcome on
+ * this page.
  */
 export default function NewGameForm() {
   const [state, formAction, pending] = useActionState(createGameAction, initial);
 
   return (
-    <form action={formAction} className="panel host-panel">
-      <div className="host-copy">
-        <h2>Host an open game</h2>
-        <p className="muted">
-          Puts a table up for anyone signed in to join. It waits in the list
-          below, and the game starts the moment someone sits down — the pace
-          you pick is how long each move may take, not a clock you must watch.
-        </p>
-      </div>
-      <div className="host-controls">
-        <label className="muted" htmlFor="host-pace">
-          Pace
-        </label>
-        <select id="host-pace" name="move_seconds" defaultValue="259200">
+    <form action={formAction} className="panel start-card">
+      <h2>Host a table</h2>
+      <p className="muted">
+        Waits in the list below until someone sits down.
+      </p>
+
+      <label className="start-field">
+        <span>Pace</span>
+        <select name="move_seconds" defaultValue="259200">
+          <option value="43200">12 hours per move</option>
           <option value="86400">1 day per move</option>
           <option value="259200">3 days per move</option>
           <option value="604800">7 days per move</option>
-          <option value="300">5 minutes per move (testing)</option>
+          <option value="1209600">14 days per move</option>
+          <option value="300">5 minutes per move</option>
         </select>
-        <button type="submit" className="btn btn-primary" disabled={pending}>
-          {pending ? "…" : "Host game"}
-        </button>
-      </div>
+      </label>
+
+      <label className="start-check">
+        <input type="checkbox" name="casual" />
+        <span>Casual — does not count</span>
+      </label>
+
+      <button type="submit" className="btn btn-primary" disabled={pending}>
+        {pending ? "…" : "Host table"}
+      </button>
       {state.error && <p className="error">{state.error}</p>}
     </form>
   );

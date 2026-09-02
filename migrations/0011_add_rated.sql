@@ -1,0 +1,22 @@
+-- 0011_add_rated — a game either counts or it does not, and you choose.
+--
+-- The engine ladder made this necessary rather than merely nice. Every game
+-- against a bot counted, so there was nowhere to experiment: trying an idea
+-- out, or handing the keyboard to someone, cost rating. A player who wants to
+-- practise should not have to weigh that.
+--
+-- Rated by default, because the interesting question is "how do you actually
+-- do", and a default of casual would make the ladder a record of the games
+-- people remembered to opt into.
+--
+-- It also replaces a subtler safeguard. Against the engine a player may take
+-- a move back whenever they like, and undoTurn deletes the rows — so a rated
+-- game had to be identified after the fact by counting rewinds (0010). Now a
+-- rated game simply refuses the takeback, which is a rule you can see before
+-- you break it rather than a penalty applied afterwards. The rewind count
+-- stays as the belt to that pair of braces: games from before this migration
+-- were rewindable and are marked rated, and the count is the only thing that
+-- can still tell which of those were played straight through.
+--
+-- Existing games are rated, which is what they were when they were played.
+ALTER TABLE games ADD COLUMN rated INTEGER NOT NULL DEFAULT 1;

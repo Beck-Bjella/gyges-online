@@ -11,8 +11,9 @@ import {
 import { relativeTime, describeTimeControl, endingSuffix } from "@/lib/format";
 import NewGameForm from "@/components/NewGameForm";
 import QuickGameButton from "@/components/QuickGameButton";
+import StartComputerForm from "@/components/StartComputerForm";
+import { BOTS } from "@/lib/bots";
 import Tabs from "@/components/Tabs";
-import ChallengeEngineButton from "@/components/ChallengeEngineButton";
 import AutoRefresh from "@/components/AutoRefresh";
 import ChatPanel from "@/components/ChatPanel";
 import JoinGameButton from "@/components/JoinGameButton";
@@ -51,8 +52,8 @@ export default async function GamesPage() {
         <div>
           <h1>Games</h1>
           <p className="lede" style={{ marginBottom: 0 }}>
-            Host a game and wait for a challenger, or join one that is already
-            waiting. Games in progress are open to watch.
+            Join a table, host one, or take on the computer. Games in progress
+            are open to watch.
           </p>
         </div>
       </header>
@@ -67,28 +68,63 @@ export default async function GamesPage() {
                 label: "Play",
                 content: (
                   <>
+          {/*
+            Three ways to start, side by side, because they are three answers
+            to one question and the old page made you scroll past two of them
+            to find the third. Each says what it costs you: quick match and the
+            computer begin at once, hosting waits.
+          */}
+          <SectionHead title="Start a game" />
+          {user ? (
+            <div className="start-grid">
+              <div className="panel start-card">
+                <h2>Quick match</h2>
+                <p className="muted">
+                  Sits you down at the table that has waited longest.
+                </p>
+                <div className="start-spacer" />
+                <QuickGameButton />
+              </div>
+
+              <NewGameForm />
+
+              <StartComputerForm
+                bots={bots.map((b) => ({
+                  id: b.id,
+                  username: b.username,
+                  rating: BOTS.find((spec) => spec.username === b.username)?.rating ?? 0,
+                }))}
+              />
+            </div>
+          ) : (
+            <div className="panel host-panel">
+              <div className="host-copy">
+                <h2>Want to play?</h2>
+                <p className="muted">
+                  Pick a name and you can host a table, join one, or take on the
+                  computer. Games are correspondence-style, so you take your turn
+                  whenever suits you.
+                </p>
+              </div>
+              <Link href="/" className="btn btn-primary">
+                Get started
+              </Link>
+            </div>
+          )}
+
           <SectionHead
-            title="Waiting for a player"
+            title="Open tables"
             count={openGames.length}
             accent="amber"
           />
           <p className="muted" style={{ margin: "0 0 12px", lineHeight: 1.6 }}>
-            Games other players have hosted and are waiting for an opponent —
-            join one and it starts right away.
+            Hosted by other players and waiting for an opponent. Joining one
+            starts it immediately.
           </p>
-          {user && (
-            <div className="panel host-panel">
-              <div className="host-copy">
-                <h2>Quick match</h2>
-                <p className="muted">Joins an open game.</p>
-              </div>
-              <QuickGameButton />
-            </div>
-          )}
           {openGames.length === 0 ? (
             <Empty>
               Nobody is waiting right now.{" "}
-              {user ? "Host one and see who turns up." : "Sign in to host one."}
+              {user ? "Host a table and see who turns up." : "Sign in to host one."}
             </Empty>
           ) : (
             <ul className="watch-grid">
@@ -103,6 +139,11 @@ export default async function GamesPage() {
                   <div className="game-card-meta">
                     <div>
                       <strong>{nameLink(g.player1_name)}</strong>
+                      {g.rated === 0 && (
+                        <span className="tag" style={{ marginLeft: 8 }}>
+                          casual
+                        </span>
+                      )}
                     </div>
                     <span className="muted">
                       {describeTimeControl(g.move_seconds)} ·{" "}
@@ -120,68 +161,6 @@ export default async function GamesPage() {
               ))}
             </ul>
           )}
-
-          {user ? (
-            <NewGameForm />
-          ) : (
-            <div className="panel host-panel">
-              <div className="host-copy">
-                <h2>Want to play?</h2>
-                <p className="muted">
-                  Pick a name and you can host or join a game. Games are
-                  correspondence-style, so you take your turn whenever suits
-                  you.
-                </p>
-              </div>
-              <Link href="/" className="btn btn-primary">
-                Get started
-              </Link>
-            </div>
-          )}
-
-          <SectionHead title="Play the computer" />
-          <p className="muted" style={{ margin: "0 0 12px", lineHeight: 1.6 }}>
-            Each strength is its own account and plays by the same rules as
-            anyone else. The game runs in your browser, and the computer waits
-            as long as you do.
-          </p>
-          <div className="panel">
-            <table>
-              <thead>
-                <tr>
-                  <th>Bot</th>
-                  <th style={{ textAlign: "right" }}>Won</th>
-                  <th style={{ textAlign: "right" }}>Lost</th>
-                  <th style={{ width: 1 }} />
-                </tr>
-              </thead>
-              <tbody>
-                {bots.map((b) => (
-                  <tr key={b.id}>
-                    <td>
-                      <Link href={`/player/${encodeURIComponent(b.username)}`}>
-                        {b.username}
-                      </Link>
-                      {b.description && (
-                        <div className="muted" style={{ fontSize: "0.85em" }}>
-                          {b.description}
-                        </div>
-                      )}
-                    </td>
-                    <td className="num">{b.wins}</td>
-                    <td className="num">{b.losses}</td>
-                    <td style={{ textAlign: "right" }}>
-                      {user ? (
-                        <ChallengeEngineButton botId={b.id} />
-                      ) : (
-                        <span className="muted">sign in</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
 
                   </>
                 ),
