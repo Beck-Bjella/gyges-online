@@ -11,6 +11,7 @@ import {
   type Record_,
 } from "@/lib/db/queries";
 import { relativeTime } from "@/lib/format";
+import { engineRatingFor } from "@/lib/ladder";
 import { currentUser } from "@/lib/auth";
 import RenameForm from "@/components/RenameForm";
 import EmailForm from "@/components/EmailForm";
@@ -57,6 +58,9 @@ export default async function PlayerPage({
   // opponents table.
   const finished = finishedGamesForUser(user.id);
   const opponents = opponentRecords(user.id);
+  // Bots are rated by their fixed anchor, not by playing; the ladder is for
+  // the people climbing it.
+  const ladder = isBot ? null : engineRatingFor(user.id);
   // Only meaningful on your own profile, where the account panel prints it.
   const seats = isMe ? openSeatCount(user.id) : 0;
 
@@ -138,6 +142,23 @@ export default async function PlayerPage({
 
       {viewer && !isMe && user.bot_strength === null && (
         <SocialButtons userId={user.id} state={friendState(viewer.id, user.id)} />
+      )}
+
+      {ladder && (
+        <p className="lede" style={{ marginTop: -14 }}>
+          Engine rating <strong>{ladder.rating}</strong>
+          {ladder.provisional && <span className="muted"> (provisional)</span>}
+          {ladder.bestBeaten && (
+            <>
+              {" — best win against "}
+              <Link href={`/player/${encodeURIComponent(ladder.bestBeaten)}`}>
+                {ladder.bestBeaten}
+              </Link>
+            </>
+          )}
+          {". "}
+          <Link href="/leaderboard">See the ladder.</Link>
+        </p>
       )}
 
       {/* Against people. This is the record — the one the leaderboard ranks. */}

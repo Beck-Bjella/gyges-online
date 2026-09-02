@@ -1399,22 +1399,6 @@ td.num {
  * The hosting panel reads left to right: what hosting means, then the two
  * controls that do it. On narrow screens the halves stack instead.
  */
-/* Not a panel: one button and a half-line saying what it does. It is a
-   shortcut past the lists below, and a shortcut that needs a paragraph is
-   not one. */
-.quick-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  margin-bottom: 16px;
-}
-.quick-row form {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
 .host-panel {
   display: flex;
   flex-wrap: wrap;

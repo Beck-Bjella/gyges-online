@@ -1022,6 +1022,9 @@ test("the game cap never applies to a bot's own seat", () => {
   const bot = createBot({
     username: uniqueName("CapBot"),
     strength: 1,
+    // Not in BOTS, so the ladder has no anchor for it and its games are never
+    // rated — which is what this fixture wants.
+    rating: 1000,
     engineBuild: "test",
     options: { maxNodes: 1 },
   });

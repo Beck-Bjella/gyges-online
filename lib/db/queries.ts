@@ -118,6 +118,14 @@ export interface Game {
   takeback_offered: number;
   /** The side offering a draw, while one is on offer. Null otherwise. */
   draw_offered_by: Player | null;
+  /**
+   * How many times this game has been rewound.
+   *
+   * Against the engine a player may take a move back whenever they like, and
+   * undoTurn deletes the rows — so nothing else would show it happened. The
+   * engine ladder rates only games where this is 0; see migrations/0010.
+   */
+  takebacks_used: number;
 }
 
 export interface MoveRow {
@@ -494,7 +502,7 @@ const GAME_COLUMNS = `
   g.id, g.player1_id, g.player2_id, g.status, g.turn, g.result, g.result_reason,
   g.start_board, g.board, g.ply, g.move_seconds, g.deadline_at,
   g.created_at, g.started_at, g.finished_at, g.updated_at, g.invited_id,
-  g.takeback_offered, g.draw_offered_by,
+  g.takeback_offered, g.draw_offered_by, g.takebacks_used,
   p1.username AS player1_name, p2.username AS player2_name,
   inv.username AS invited_name,
   (SELECT m.move FROM moves m
@@ -571,6 +579,7 @@ export function createGame(
     invited_id: null,
     takeback_offered: 0,
     draw_offered_by: null,
+    takebacks_used: 0,
   };
 
   getDb()
@@ -1508,9 +1517,12 @@ export function undoTurn(gameId: string, userId: string): GameWithPlayers {
     if (!before) throw new GameError("Nothing to take back.");
 
     db.prepare("DELETE FROM moves WHERE game_id = ? AND ply > ?").run(gameId, cutoff);
+    // Counted because the rows are gone: after this, nothing else would show
+    // the game was rewound, and the engine ladder has to be able to tell.
     db.prepare(
       `UPDATE games
-          SET board = ?, ply = ?, turn = ?, deadline_at = ?, updated_at = ?
+          SET board = ?, ply = ?, turn = ?, deadline_at = ?, updated_at = ?,
+              takebacks_used = takebacks_used + 1
         WHERE id = ?`,
     ).run(
       before.board_after,
@@ -2015,10 +2027,67 @@ export function botLeaderboard(): BotRow[] {
  * Deliberately has no password: verifyPassword refuses a null hash, so a bot's
  * account cannot be signed in to at all.
  */
+/** One rated game against the engine, as the ladder needs it. */
+export interface EngineGameRow {
+  user_id: string;
+  username: string;
+  bot_username: string;
+  /** 1 if the human won. */
+  won: number;
+  finished_at: number;
+}
+
+/**
+ * Every finished bot game that counts towards the engine ladder, oldest first.
+ *
+ * Two exclusions, and both matter:
+ *
+ * - **Rewound games.** Against the engine a player may take back a move as
+ *   often as they like, so a game played with takebacks says nothing about
+ *   who would have won — undo until you win and every game is a win.
+ * - **Games against a retired bot**, filtered by the caller: an anchor it no
+ *   longer has is an anchor nobody can rate against.
+ *
+ * Ordered by when they ended, because a rating is a replay and a replay needs
+ * an order. Deleted accounts are dropped — their games survive, but there is
+ * nobody to rank.
+ */
+export function engineGamesForLadder(): EngineGameRow[] {
+  return getDb()
+    .prepare(
+      `SELECT
+         human.id       AS user_id,
+         human.username AS username,
+         bot.username    AS bot_username,
+         CASE WHEN (g.player1_id = human.id AND g.result = 1)
+                OR (g.player2_id = human.id AND g.result = -1)
+              THEN 1 ELSE 0 END AS won,
+         g.finished_at  AS finished_at
+       FROM games g
+       JOIN users bot   ON bot.id IN (g.player1_id, g.player2_id)
+                       AND bot.bot_strength IS NOT NULL
+       JOIN users human ON human.id IN (g.player1_id, g.player2_id)
+                       AND human.bot_strength IS NULL
+                       AND human.deleted_at IS NULL
+      WHERE g.status = 'finished'
+        AND g.result IS NOT NULL
+        AND g.result <> 0
+        AND g.takebacks_used = 0
+      ORDER BY g.finished_at ASC, g.id ASC`,
+    )
+    .all() as EngineGameRow[];
+}
+
 export interface BotSpec {
   username: string;
   /** Engine skill setting. */
   strength: number;
+  /**
+   * This bot's fixed rating, the anchor the engine ladder measures players
+   * against. Configuration rather than data: it is never stored, so it can be
+   * re-tuned and every rating on the site is right on the next page load.
+   */
+  rating: number;
   /**
    * UGI options, applied verbatim before the search.
    *

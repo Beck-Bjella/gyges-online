@@ -1,0 +1,19 @@
+-- 0010_add_takebacks_used — count the rewinds a game has had.
+--
+-- undoTurn DELETES the move rows it rewinds, which is right for the game
+-- record: the moves did not happen, and a history full of moves that were
+-- retracted is a history nobody can read. But it means a finished game gives
+-- no sign that it was ever rewound, and against the engine a player may rewind
+-- as often as they like.
+--
+-- That is fine while a bot game is only a bot game. It stops being fine the
+-- moment those games are rated: undo until you win and every game is a win,
+-- which would make the engine ladder a measure of persistence.
+--
+-- So the game counts them. The ladder rates only games that were played
+-- straight through, and the count is what says which those are.
+--
+-- Existing rows get 0, including any that were in fact rewound before this
+-- migration. Nothing records what happened to them, and inventing a number
+-- would be worse than admitting the record starts here.
+ALTER TABLE games ADD COLUMN takebacks_used INTEGER NOT NULL DEFAULT 0;

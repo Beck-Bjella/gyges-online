@@ -67,11 +67,58 @@ export default async function GamesPage() {
                 label: "Play",
                 content: (
                   <>
+          <SectionHead
+            title="Waiting for a player"
+            count={openGames.length}
+            accent="amber"
+          />
+          <p className="muted" style={{ margin: "0 0 12px", lineHeight: 1.6 }}>
+            Games other players have hosted and are waiting for an opponent —
+            join one and it starts right away.
+          </p>
           {user && (
-            <div className="quick-row">
+            <div className="panel host-panel">
+              <div className="host-copy">
+                <h2>Quick match</h2>
+                <p className="muted">Joins an open game.</p>
+              </div>
               <QuickGameButton />
-              <span className="muted">Joins the longest-waiting table.</span>
             </div>
+          )}
+          {openGames.length === 0 ? (
+            <Empty>
+              Nobody is waiting right now.{" "}
+              {user ? "Host one and see who turns up." : "Sign in to host one."}
+            </Empty>
+          ) : (
+            <ul className="watch-grid">
+              {openGames.map((g) => (
+                <li key={g.id} className="game-card list-item">
+                  <Link
+                    className="stretch-link"
+                    href={`/game/${g.id}`}
+                    aria-label="Open game"
+                  />
+                  <MiniBoard board={decodeBoard(g.board)} size={150} />
+                  <div className="game-card-meta">
+                    <div>
+                      <strong>{nameLink(g.player1_name)}</strong>
+                    </div>
+                    <span className="muted">
+                      {describeTimeControl(g.move_seconds)} ·{" "}
+                      {relativeTime(g.created_at)}
+                    </span>
+                  </div>
+                  {!user ? (
+                    <span className="muted">sign in to join</span>
+                  ) : g.player1_id === user.id ? (
+                    <span className="tag tag-turn">yours</span>
+                  ) : (
+                    <JoinGameButton gameId={g.id} />
+                  )}
+                </li>
+              ))}
+            </ul>
           )}
 
           {user ? (
@@ -136,50 +183,6 @@ export default async function GamesPage() {
             </table>
           </div>
 
-          <SectionHead
-            title="Waiting for a player"
-            count={openGames.length}
-            accent="amber"
-          />
-          <p className="muted" style={{ margin: "0 0 12px", lineHeight: 1.6 }}>
-            Games other players have hosted and are waiting for an opponent —
-            join one and it starts right away.
-          </p>
-          {openGames.length === 0 ? (
-            <Empty>
-              Nobody is waiting right now.{" "}
-              {user ? "Host one and see who turns up." : "Sign in to host one."}
-            </Empty>
-          ) : (
-            <ul className="watch-grid">
-              {openGames.map((g) => (
-                <li key={g.id} className="game-card list-item">
-                  <Link
-                    className="stretch-link"
-                    href={`/game/${g.id}`}
-                    aria-label="Open game"
-                  />
-                  <MiniBoard board={decodeBoard(g.board)} size={150} />
-                  <div className="game-card-meta">
-                    <div>
-                      <strong>{nameLink(g.player1_name)}</strong>
-                    </div>
-                    <span className="muted">
-                      {describeTimeControl(g.move_seconds)} ·{" "}
-                      {relativeTime(g.created_at)}
-                    </span>
-                  </div>
-                  {!user ? (
-                    <span className="muted">sign in to join</span>
-                  ) : g.player1_id === user.id ? (
-                    <span className="tag tag-turn">yours</span>
-                  ) : (
-                    <JoinGameButton gameId={g.id} />
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
                   </>
                 ),
               },
