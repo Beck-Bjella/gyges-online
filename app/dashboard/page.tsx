@@ -12,6 +12,7 @@ import {
   listOutgoingChallenges,
   dashboardVersion,
 } from "@/lib/db/queries";
+import { now } from "@/lib/db/index";
 import FriendsPanel from "@/components/FriendsPanel";
 import ChallengesPanel from "@/components/ChallengesPanel";
 import CancelGameButton from "@/components/CancelGameButton";
@@ -111,45 +112,109 @@ export default async function DashboardPage() {
         <StatCard label="In progress" value={stats.active} accent="amber" />
       </div>
 
-      <div className="grid-2" style={{ marginTop: 32 }}>
-        <section>
-          {/*
-            Every section is always shown, empty or not. A page whose headings
-            appear and disappear depending on state is hard to read: you cannot
-            learn where anything lives, and an absent section is
-            indistinguishable from a section you have scrolled past.
-          */}
-          <ChallengesPanel incoming={incoming} outgoing={outgoing} />
+      {/*
+        Every section is always shown, empty or not. A page whose headings
+        appear and disappear depending on state is hard to read: you cannot
+        learn where anything lives, and an absent section is indistinguishable
+        from a section you have scrolled past.
+      */}
+      <div style={{ marginTop: 32 }}>
+        <ChallengesPanel incoming={incoming} outgoing={outgoing} />
 
-          <GameSection
-            title="Games"
-            games={active}
-            userId={user.id}
-            accent={yourMoveCount > 0 ? "mint" : undefined}
-            empty={
-              <>
-                No games in play. <Link href="/games">Find an opponent.</Link>
-              </>
-            }
-          />
+        <GameSection
+          title="Games"
+          games={active}
+          userId={user.id}
+          accent={yourMoveCount > 0 ? "mint" : undefined}
+          empty={
+            <>
+              No games in play. <Link href="/games">Find an opponent.</Link>
+            </>
+          }
+        />
 
-          <GameSection
-            title="Completed games"
-            games={finished}
-            userId={user.id}
-            empty={
-              <>
-                No finished games yet. <Link href="/games">Find an opponent.</Link>
-              </>
-            }
-          />
-        </section>
+        {/*
+          The archive, and it reads like one: rows, not board tiles. A finished
+          game and a game waiting on your move were drawing the same 150px
+          square, which gave the two the same weight on a page that exists to
+          tell you what needs doing.
+        */}
+        <div className="section-head">
+          <h2>Completed games</h2>
+          {finished.length > 0 && <span className="count">{finished.length}</span>}
+        </div>
+        {finished.length === 0 ? (
+          <p className="empty">
+            No finished games yet. <Link href="/games">Find an opponent.</Link>
+          </p>
+        ) : (
+          <>
+            <ul className="list">
+              {finished.slice(0, RECENT_FINISHED).map((g) => (
+                <FinishedGame key={g.id} game={g} userId={user.id} />
+              ))}
+            </ul>
+            {finished.length > RECENT_FINISHED && (
+              <p className="hint" style={{ marginTop: 10 }}>
+                Your {RECENT_FINISHED} most recent, of {finished.length}.
+              </p>
+            )}
+          </>
+        )}
 
-        <aside className="rail">
+        <div style={{ marginTop: 34 }}>
           <FriendsPanel requests={requests} friends={friends} />
-        </aside>
+        </div>
       </div>
     </>
+  );
+}
+
+/**
+ * How many finished games the dashboard lists.
+ *
+ * The archive is not why anyone opens this page, and an unbounded list of it
+ * pushes everything else off the screen for a player with a long history.
+ */
+const RECENT_FINISHED = 10;
+
+/**
+ * A finished game, as a row.
+ *
+ * Deliberately not the tile the live games get: the position of a game that
+ * ended is worth a click, not a square of the page.
+ */
+function FinishedGame({
+  game,
+  userId,
+}: {
+  game: GameWithPlayers;
+  userId: string;
+}) {
+  const side = sideOf(game, userId);
+  const opponent = side === 1 ? game.player2_name : game.player1_name;
+  const outcome =
+    game.result === 0 ? "Draw" : game.result === side ? "Won" : "Lost";
+
+  return (
+    <li className="list-item">
+      <Link className="stretch-link" href={`/game/${game.id}`} aria-label="Open game" />
+      <span className={outcome === "Won" ? "tag tag-turn" : "tag"}>{outcome}</span>
+      <span style={{ flex: 1, minWidth: 0 }}>
+        vs{" "}
+        {opponent ? (
+          <Link href={`/player/${encodeURIComponent(opponent)}`}>
+            <strong>{opponent}</strong>
+          </Link>
+        ) : (
+          "—"
+        )}
+      </span>
+      <span className="muted">
+        {game.ply} moves{endingSuffix(game.result_reason, " · by ")} ·{" "}
+        {relativeTime(game.updated_at)}
+      </span>
+    </li>
   );
 }
 
@@ -250,7 +315,16 @@ function MyGame({
     game.status === "active" &&
     game.draw_offered_by !== null &&
     game.draw_offered_by !== side;
-  const yourTurn = (inPlay && side === game.turn) || takebackForYou || drawForYou;
+  // Their clock has run out and the win is sitting there. It needs a click,
+  // which made it exactly the kind of game that must not look like one of the
+  // games where there is nothing to do.
+  const claimable =
+    game.status === "active" &&
+    side !== game.turn &&
+    game.deadline_at !== null &&
+    game.deadline_at <= now();
+  const yourTurn =
+    (inPlay && side === game.turn) || takebackForYou || drawForYou || claimable;
   const open = game.status === "open";
 
   // Two states cover everything unfinished: it is your turn, or you are
@@ -263,7 +337,8 @@ function MyGame({
   const waitingLabel = waitingOn ? `waiting for ${waitingOn}` : "waiting for opponent";
 
   let label: string;
-  if (drawForYou) label = "draw offered — your call";
+  if (claimable) label = "their time is up — claim the win";
+  else if (drawForYou) label = "draw offered — your call";
   else if (open) label = waitingLabel;
   else if (game.status === "setup") {
     label = yourTurn ? "your turn" : waitingLabel;
@@ -319,7 +394,9 @@ function MyGame({
           {label} · {relativeTime(game.updated_at)}
         </span>
       </div>
-      {yourTurn && <span className="tag tag-turn">play</span>}
+      {yourTurn && (
+        <span className="tag tag-turn">{claimable ? "claim" : "play"}</span>
+      )}
       {open && <CancelGameButton gameId={game.id} />}
     </li>
   );

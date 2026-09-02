@@ -1151,7 +1151,7 @@ export default function GameView({
         and the board never has to give up width for it. Whatever joins it
         later — a game's notes, an analysis strip — belongs in this band too.
       */}
-      <section className="game-chat">
+      <section className="game-chat chat-band">
         {canChat ? (
           <ChatPanel gameId={game.id} title="Table talk" canPost />
         ) : (

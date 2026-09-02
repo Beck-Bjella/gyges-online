@@ -26,11 +26,18 @@ const PLATE = 88;
 export default function MiniBoard({
   board,
   lastMove = null,
+  mark = null,
   size = 120,
 }: {
   board: BoardState;
   /** "from|to[|drop]" as the moves table stores it; drawn as amber legs. */
   lastMove?: string | null;
+  /**
+   * Squares to ring in mint. Nothing in a game uses this — it is for the
+   * rules diagrams, where a sentence like "only these may move" needs the
+   * board to say which ones.
+   */
+  mark?: number[] | null;
   size?: number;
 }) {
   const cx = (i: number) => ORIGIN + (i % 6) * PITCH;
@@ -97,6 +104,22 @@ export default function MiniBoard({
       {Array.from({ length: 36 }, (_, i) => (
         <circle key={i} cx={cx(i)} cy={cy(i)} r={3.3} fill="var(--gridspot-dark)" />
       ))}
+      {/* Marked squares, under everything: the diagram's pointing finger. */}
+      {(mark ?? []).map((i) => {
+        const p = at(i);
+        return (
+          <circle
+            key={`m${i}`}
+            cx={p.x}
+            cy={p.y}
+            r={5.6}
+            fill="var(--accent-mint-soft)"
+            stroke="var(--accent-mint)"
+            strokeWidth="1"
+            opacity="0.9"
+          />
+        );
+      })}
       {/* The last move, as the big board draws it: a solid leg for the
           travel, a dashed one for the displaced piece. Under the pieces, so
           the position stays the subject. */}

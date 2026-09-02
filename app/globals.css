@@ -417,6 +417,36 @@ h2 {
   margin-top: 0;
 }
 
+/*
+ * Rules diagrams: a board and the sentence it is making, as many across as
+ * fit. The caption is the point — the board is there because three of these
+ * rules are much easier to see than to read.
+ */
+.figures {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: clamp(14px, 2vw, 22px);
+  margin: 24px 0 6px;
+}
+.figures figure {
+  margin: 0;
+  padding: 14px;
+  background: var(--bg-darkest);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  text-align: center;
+}
+.figures figcaption {
+  margin-top: 10px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-dim);
+  text-align: left;
+}
+.figures figcaption strong {
+  color: var(--text-secondary);
+}
+
 .lede {
   color: var(--text-secondary);
   margin: 0 0 26px;
@@ -625,6 +655,52 @@ input::placeholder {
   box-shadow: 0 0 0 1px rgba(232, 167, 92, 0.22), var(--shadow);
 }
 
+/* Your own row in a ranking, so the table can be scanned for it. */
+tr.you td {
+  background: var(--accent-mint-soft);
+}
+tr.you td:first-child {
+  box-shadow: inset 2px 0 0 var(--accent-mint);
+}
+
+/* The two dials that describe a computer opponent: how hard it looks, and
+   where it does the looking. Side by side because the pair is the point. */
+.bot-panel {
+  margin-bottom: 26px;
+}
+.botdials {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 10px;
+}
+.botdial {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg-darkest);
+}
+.botdial-label {
+  font-size: 11px;
+  font-weight: 620;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.botdial-value {
+  font-size: 16px;
+  font-weight: 620;
+  color: var(--accent-mint);
+}
+.botdial-detail {
+  font-size: 12px;
+  color: var(--text-dim);
+  line-height: 1.45;
+  margin-top: 2px;
+}
+
 .tag {
   font-size: 10.5px;
   font-weight: 600;
@@ -751,12 +827,19 @@ input::placeholder {
   min-width: min(calc(100dvh - 212px), calc(100vw - 420px));
 }
 
-/* The chat band: a wide, short conversation rather than a tall narrow one,
-   sitting directly above the site footer. */
-.game-chat {
+/*
+ * Chat sits in a band across the foot of the page — here and on the lobby,
+ * the same way in both places. It is the one thing on either page that is read
+ * left to right, and the last thing anyone came for, so it gets the width and
+ * the bottom rather than a column beside what matters. Wide and short, not
+ * tall and narrow.
+ *
+ * .game-chat adds only the width breakout; the band itself is shared.
+ */
+.chat-band {
   margin-top: clamp(18px, 2.2vh, 30px);
 }
-.game-chat .chat-messages {
+.chat-band .chat-messages {
   min-height: 200px;
   max-height: 340px;
 }
@@ -1287,19 +1370,6 @@ td.num {
 }
 
 /*
- * The lobby's version of board-priority: the game tiles are the point, so the
- * chat flexes down before the tiles do — and off a proper desktop it leaves
- * the side entirely, because a compressed chat next to cramped tile columns
- * serves neither.
- */
-.grid-chat {
-  display: grid;
-  grid-template-columns: minmax(280px, 400px) minmax(0, 1fr);
-  gap: clamp(26px, 3vw, 44px);
-  align-items: start;
-}
-
-/*
  * The hosting panel reads left to right: what hosting means, then the two
  * controls that do it. On narrow screens the halves stack instead.
  */
@@ -1326,29 +1396,6 @@ td.num {
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
-}
-
-/*
- * Side chat is a desktop luxury: it needs the display to be both wide AND
- * flat. An iPad in landscape clears neither bar comfortably, and there the
- * games matter more — the chat stays below.
- */
-@media (max-width: 1560px) {
-  .grid-chat {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .grid-chat .chat-rail {
-    order: 9;
-  }
-}
-
-@media (max-aspect-ratio: 3/2) {
-  .grid-chat {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .grid-chat .chat-rail {
-    order: 9;
-  }
 }
 
 /* --- placing pieces before play ----------------------------------------- */

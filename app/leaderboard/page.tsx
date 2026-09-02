@@ -1,11 +1,14 @@
 import Link from "next/link";
 import { botLeaderboard, leaderboard } from "@/lib/db/queries";
+import { currentUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
-export default function LeaderboardPage() {
+export default async function LeaderboardPage() {
   const rows = leaderboard();
   const bots = botLeaderboard();
+  // A ranking you cannot find yourself in is doing half its job.
+  const viewer = await currentUser();
 
   return (
     <>
@@ -42,7 +45,7 @@ export default function LeaderboardPage() {
             </thead>
             <tbody>
               {rows.map((r, i) => (
-                <tr key={r.id}>
+                <tr key={r.id} className={r.id === viewer?.id ? "you" : undefined}>
                   <td className="num" style={{ color: "var(--text-dim)" }}>
                     {i + 1}
                   </td>
@@ -50,6 +53,11 @@ export default function LeaderboardPage() {
                     <Link href={`/player/${encodeURIComponent(r.username)}`}>
                       {r.username}
                     </Link>
+                    {r.id === viewer?.id && (
+                      <span className="tag tag-turn" style={{ marginLeft: 8 }}>
+                        you
+                      </span>
+                    )}
                   </td>
                   <td className="num">{r.wins}</td>
                   <td className="num">{r.losses}</td>

@@ -15,6 +15,7 @@ import { currentUser } from "@/lib/auth";
 import RenameForm from "@/components/RenameForm";
 import EmailForm from "@/components/EmailForm";
 import ChangePasswordForm from "@/components/ChangePasswordForm";
+import ChallengeEngineButton from "@/components/ChallengeEngineButton";
 import SignOutButton from "@/components/SignOutButton";
 import SocialButtons from "@/components/SocialButtons";
 import { friendState, opponentRecords } from "@/lib/db/queries";
@@ -34,6 +35,7 @@ export default async function PlayerPage({
   const { user } = stats;
   const viewer = await currentUser();
   const isMe = viewer?.id === user.id;
+  const isBot = user.bot_strength !== null;
 
   // A closed account keeps its games but shows nothing personal.
   if (user.deleted_at) {
@@ -81,10 +83,48 @@ export default async function PlayerPage({
         <div>
           <h1>{user.username}</h1>
           <p className="lede" style={{ marginBottom: 0 }}>
-            Member since {relativeTime(user.created_at)}.
+            {isBot
+              ? (user.bot_description ??
+                "One of the strengths the computer plays at.")
+              : `Member since ${relativeTime(user.created_at)}.`}
           </p>
         </div>
+        {/* The lobby links every computer's name here, so the answer to "what
+            am I about to play" has to be here, and so does the way to play
+            it. */}
+        {isBot && viewer && <ChallengeEngineButton botId={user.id} />}
       </header>
+
+      {isBot && (
+        <div className="panel bot-panel">
+          <div className="section-head">
+            <h2>How this one plays</h2>
+          </div>
+          <div className="botdials">
+            <div className="botdial">
+              <span className="botdial-label">Strength</span>
+              <span className="botdial-value">{user.bot_strength}</span>
+              <span className="botdial-detail">
+                Higher looks further ahead and blunders less.
+              </span>
+            </div>
+            <div className="botdial">
+              <span className="botdial-label">Where it runs</span>
+              <span className="botdial-value">Your browser</span>
+              <span className="botdial-detail">
+                Nothing is sent to a server, and it will wait as long as you
+                do.
+              </span>
+            </div>
+          </div>
+          <p className="hint" style={{ marginTop: 12 }}>
+            It searches a fixed number of positions rather than for a fixed
+            time, so it plays the same move on a slow phone as on a desktop —
+            a weaker device waits longer, it does not face a weaker opponent.
+            {user.bot_engine_build ? ` Engine build ${user.bot_engine_build}.` : ""}
+          </p>
+        </div>
+      )}
 
       {/*
         Your own profile doubles as your account page. The public half is what

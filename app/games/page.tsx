@@ -56,14 +56,10 @@ export default async function GamesPage() {
         </div>
       </header>
 
-      <div className="grid-chat">
-        <aside className="chat-rail">
-          <ChatPanel title="Lobby" canPost={user !== null} />
-        </aside>
-        <section>
-          {/* Two tabs: starting a game, and looking at games. Finding an
-              opponent — a person or the computer — is one activity; spectating is
-              another; mixing them made the page a scroll of everything. */}
+      <section>
+        {/* Two tabs: starting a game, and looking at games. Finding an
+            opponent — a person or the computer — is one activity; spectating
+            is another; mixing them made the page a scroll of everything. */}
           <Tabs
             tabs={[
               {
@@ -213,8 +209,13 @@ export default async function GamesPage() {
               },
             ]}
           />
-        </section>
-      </div>
+      </section>
+
+      {/* The same band the game page puts it in: across the foot, under the
+          thing the page is actually for. */}
+      <section className="chat-band">
+        <ChatPanel title="Lobby" canPost={user !== null} />
+      </section>
     </>
   );
 }
