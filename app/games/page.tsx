@@ -10,7 +10,8 @@ import {
 } from "@/lib/db/queries";
 import { relativeTime, describeTimeControl, endingSuffix } from "@/lib/format";
 import NewGameForm from "@/components/NewGameForm";
-import NewBotGameForm from "@/components/NewBotGameForm";
+import Tabs from "@/components/Tabs";
+import ChallengeEngineButton from "@/components/ChallengeEngineButton";
 import AutoRefresh from "@/components/AutoRefresh";
 import ChatPanel from "@/components/ChatPanel";
 import JoinGameButton from "@/components/JoinGameButton";
@@ -35,33 +36,10 @@ export default async function GamesPage() {
   // so a game someone else creates or joins appears here on its own.
   const version = siteVersion();
 
-  // The engine's accounts, as choosable opponents. The work budget is pulled
-  // out of the stored UGI options only so the form can estimate a wait; the
-  // site does not otherwise interpret them.
-  const botOptions = botLeaderboard().map((b) => {
-    let maxNodes: number | null = null;
-    let maxPly: number | null = null;
-    let weakness: number | null = null;
-    let allowLosing = false;
-    try {
-      const parsed = JSON.parse(b.options ?? "{}") as Record<string, unknown>;
-      if (typeof parsed.maxNodes === "number") maxNodes = parsed.maxNodes;
-      if (typeof parsed.maxPly === "number") maxPly = parsed.maxPly;
-      if (typeof parsed["skill-weakness"] === "number") weakness = parsed["skill-weakness"];
-      allowLosing = parsed["skill-allowLosing"] === true;
-    } catch {
-      /* a malformed row simply shows no dials */
-    }
-    return {
-      id: b.id,
-      username: b.username,
-      description: b.description,
-      maxNodes,
-      maxPly,
-      weakness,
-      allowLosing,
-    };
-  });
+  // The engine's accounts, shown as rows to challenge — the same table the
+  // leaderboard prints, plus a button. No opponent-picker form: the row
+  // already says who the bot is and how it has done.
+  const bots = botLeaderboard();
 
   return (
     <>
@@ -81,6 +59,15 @@ export default async function GamesPage() {
           <ChatPanel title="Lobby" canPost={user !== null} />
         </aside>
         <section>
+          {/* Two tabs: starting a game, and looking at games. Finding an
+              opponent — human or engine — is one activity; spectating is
+              another; mixing them made the page a scroll of everything. */}
+          <Tabs
+            tabs={[
+              {
+                label: "Play",
+                content: (
+                  <>
           <SectionHead
             title="Waiting for a player"
             count={openGames.length}
@@ -126,11 +113,60 @@ export default async function GamesPage() {
             </ul>
           )}
 
+          <SectionHead title="Play the engine" count={0} style={{ marginTop: 34 }} />
+          <p className="muted" style={{ margin: "0 0 12px", lineHeight: 1.6 }}>
+            Each strength is its own account and plays by the same rules as
+            anyone else. The game runs in your browser, and the engine waits as
+            long as you do.
+          </p>
+          <div className="panel">
+            <table>
+              <thead>
+                <tr>
+                  <th>Bot</th>
+                  <th style={{ textAlign: "right" }}>Won</th>
+                  <th style={{ textAlign: "right" }}>Lost</th>
+                  <th style={{ width: 1 }} />
+                </tr>
+              </thead>
+              <tbody>
+                {bots.map((b) => (
+                  <tr key={b.id}>
+                    <td>
+                      <Link href={`/player/${encodeURIComponent(b.username)}`}>
+                        {b.username}
+                      </Link>
+                      {b.description && (
+                        <div className="muted" style={{ fontSize: "0.85em" }}>
+                          {b.description}
+                        </div>
+                      )}
+                    </td>
+                    <td className="num">{b.wins}</td>
+                    <td className="num">{b.losses}</td>
+                    <td style={{ textAlign: "right" }}>
+                      {user ? (
+                        <ChallengeEngineButton botId={b.id} />
+                      ) : (
+                        <span className="muted">sign in</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+                  </>
+                ),
+              },
+              {
+                label: "Active games",
+                content: (
+                  <>
           <SectionHead
             title="In progress"
             count={activeGames.length}
             accent="mint"
-            style={{ marginTop: 34 }}
           />
           {activeGames.length === 0 ? (
             <Empty>No games are being played right now.</Empty>
@@ -174,14 +210,16 @@ export default async function GamesPage() {
               ))}
             </ul>
           )}
+                  </>
+                ),
+              },
+            ]}
+          />
         </section>
 
         <aside className="rail">
           {user ? (
-            <>
-              <NewGameForm />
-              <NewBotGameForm bots={botOptions} />
-            </>
+            <NewGameForm />
           ) : (
             <div className="panel">
               <h2>Want to play?</h2>
