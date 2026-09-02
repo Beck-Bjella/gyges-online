@@ -48,7 +48,6 @@ const {
   claimTimeout,
   sideOf,
   leaderboard,
-  timingStats,
   createSession,
   userForSession,
   GameError,
@@ -623,20 +622,6 @@ test("each move records how long the player took", () => {
     // seconds-based epoch would be.
     assert.ok(m.created_at > 1_000_000_000_000, "timestamps should be ms");
   }
-});
-
-test("timing statistics are derivable from stored moves", () => {
-  const { a, b, gameId } = twoPlayerGame();
-  submitMove(gameId, a.id, P1_OPENING);
-  submitMove(gameId, b.id, P2_REPLY);
-  submitMove(gameId, a.id, [1, 7]);
-
-  const stats = timingStats(a.id);
-  // Two moves plus one setup placement.
-  assert.equal(stats.moves, 3, "counts only this player's actions");
-  assert.ok(stats.medianThinkMs !== null);
-  assert.ok(stats.fastestMs !== null && stats.slowestMs !== null);
-  assert.ok(stats.fastestMs! <= stats.slowestMs!);
 });
 
 // --- concurrency -----------------------------------------------------------

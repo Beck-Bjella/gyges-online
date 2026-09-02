@@ -6,11 +6,17 @@ import {
   finishedGamesForUser,
   listGamesForUser,
   sideOf,
+  emailFor,
+  openSeatCount,
+  MAX_OPEN_GAMES,
   type Record_,
 } from "@/lib/db/queries";
 import { relativeTime, endingSuffix } from "@/lib/format";
 import { currentUser } from "@/lib/auth";
 import RenameForm from "@/components/RenameForm";
+import EmailForm from "@/components/EmailForm";
+import ChangePasswordForm from "@/components/ChangePasswordForm";
+import SignOutButton from "@/components/SignOutButton";
 import SocialButtons from "@/components/SocialButtons";
 import MiniBoard from "@/components/MiniBoard";
 import { decodeBoard } from "@/lib/db/queries";
@@ -55,6 +61,8 @@ export default async function PlayerPage({
   // answer. Named by whoever the seat is held for, when it is held.
   const waiting = all.filter((g) => g.status === "open");
   const opponents = opponentRecords(user.id);
+  // Only meaningful on your own profile, where the account panel prints it.
+  const seats = isMe ? openSeatCount(user.id) : 0;
 
   // The viewer's own record against this player. Only worth a panel when
   // there is one — most profiles a player looks at are strangers.
@@ -84,10 +92,44 @@ export default async function PlayerPage({
         </div>
       </header>
 
+      {/*
+        Your own profile doubles as your account page. The public half is what
+        everyone sees; this panel is the half only you get, and it is here
+        rather than on the dashboard because "who I am" and "what is waiting
+        for me" are different questions.
+      */}
       {isMe && (
-        <div className="panel" style={{ marginBottom: 24 }}>
-          <h2>Your account</h2>
-          <RenameForm current={user.username} />
+        <div className="panel account-panel">
+          <div className="section-head">
+            <h2>Your account</h2>
+          </div>
+
+          <div className="account-field">
+            <span className="account-label">Username</span>
+            <RenameForm current={user.username} />
+          </div>
+
+          <EmailForm current={emailFor(user.id)} />
+
+          <ChangePasswordForm />
+
+          <div className="account-field">
+            <span className="account-label">This account</span>
+            <p style={{ margin: "0 0 14px", fontSize: 15 }}>
+              Tables in use:{" "}
+              <strong
+                style={{
+                  color:
+                    seats >= MAX_OPEN_GAMES
+                      ? "var(--accent-amber)"
+                      : "var(--accent-mint)",
+                }}
+              >
+                {seats}/{MAX_OPEN_GAMES}
+              </strong>
+            </p>
+            <SignOutButton />
+          </div>
         </div>
       )}
 

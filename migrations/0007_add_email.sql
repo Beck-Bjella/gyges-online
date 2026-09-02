@@ -1,0 +1,13 @@
+-- 0007_add_email — an optional email address on an account.
+--
+-- Optional, and deliberately not an identity. Nothing signs in with it,
+-- nothing is sent to it yet, and no account is required to have one; it is a
+-- contact field a player may fill in, so that notifications ("your move") and
+-- password recovery have somewhere to go when those are built.
+--
+-- Hence no UNIQUE constraint and no verification column. Both belong to the
+-- migration that makes email mean something — the day an address can recover
+-- an account is the day two accounts sharing one becomes ambiguous, and the
+-- day an unverified address becomes a way to take someone else's account.
+-- Adding them now would be guessing at that design a release early.
+ALTER TABLE users ADD COLUMN email TEXT;

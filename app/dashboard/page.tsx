@@ -4,23 +4,20 @@ import { currentUser } from "@/lib/auth";
 import {
   listGamesForUser,
   playerStats,
-  timingStats,
   sideOf,
   type GameWithPlayers,
   listFriends,
   listFriendRequests,
   listIncomingChallenges,
   listOutgoingChallenges,
-  openSeatCount,
   dashboardVersion,
-  MAX_OPEN_GAMES,
 } from "@/lib/db/queries";
 import FriendsPanel from "@/components/FriendsPanel";
 import ChallengesPanel from "@/components/ChallengesPanel";
 import CancelGameButton from "@/components/CancelGameButton";
 import MiniBoard from "@/components/MiniBoard";
 import { decodeBoard } from "@/lib/db/queries";
-import { relativeTime, describeThinkTime, endingSuffix } from "@/lib/format";
+import { relativeTime, endingSuffix } from "@/lib/format";
 import AutoRefresh from "@/components/AutoRefresh";
 
 export const dynamic = "force-dynamic";
@@ -38,7 +35,6 @@ export default async function DashboardPage() {
   if (!user) redirect("/");
 
   const stats = playerStats(user.username)!;
-  const timing = timingStats(user.id);
   const games = listGamesForUser(user.id);
 
   // One list of games, ordered so the ones needing you come first, then play
@@ -65,7 +61,6 @@ export default async function DashboardPage() {
     (g) => sideOf(g, user.id) === g.turn,
   ).length;
 
-  const seats = openSeatCount(user.id);
   const friends = listFriends(user.id).map((u) => ({ id: u.id, username: u.username }));
   const requests = listFriendRequests(user.id).map((u) => ({
     id: u.id,
@@ -114,10 +109,6 @@ export default async function DashboardPage() {
           value={stats.played ? `${Math.round((100 * stats.wins) / stats.played)}%` : "—"}
         />
         <StatCard label="In progress" value={stats.active} accent="amber" />
-        <StatCard
-          label="Median reply"
-          value={describeThinkTime(timing.medianThinkMs)}
-        />
       </div>
 
       <div className="grid-2" style={{ marginTop: 32 }}>
@@ -156,46 +147,6 @@ export default async function DashboardPage() {
 
         <aside className="rail">
           <FriendsPanel requests={requests} friends={friends} />
-
-          <div className="panel">
-            <h2>Account</h2>
-            <p className="muted" style={{ margin: "0 0 10px", lineHeight: 1.6 }}>
-              Member since {relativeTime(user.created_at)}.
-            </p>
-            <p style={{ margin: "0 0 14px", fontSize: 15 }}>
-              Tables in use:{" "}
-              <strong
-                style={{
-                  color:
-                    seats >= MAX_OPEN_GAMES
-                      ? "var(--accent-amber)"
-                      : "var(--accent-mint)",
-                }}
-              >
-                {seats}/{MAX_OPEN_GAMES}
-              </strong>
-            </p>
-            <Link
-              href={`/player/${encodeURIComponent(user.username)}`}
-              className="btn"
-            >
-              Public profile
-            </Link>
-          </div>
-
-          <div className="panel">
-            <h2>Reply times</h2>
-            <dl className="deflist">
-              <dt>Actions</dt>
-              <dd>{timing.moves}</dd>
-              <dt>Fastest</dt>
-              <dd>{describeThinkTime(timing.fastestMs)}</dd>
-              <dt>Median</dt>
-              <dd>{describeThinkTime(timing.medianThinkMs)}</dd>
-              <dt>Slowest</dt>
-              <dd>{describeThinkTime(timing.slowestMs)}</dd>
-            </dl>
-          </div>
         </aside>
       </div>
     </>

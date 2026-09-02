@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { currentUser } from "@/lib/auth";
 import { gamesAwaitingUser } from "@/lib/db/queries";
-import SignOutButton from "@/components/SignOutButton";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -22,6 +21,12 @@ export default async function RootLayout({
     <html lang="en">
       <body>
         <div className="site">
+          {/*
+            Three parts, and the middle one is centred on the PAGE rather than
+            in whatever space is left over: brand, navigation, you. Equal-width
+            outer columns are what make that true, so the tabs stay put whether
+            the right-hand side says a long username or nothing at all.
+          */}
           <header className="topbar">
             <Link href={user ? "/dashboard" : "/"} className="brand">
               <span className="brand-mark" aria-hidden />
@@ -38,20 +43,25 @@ export default async function RootLayout({
               <Link href="/leaderboard">Leaderboard</Link>
               <Link href="/rules">Rules</Link>
             </nav>
-            <div className="spacer" />
-            {user ? (
-              <div className="row">
-                <span className="who">
-                  signed in as{" "}
-                  <Link href={`/player/${encodeURIComponent(user.username)}`}>
-                    <strong>{user.username}</strong>
-                  </Link>
-                </span>
-                <SignOutButton />
-              </div>
-            ) : (
-              <span className="who">not signed in</span>
-            )}
+            <div className="topbar-end">
+              {user ? (
+                /* Your own profile is also your account page, so this single
+                   button is the way to both. */
+                <Link
+                  href={`/player/${encodeURIComponent(user.username)}`}
+                  className="profile-button"
+                >
+                  <span className="profile-initial" aria-hidden>
+                    {user.username.charAt(0).toUpperCase()}
+                  </span>
+                  <span className="profile-name">{user.username}</span>
+                </Link>
+              ) : (
+                <Link href="/" className="btn">
+                  Sign in
+                </Link>
+              )}
+            </div>
           </header>
           <main>{children}</main>
           <footer className="site-foot">

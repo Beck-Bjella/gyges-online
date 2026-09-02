@@ -13,6 +13,7 @@ import {
   respondToFriendRequest,
   removeFriend,
   sendFriendRequest,
+  setUserEmail,
 } from "@/lib/db/queries";
 
 export interface ActionState {
@@ -77,6 +78,34 @@ export async function changePasswordAction(
   }
 
   return { message: "Password changed. Other sessions have been signed out." };
+}
+
+/**
+ * Set or clear the email on your own account.
+ *
+ * Nothing is sent to it yet — it is stored so that notifications and password
+ * recovery have somewhere to go when those exist. Submitting an empty field
+ * takes the address back off the site.
+ */
+export async function setEmailAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const user = await currentUser();
+  if (!user) return { error: "Sign in first." };
+
+  const email = String(formData.get("email") ?? "");
+  try {
+    setUserEmail(user.id, email);
+  } catch (err) {
+    if (err instanceof GameError) return { error: err.message };
+    return { error: "Could not save that address." };
+  }
+
+  revalidatePath(`/player/${encodeURIComponent(user.username)}`);
+  return {
+    message: email.trim() ? "Email saved." : "Email removed.",
+  };
 }
 
 export async function signOutAction(): Promise<void> {

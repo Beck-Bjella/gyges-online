@@ -295,6 +295,43 @@ function toUser(row: Record<string, unknown> | undefined): User | null {
   };
 }
 
+/**
+ * The email on an account, or null.
+ *
+ * A separate query rather than a column on `User`, for the same reason the
+ * password hash is: a `User` is handed to pages and on to client components,
+ * and a profile page renders the `User` of whoever it is about — so anything
+ * on that type is visible to everyone who can see that page. An address must
+ * only ever reach its own owner, and the way to guarantee that is for no
+ * query building a User to select it.
+ */
+export function emailFor(userId: string): string | null {
+  const row = getDb()
+    .prepare("SELECT email FROM users WHERE id = ?")
+    .get(userId) as { email: string | null } | undefined;
+  return row?.email ?? null;
+}
+
+/**
+ * Set or clear an account's email. An empty string clears it, which is how a
+ * player takes their address back off the site.
+ */
+export function setUserEmail(userId: string, email: string): void {
+  const trimmed = email.trim();
+  if (trimmed.length > 254) throw new GameError("That address is too long.");
+  // Not a validator so much as a typo-catcher: one @, something either side,
+  // a dot in the domain. Whether an address can actually receive mail is not
+  // knowable from its shape, and only sending to it ever proves anything.
+  if (trimmed && !/^[^\s@]+@[^\s@.]+\.[^\s@]+$/.test(trimmed)) {
+    throw new GameError("That does not look like an email address.");
+  }
+
+  const db = getDb();
+  const user = getUser(userId);
+  if (!user) throw new GameError("No such account.", 404);
+  db.prepare("UPDATE users SET email = ? WHERE id = ?").run(trimmed || null, userId);
+}
+
 export function findUserByName(username: string): User | null {
   return toUser(
     getDb()
@@ -1733,45 +1770,6 @@ export function gamesAwaitingUser(userId: string): number {
   return row.n;
 }
 
-/**
- * Timing statistics for a player.
- *
- * Everything here is computed from moves.think_ms, which is recorded per move.
- * This exists partly to prove the stored data supports the stats we will want
- * later — median think time, moves per day, longest game — without another
- * schema change.
- */
-export interface TimingStats {
-  moves: number;
-  medianThinkMs: number | null;
-  fastestMs: number | null;
-  slowestMs: number | null;
-}
-
-export function timingStats(userId: string): TimingStats {
-  const rows = getDb()
-    .prepare(
-      `SELECT m.think_ms AS t
-         FROM moves m
-         JOIN games g ON g.id = m.game_id
-        WHERE m.think_ms IS NOT NULL
-          AND ((g.player1_id = ? AND m.player = 1)
-            OR (g.player2_id = ? AND m.player = -1))
-        ORDER BY m.think_ms ASC`,
-    )
-    .all(userId, userId) as { t: number }[];
-
-  if (rows.length === 0) {
-    return { moves: 0, medianThinkMs: null, fastestMs: null, slowestMs: null };
-  }
-
-  return {
-    moves: rows.length,
-    medianThinkMs: rows[Math.floor(rows.length / 2)].t,
-    fastestMs: rows[0].t,
-    slowestMs: rows[rows.length - 1].t,
-  };
-}
 
 /**
  * The human leaderboard.
