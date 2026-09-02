@@ -801,6 +801,18 @@ input::placeholder {
   font-size: 13px;
 }
 
+/* The ends of the list, ruled off from it: part of the moves panel, not part
+   of the moves. Never shrinks — the list above it is what gives. */
+.moves-controls {
+  flex: none;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-subtle);
+}
+.moves-controls .hint {
+  margin-top: 9px;
+}
+
 .move-row {
   display: flex;
   width: 100%;
@@ -1051,18 +1063,6 @@ td.num {
   filter: saturate(0.6) brightness(0.84);
   cursor: default;
   pointer-events: none;
-}
-
-/*
- * Separates a view toggle from the history controls beside it. Without it the
- * row reads as one undifferentiated set of buttons, and "Flip board" looks
- * like it belongs with "Opening" and "Latest".
- */
-.control-divider {
-  width: 1px;
-  align-self: stretch;
-  margin: 2px 4px;
-  background: var(--border-subtle);
 }
 
 /*

@@ -1058,6 +1058,7 @@ export default function GameView({
                 </button>
               </div>
             )}
+            {error && <p className="error">{error}</p>}
           </div>
 
           <div className="panel">
@@ -1075,30 +1076,15 @@ export default function GameView({
                   Explore
                 </button>
               )}
-              <span className="control-divider" aria-hidden="true" />
-              <button
-                className="btn"
-                onClick={() => goToPly(openingPly)}
-                disabled={openingPly === null || viewingPly === openingPly}
-                title="Both home rows placed, before the first move"
-              >
-                Opening
-              </button>
-              <button
-                className="btn"
-                onClick={() => goToPly(null)}
-                disabled={!reviewing}
-              >
-                Latest
-              </button>
             </div>
-            <p className="hint" style={{ margin: "10px 0 0" }}>
-              {reviewing
-                ? `Reviewing move ${viewingPly} of ${game.ply}`
-                : "← → to review history"}
-            </p>
-            {error && <p className="error" style={{ margin: "10px 0 0" }}>{error}</p>}
           </div>
+          {/*
+            The list and the two jumps that move around it are one thing:
+            Opening and Latest are the ends of this list, and the arrow keys
+            walk it. They lived under Tools, which is for how the board is
+            looked at — flipping it, exploring on it — not for where in the
+            game you are.
+          */}
           <div className="panel moves-panel">
             <h2>Moves</h2>
             {history.length === 0 ? (
@@ -1131,6 +1117,30 @@ export default function GameView({
                 })}
               </ol>
             )}
+            <div className="moves-controls">
+              <div className="row">
+                <button
+                  className="btn"
+                  onClick={() => goToPly(openingPly)}
+                  disabled={openingPly === null || viewingPly === openingPly}
+                  title="Both home rows placed, before the first move"
+                >
+                  Opening
+                </button>
+                <button
+                  className="btn"
+                  onClick={() => goToPly(null)}
+                  disabled={!reviewing}
+                >
+                  Latest
+                </button>
+              </div>
+              <p className="hint">
+                {reviewing
+                  ? `Reviewing move ${viewingPly} of ${game.ply}`
+                  : "← → to review history"}
+              </p>
+            </div>
           </div>
 
         </aside>
