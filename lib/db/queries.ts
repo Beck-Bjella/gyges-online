@@ -119,18 +119,23 @@ export interface Game {
   /** The side offering a draw, while one is on offer. Null otherwise. */
   draw_offered_by: Player | null;
   /**
-   * Whether this game counts towards ratings. 1 by default.
+   * Whether this game counts towards ratings. Always 1 today.
    *
-   * A rated game also refuses takebacks against the engine — see undoTurn.
-   * That is the point of the flag: somewhere to experiment that costs nothing.
+   * There was briefly a casual mode, and it was taken out rather than kept:
+   * with this few players, two kinds of game means two thinner pools and
+   * every list shorter. The column stays because it costs nothing and the
+   * question it asks may come back with more players — but nothing sets it to
+   * 0, and the ladder still filters on it, so that day needs no new plumbing.
    */
   rated: number;
   /**
    * How many times this game has been rewound.
    *
    * Against the engine a player may take a move back whenever they like, and
-   * undoTurn deletes the rows — so nothing else would show it happened. The
-   * engine ladder rates only games where this is 0; see migrations/0010.
+   * undoTurn deletes the rows — so nothing else would show it happened. This
+   * is what keeps the ladder honest without forbidding anything: rewind a
+   * game and it stops counting, which is the whole price of the rewind. See
+   * migrations/0010.
    */
   takebacks_used: number;
 }
@@ -1508,14 +1513,6 @@ export function undoTurn(gameId: string, userId: string): GameWithPlayers {
     if (bot === null) {
       throw new GameError("Against a person, takebacks are offered — from the winner, when the game ends.", 409);
     }
-    // A rule you can see before you break it, rather than a game quietly
-    // disqualified from the ladder afterwards.
-    if (game.rated) {
-      throw new GameError(
-        "This game is rated, so moves stand. Start a casual game to experiment.",
-        409,
-      );
-    }
     const removed = 2;
 
     // Every removed row must be an ordinary move by the expected side; setup
@@ -2060,13 +2057,13 @@ export interface EngineGameRow {
 /**
  * Every finished bot game that counts towards the engine ladder, oldest first.
  *
- * Two exclusions, and both matter:
+ * The exclusion that matters is **rewound games**. Against the engine a
+ * player may take back a move as often as they like, so a game played with
+ * takebacks says nothing about who would have won — undo until you win and
+ * every game is a win. Taking a move back stays allowed; it just costs the
+ * game its place on the ladder.
  *
- * - **Casual games**, which is what the flag is for: somewhere to try things
- *   without the ladder watching.
- * - **Rewound games.** A rated game refuses takebacks now, so this only
- *   catches games played before that rule existed — but it catches them, and
- *   a game undone until it was won says nothing about who would have won.
+ * `rated` is checked too, though nothing sets it to 0 today — see the column.
  * - **Games against a retired bot**, filtered by the caller: an anchor it no
  *   longer has is an anchor nobody can rate against.
  *

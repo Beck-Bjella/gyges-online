@@ -1443,22 +1443,6 @@ td.num {
   width: 100%;
 }
 
-/* Rated is the default, so the box is the exception and reads as one. */
-.start-check {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: var(--text-secondary);
-  cursor: pointer;
-}
-.start-check input {
-  accent-color: var(--accent-mint);
-  width: 15px;
-  height: 15px;
-  cursor: pointer;
-}
-
 /*
  * The hosting panel reads left to right: what hosting means, then the two
  * controls that do it. On narrow screens the halves stack instead.

@@ -128,7 +128,7 @@ export async function createGameAction(
   }
 
   try {
-    createGame(user.id, seconds, undefined, formData.get("casual") === null);
+    createGame(user.id, seconds);
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Could not create the game." };
   }
@@ -193,13 +193,9 @@ export async function createBotGameAction(
     return { error: "Invalid time control." };
   }
 
-  // Unchecked box sends nothing, so absence is "rated" — which is also the
-  // right default when this is called from somewhere with no box at all.
-  const rated = formData.get("casual") === null;
-
   let id: string;
   try {
-    id = createBotGame(user.id, botId, seconds, rated).id;
+    id = createBotGame(user.id, botId, seconds).id;
   } catch (err) {
     if (err instanceof GameError) return { error: err.message };
     return { error: "Could not start that game." };

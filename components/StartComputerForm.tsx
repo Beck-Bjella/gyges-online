@@ -24,7 +24,10 @@ export default function StartComputerForm({ bots }: { bots: BotChoice[] }) {
   return (
     <form action={submit} className="panel start-card">
       <h2>Play the computer</h2>
-      <p className="muted">Starts at once, and it waits as long as you do.</p>
+      <p className="muted">
+        Starts at once, and it waits as long as you do. Take a move back and
+        the game stops counting towards your rating.
+      </p>
 
       <label className="start-field">
         <span>Opponent</span>
@@ -35,13 +38,6 @@ export default function StartComputerForm({ bots }: { bots: BotChoice[] }) {
             </option>
           ))}
         </select>
-      </label>
-
-      <label className="start-check">
-        {/* Casual is also where taking moves back lives: a rated game refuses
-            them, so this box is the difference between a test and a result. */}
-        <input type="checkbox" name="casual" />
-        <span>Casual — take moves back</span>
       </label>
 
       <button type="submit" className="btn btn-primary" disabled={pending}>

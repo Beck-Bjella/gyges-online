@@ -35,11 +35,6 @@ export default function NewGameForm() {
         </select>
       </label>
 
-      <label className="start-check">
-        <input type="checkbox" name="casual" />
-        <span>Casual — does not count</span>
-      </label>
-
       <button type="submit" className="btn btn-primary" disabled={pending}>
         {pending ? "…" : "Host table"}
       </button>

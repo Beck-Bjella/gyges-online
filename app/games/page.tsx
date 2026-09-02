@@ -139,11 +139,6 @@ export default async function GamesPage() {
                   <div className="game-card-meta">
                     <div>
                       <strong>{nameLink(g.player1_name)}</strong>
-                      {g.rated === 0 && (
-                        <span className="tag" style={{ marginLeft: 8 }}>
-                          casual
-                        </span>
-                      )}
                     </div>
                     <span className="muted">
                       {describeTimeControl(g.move_seconds)} ·{" "}
