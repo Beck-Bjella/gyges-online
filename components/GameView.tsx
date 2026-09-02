@@ -1135,11 +1135,10 @@ export default function GameView({
                   Latest
                 </button>
               </div>
-              <p className="hint">
-                {reviewing
-                  ? `Reviewing move ${viewingPly} of ${game.ply}`
-                  : "← → to review history"}
-              </p>
+              {/* Always the same line. Which move is being reviewed is on the
+                  board and in its banner already, and a hint that changes into
+                  a status reads as something having gone wrong. */}
+              <p className="hint">← → to review history</p>
             </div>
           </div>
 
