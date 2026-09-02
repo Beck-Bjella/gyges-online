@@ -1,0 +1,17 @@
+-- 0008_add_draw_offer — a draw may be agreed.
+--
+-- Until now `games.result = 0` was a value nothing could produce. A game ends
+-- at the goal, by resignation, or on time, and all three name a winner; the
+-- rules cannot deadlock either, because a piece that lands on an occupied
+-- square displaces it and there is always an empty square to displace it to.
+-- So the draw columns on every statistics query were counting an event that
+-- could not happen.
+--
+-- The one real way a Gygès game draws is that both players agree to stop, and
+-- that is what this adds. Without it the only escape from a position neither
+-- side can win is for someone to resign a game they did not lose.
+--
+-- Which SIDE offered, not merely that someone did: either player may offer,
+-- and the answer has to come from the other one. 1, -1, or NULL for no offer,
+-- the same encoding as games.turn.
+ALTER TABLE games ADD COLUMN draw_offered_by INTEGER;

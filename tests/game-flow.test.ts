@@ -48,6 +48,8 @@ const {
   claimTimeout,
   sideOf,
   leaderboard,
+  offerDraw,
+  answerDraw,
   createSession,
   userForSession,
   GameError,
@@ -752,6 +754,78 @@ test("between people, a move is never taken back unilaterally", () => {
   // The instant takeback is for bot games; between people it is an offer,
   // made by the winner once the game ends at the goal.
   assert.throws(() => undoTurn(gameId, b.id), /offered/i);
+});
+
+// --- draws ----------------------------------------------------------------
+//
+// The only ending neither player can reach alone. Every other way a game
+// finishes names a winner, and the rules cannot deadlock — a piece landing on
+// an occupied square displaces it, and with twelve pieces on thirty-six
+// squares there is always somewhere to displace it to. So agreement is the
+// only thing that can produce result = 0.
+
+test("a draw is offered by one player and accepted by the other", () => {
+  const { a, b, gameId } = twoPlayerGame();
+  submitMove(gameId, a.id, P1_OPENING);
+
+  const offered = offerDraw(gameId, b.id);
+  assert.equal(offered.draw_offered_by, -1);
+  assert.equal(offered.status, "active", "an offer is not a move");
+  assert.equal(offered.turn, -1, "and does not pass the turn");
+
+  assert.throws(() => answerDraw(gameId, b.id, true), /your own offer/i);
+
+  const drawn = answerDraw(gameId, a.id, true);
+  assert.equal(drawn.status, "finished");
+  assert.equal(drawn.result, 0, "the one way a game draws");
+  assert.equal(drawn.result_reason, "agreement");
+  assert.equal(drawn.draw_offered_by, null);
+});
+
+test("declining a draw leaves the game exactly as it was", () => {
+  const { a, b, gameId } = twoPlayerGame();
+  submitMove(gameId, a.id, P1_OPENING);
+  offerDraw(gameId, a.id);
+
+  const declined = answerDraw(gameId, b.id, false);
+  assert.equal(declined.status, "active");
+  assert.equal(declined.result, null);
+  assert.equal(declined.draw_offered_by, null);
+  assert.equal(declined.turn, -1, "still their move");
+
+  // And the offer is gone, not merely answered.
+  assert.throws(() => answerDraw(gameId, b.id, true), /no draw/i);
+});
+
+test("an offerer may withdraw their own draw offer", () => {
+  const { a, gameId } = twoPlayerGame();
+  submitMove(gameId, a.id, P1_OPENING);
+  offerDraw(gameId, a.id);
+  assert.throws(() => offerDraw(gameId, a.id), /already on the table/i);
+
+  const withdrawn = answerDraw(gameId, a.id, false);
+  assert.equal(withdrawn.draw_offered_by, null);
+});
+
+test("playing on clears a draw offer", () => {
+  const { a, b, gameId } = twoPlayerGame();
+  submitMove(gameId, a.id, P1_OPENING);
+  offerDraw(gameId, a.id);
+
+  // The offer was about a position that no longer exists.
+  const after = submitMove(gameId, b.id, P2_REPLY);
+  assert.equal(after.draw_offered_by, null);
+  assert.throws(() => answerDraw(gameId, a.id, true), /no draw/i);
+});
+
+test("only a player may offer or answer a draw", () => {
+  const { a, gameId } = twoPlayerGame();
+  submitMove(gameId, a.id, P1_OPENING);
+  const stranger = createUser("stranger-draw");
+
+  assert.throws(() => offerDraw(gameId, stranger.id), /not a player/i);
+  offerDraw(gameId, a.id);
+  assert.throws(() => answerDraw(gameId, stranger.id, true), /not a player/i);
 });
 
 test("a takeback is offered by the winner and answered by the loser", () => {

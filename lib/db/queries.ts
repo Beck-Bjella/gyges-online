@@ -116,6 +116,8 @@ export interface Game {
   invited_id: string | null;
   /** 1 while the winner of a goal-ended game is offering the loser a rewind. */
   takeback_offered: number;
+  /** The side offering a draw, while one is on offer. Null otherwise. */
+  draw_offered_by: Player | null;
 }
 
 export interface MoveRow {
@@ -448,7 +450,7 @@ const GAME_COLUMNS = `
   g.id, g.player1_id, g.player2_id, g.status, g.turn, g.result, g.result_reason,
   g.start_board, g.board, g.ply, g.move_seconds, g.deadline_at,
   g.created_at, g.started_at, g.finished_at, g.updated_at, g.invited_id,
-  g.takeback_offered,
+  g.takeback_offered, g.draw_offered_by,
   p1.username AS player1_name, p2.username AS player2_name,
   inv.username AS invited_name,
   (SELECT m.move FROM moves m
@@ -524,6 +526,7 @@ export function createGame(
     updated_at: now(),
     invited_id: null,
     takeback_offered: 0,
+    draw_offered_by: null,
   };
 
   getDb()
@@ -1295,6 +1298,8 @@ export function submitMove(gameId: string, userId: string, mv: Move): GameWithPl
     // change and we abort rather than overwriting their move. The same
     // condition works on SQLite and Postgres, so this survives the migration.
     const guard = "WHERE id = ? AND ply = ? AND turn = ? AND status = 'active'";
+    // Playing on answers a draw offer the way it does over a board: the offer
+    // was about a position that no longer exists, so it does not outlive it.
     const expectedPly = game.ply;
 
     const result = finished
@@ -1303,14 +1308,15 @@ export function submitMove(gameId: string, userId: string, mv: Move): GameWithPl
             `UPDATE games
                 SET board = ?, ply = ?, status = 'finished', result = ?,
                     result_reason = 'goal', deadline_at = NULL,
-                    finished_at = ?, updated_at = ?
+                    draw_offered_by = NULL, finished_at = ?, updated_at = ?
               ${guard}`,
           )
           .run(encoded, ply, winner(nextBoard), now(), now(), gameId, expectedPly, side)
       : db
           .prepare(
             `UPDATE games
-                SET board = ?, ply = ?, turn = ?, deadline_at = ?, updated_at = ?
+                SET board = ?, ply = ?, turn = ?, deadline_at = ?,
+                    draw_offered_by = NULL, updated_at = ?
               ${guard}`,
           )
           .run(
@@ -1485,6 +1491,90 @@ export function offerTakeback(gameId: string, userId: string): GameWithPlayers {
       now(),
       gameId,
     );
+    return getGame(gameId)!;
+  });
+}
+
+/**
+ * Offer a draw.
+ *
+ * Either player, at any point in a live game, and it does not cost them their
+ * turn — an offer is a question, not a move. Re-offering while your own offer
+ * stands is refused rather than silently doing nothing, so the button can say
+ * why.
+ *
+ * Not against the engine: it has no view on whether a position is drawn, and
+ * a bot that always declined would just be a button that never works.
+ */
+export function offerDraw(gameId: string, userId: string): GameWithPlayers {
+  return transaction(() => {
+    const db = getDb();
+    const game = db.prepare("SELECT * FROM games WHERE id = ?").get(gameId) as
+      | Game
+      | undefined;
+    if (!game) throw new GameError("Game not found.", 404);
+    if (game.status !== "active") throw new GameError("This game is not in play.");
+    if (botInGame(game)) throw new GameError("The engine does not agree draws.");
+    const side = sideOf(game, userId);
+    if (side === null) throw new GameError("You are not a player in this game.", 403);
+    if (game.draw_offered_by === side) {
+      throw new GameError("Your draw offer is already on the table.");
+    }
+    // Their offer stands and you are entitled to answer it, but silently
+    // turning "offer" into "accept" is not something a button should do.
+    if (game.draw_offered_by !== null) {
+      throw new GameError("They have already offered a draw — accept or decline it.");
+    }
+
+    db.prepare(
+      "UPDATE games SET draw_offered_by = ?, updated_at = ? WHERE id = ?",
+    ).run(side, now(), gameId);
+    return getGame(gameId)!;
+  });
+}
+
+/**
+ * Answer a draw offer, or withdraw your own.
+ *
+ * Accepting ends the game at result 0 — the one thing that can produce a drawn
+ * game. Declining clears the offer and play continues; the offerer clearing
+ * their own offer is the same operation, which is why this does not insist the
+ * answer come from the other side.
+ */
+export function answerDraw(
+  gameId: string,
+  userId: string,
+  accept: boolean,
+): GameWithPlayers {
+  return transaction(() => {
+    const db = getDb();
+    const game = db.prepare("SELECT * FROM games WHERE id = ?").get(gameId) as
+      | Game
+      | undefined;
+    if (!game) throw new GameError("Game not found.", 404);
+    if (game.draw_offered_by === null) {
+      throw new GameError("No draw is on offer.", 404);
+    }
+    const side = sideOf(game, userId);
+    if (side === null) throw new GameError("You are not a player in this game.", 403);
+    if (accept && side === game.draw_offered_by) {
+      throw new GameError("You cannot accept your own offer.", 403);
+    }
+
+    if (!accept) {
+      db.prepare(
+        "UPDATE games SET draw_offered_by = NULL, updated_at = ? WHERE id = ?",
+      ).run(now(), gameId);
+      return getGame(gameId)!;
+    }
+
+    db.prepare(
+      `UPDATE games
+          SET status = 'finished', result = 0, result_reason = 'agreement',
+              draw_offered_by = NULL, deadline_at = NULL,
+              finished_at = ?, updated_at = ?
+        WHERE id = ? AND status = 'active'`,
+    ).run(now(), now(), gameId);
     return getGame(gameId)!;
   });
 }

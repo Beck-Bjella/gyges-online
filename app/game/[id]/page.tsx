@@ -37,6 +37,7 @@ export default async function GamePage({
         result: game.result,
         resultReason: game.result_reason,
         takebackOffered: game.takeback_offered === 1,
+        drawOfferedBy: game.draw_offered_by,
         ply: game.ply,
         moveSeconds: game.move_seconds,
         deadlineAt: game.deadline_at,

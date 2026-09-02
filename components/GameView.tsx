@@ -37,6 +37,8 @@ interface GameSummary {
   resultReason: string | null;
   /** The winner of a goal-ended game is offering the loser a rewind. */
   takebackOffered: boolean;
+  /** The side with a draw offer standing, if any. */
+  drawOfferedBy: Player | null;
   ply: number;
   moveSeconds: number;
   deadlineAt: number | null;
@@ -583,6 +585,31 @@ export default function GameView({
     [game.id, router],
   );
 
+  /** The draw conversation: either player offers, the other answers. */
+  const draw = useCallback(
+    async (op: "offer" | "accept" | "decline") => {
+      if (op === "offer" && !confirm("Offer a draw?")) return;
+      if (op === "accept" && !confirm("Agree to a draw? The game ends here.")) return;
+      setPending(true);
+      try {
+        const res = await fetch(`/api/games/${game.id}/draw`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ op }),
+        });
+        if (!res.ok) {
+          const body = (await res.json().catch(() => ({}))) as { error?: string };
+          setError(body.error ?? "Could not do that.");
+          return;
+        }
+        router.refresh();
+      } finally {
+        setPending(false);
+      }
+    },
+    [game.id, router],
+  );
+
   /** Withdraw an open table before anyone joins. The game is deleted. */
   const cancel = useCallback(async () => {
     if (!confirm("Cancel this game? It will be removed.")) return;
@@ -995,6 +1022,33 @@ export default function GameView({
                     {game.botSide === null ? "Give back their turn" : "Take back move"}
                   </button>
                 )}
+                {/* A draw is the only ending neither player can reach alone,
+                    so it is the only one that needs both buttons. Against the
+                    engine there is nobody to agree with. */}
+                {game.botSide === null && game.drawOfferedBy === null && (
+                  <button className="btn" onClick={() => draw("offer")} disabled={pending}>
+                    Offer draw
+                  </button>
+                )}
+                {game.drawOfferedBy === viewerSide && (
+                  <button className="btn" onClick={() => draw("decline")} disabled={pending}>
+                    Withdraw draw offer
+                  </button>
+                )}
+                {game.drawOfferedBy !== null && game.drawOfferedBy !== viewerSide && (
+                  <>
+                    <button
+                      className="btn btn-primary"
+                      onClick={() => draw("accept")}
+                      disabled={pending}
+                    >
+                      Accept draw
+                    </button>
+                    <button className="btn" onClick={() => draw("decline")} disabled={pending}>
+                      Decline
+                    </button>
+                  </>
+                )}
                 <button
                   className="btn btn-danger"
                   onClick={resign}
@@ -1245,7 +1299,9 @@ function Status({
         ? " by resignation"
         : game.resultReason === "timeout"
           ? " on time"
-          : "";
+          : game.resultReason === "agreement"
+            ? " by agreement"
+            : "";
     return (
       <>
         <p style={{ margin: "0 0 8px" }}>
@@ -1274,6 +1330,22 @@ function Status({
           </span>
         )}
       </p>
+      {/* A draw offer is a second thing waiting on someone, independent of
+          whose move it is — so it says who it is waiting on rather than
+          leaving it to be inferred from the buttons below. */}
+      {game.drawOfferedBy !== null && (
+        <p
+          style={{
+            margin: "0 0 8px",
+            color: "var(--accent-amber)",
+            fontSize: 13.5,
+          }}
+        >
+          {game.drawOfferedBy === viewerSide
+            ? "You have offered a draw — their call."
+            : "A draw is offered — accept or decline below."}
+        </p>
+      )}
       <p className="muted" style={{ margin: 0, lineHeight: 1.6 }}>
         P1 {nameLink(game.player1Name)} · P2 {nameLink(game.player2Name)}
         <br />

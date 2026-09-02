@@ -244,7 +244,13 @@ function MyGame({
   // otherwise.
   const takebackForYou =
     game.status === "finished" && game.takeback_offered === 1 && side !== game.result;
-  const yourTurn = (inPlay && side === game.turn) || takebackForYou;
+  // A draw offered to you is the same kind of thing: the game is waiting on an
+  // answer from you, whoever's move it is.
+  const drawForYou =
+    game.status === "active" &&
+    game.draw_offered_by !== null &&
+    game.draw_offered_by !== side;
+  const yourTurn = (inPlay && side === game.turn) || takebackForYou || drawForYou;
   const open = game.status === "open";
 
   // Two states cover everything unfinished: it is your turn, or you are
@@ -257,7 +263,8 @@ function MyGame({
   const waitingLabel = waitingOn ? `waiting for ${waitingOn}` : "waiting for opponent";
 
   let label: string;
-  if (open) label = waitingLabel;
+  if (drawForYou) label = "draw offered — your call";
+  else if (open) label = waitingLabel;
   else if (game.status === "setup") {
     label = yourTurn ? "your turn" : waitingLabel;
   } else if (game.status === "finished") {
