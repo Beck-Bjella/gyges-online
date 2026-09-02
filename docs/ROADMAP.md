@@ -151,16 +151,23 @@ Small, and none of it optional once strangers can reach the site.
 
 Independent of the engine. The site is a real site without it.
 
-- Vercel for the app, Neon for Postgres, NameHero for the domain only.
-- The database migration is small but not purely mechanical — the known
-  differences are listed at the top of `migrations/0001_initial.sql`.
+- **One Linux box — Lightsail 2 GB — with the SQLite file on its disk, Caddy
+  in front for TLS, systemd keeping the process up, and the domain's A record
+  pointed at the static IP.** The full shape, and why this replaced Vercel plus
+  Neon Postgres, is in ARCHITECTURE.md under "Hosting".
+- **The Postgres port is off the roadmap.** It existed only because Vercel
+  cannot keep a file. The schema stays inside the portable subset regardless —
+  the known differences are listed at the top of `migrations/0001_initial.sql`
+  — so the door stays open at no cost.
 - **Migrations are already set up** (`migrations/`, `npm run db:migrate`), which
-  is the thing that makes a hosted schema change routine rather than
-  frightening. Keep writing them: never edit an applied migration.
-- **Use a pooled connection string.** Serverless functions each open their own
-  database connection, and a traffic spike can exhaust the pool while the app
-  itself is fine. Neon provides a pooled URL for exactly this; picking the
-  wrong one is the most common way a small Next.js + Postgres site falls over.
+  is the thing that makes a schema change routine rather than frightening. Keep
+  writing them: never edit an applied migration.
+- **Still to write, once, before the first deploy:** the systemd unit, the
+  Caddyfile, a deploy script (pull, `npm ci`, build, restart), a cron entry
+  running `npm run db:backup` and copying the result to S3, and an external
+  uptime check.
+- **Sign-in has no throttling.** Not infrastructure — a gap in the app, and the
+  one security item worth closing before the URL is public.
 - **Primary keys are already time-ordered.** `newId()` puts a millisecond
   timestamp in front of the random half, so inserts append to the end of the
   index rather than scattering through it — which was the page-split and
@@ -169,11 +176,11 @@ Independent of the engine. The site is a real site without it.
   avoid that at the cost of rewriting every foreign key, and is not worth doing
   until it measurably hurts.
 - **`listGamesForUser` will be the first slow query.** `WHERE player1_id = ?
-  OR player2_id = ?` cannot use one index, so Postgres bitmap-ORs two indexes
-  and then sorts every match before applying LIMIT. Invisible at 50 games,
-  real at 50,000. Lichess solves this with a denormalised `playerUids` array
-  it can index directly; the Postgres equivalent is a generated
-  `player_ids TEXT[]` column with a GIN index. Not worth doing until it hurts.
+  OR player2_id = ?` cannot use a single index, so the planner takes both and
+  sorts every match before applying LIMIT. Invisible at 50 games, real at
+  50,000. Lichess solves it with a denormalised `playerUids` array it can index
+  directly; on SQLite the equivalent is a `UNION ALL` of two indexed halves, or
+  a join table. Not worth doing until it hurts.
 
 ---
 

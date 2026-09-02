@@ -13,9 +13,11 @@ displacement moves, per-move history with review, resignation, forfeit on time,
 and a leaderboard. The server enforces participation, turn order, **and the
 rules of Gygès**. 135 unit tests and 63 end-to-end checks pass.
 
-**Local stack differs from the target in one place:** development uses SQLite
-rather than Postgres, on a schema deliberately restricted to the portable
-subset. Everything else below describes the intended production shape.
+**Reversed decision — SQLite is the production database, not a stand-in for
+one.** This document used to describe development on SQLite and production on
+Neon Postgres. That port is off the roadmap; see "Hosting" below for why. The
+schema stays inside the portable subset anyway, which costs nothing and keeps
+the door open.
 
 **Playing the engine works**, and nothing about it runs on the server: the
 engine is compiled to WebAssembly and searches in the player's own browser. See
@@ -242,9 +244,10 @@ not a proof of the engine's strength.
 ### What it costs
 
 The wasm is 28 MB — 5 MB of engine and 23 MB of network — which the browser
-caches after the first visit. On Vercel's free tier that is roughly 3,500 first
-visits a month before bandwidth becomes the limit; quantising the network would
-push that considerably further. Compute is free, because there is none.
+caches after the first visit. On a Lightsail instance, whose bundled transfer
+is measured in terabytes, that is tens of thousands of first visits a month
+before bandwidth is worth a thought; quantising the network would push it
+further still. Compute is free, because there is none.
 
 ### What the database does NOT do
 
@@ -464,9 +467,9 @@ design.
 
 ### Hosting consequence and cost
 
-This service cannot be serverless: the engine wants real threads (`YbwcPool`) and
-seconds of CPU, which Vercel functions do not provide. It needs an ordinary
-always-on host — Railway or Fly, roughly **$2-5/mo**.
+This service cannot be serverless: the engine wants real threads (`YbwcPool`)
+and seconds of CPU. It needs an ordinary always-on host — which, now that the
+site itself runs on one, is that same box. Nothing extra to rent.
 
 That is the entire cost, and it stays small because **correspondence play is the
 cheapest possible workload**:
@@ -628,8 +631,9 @@ often three separate companies.
 3. **The database** — permanent storage for accounts, games, and moves. Survives
    restarts, crashes, and deploys.
 
-A single provider *can* do all three. NameHero cannot do all three for this
-particular app, for the reasons in the Hosting section below.
+A single provider *can* do all three, and here two of them are the same box:
+the application and the database live together, because the database is a file
+on that machine's disk. Only the domain is bought elsewhere. See "Hosting".
 
 ## Why each tool
 
@@ -643,20 +647,25 @@ a board or a move is written once and used by both sides.
 38 numbers and a page expects something else, that is caught while writing the
 code rather than by a player hitting a broken screen.
 
-**PostgreSQL** over MySQL because it is stricter about *bookkeeping* integrity.
-It can refuse impossible rows — two moves both claiming to be ply 7 of one game,
-or a game referencing a player who does not exist. This is ordinary record
-keeping and involves no knowledge of Gygès; the rules live in Rust, never in the
-schema.
+**SQLite** because this application is shaped exactly like the workload SQLite
+is good at, and because a database that is a file is one you can copy, inspect
+and restore with tools you already have. It refuses impossible rows the way
+Postgres would — two moves both claiming to be ply 7 of one game, a game
+referencing a player who does not exist — and that is the whole of what the
+database is asked to do. It holds no knowledge of Gygès; the rules live in
+Rust, never in the schema.
 
-**Vercel** is made by the same people as Next.js. Connect the GitHub repo and
-every push deploys automatically; HTTPS, CDN, and scaling are handled. Crucially
-it does not sleep — some free hosts shut down after minutes of inactivity and
-take about a minute to wake, which makes a site look broken to anyone arriving
-during a quiet period.
+Writes are serialised, one at a time, which sounds like a limit until it meets
+the actual load: one row per move, and moves arrive minutes or days apart. With
+WAL enabled readers never wait for the writer. Reads come out of the OS page
+cache rather than over a network, which is why the query layer is synchronous.
 
-**Neon** runs the Postgres server so it does not have to be installed, patched,
-or backed up by hand.
+**One always-on Linux box** rather than a serverless platform. Serverless asks
+an application to have no memory between requests: a fresh process every time,
+a blank disk, possibly in another region. Every part of this app disagrees with
+that — an open file handle, a WAL beside it, a connection cached for the life
+of the process. Renting one small machine is not a compromise here; it is the
+shape the program already has.
 
 **Resend** sends the "it's your turn" emails. Correspondence play is unusable
 without them.
@@ -669,15 +678,17 @@ Each piece does a single job and any one can be replaced without disturbing the
 others:
 
 ```
-Browser
+Browser  ---- runs the engine itself (wasm) for bot moves
    |
    v
-Vercel (Next.js)  --->  Neon Postgres     accounts, games, move lists
+One Linux box
    |
-   +-------------->  Engine service       legality now, bot moves later
-   |                   (Rust exe + bridge)
+   +--  Caddy          TLS, reverse proxy to :3000
+   +--  Next.js        pages and server code, under systemd
+   +--  SQLite file    accounts, games, move lists, on the instance disk
    |
-   +-------------->  Resend               "it's your turn" email
+   +-------------->  S3        nightly copy of the database file
+   +-------------->  Resend    "it's your turn" email
 ```
 
 The site holds no game knowledge; it asks the engine service. The database holds
@@ -685,64 +696,92 @@ no game knowledge; it stores rows.
 
 ## Hosting
 
-**Use NameHero for the domain only. Host the application elsewhere.**
+**One small Linux box, the database on its disk, the domain pointed at its IP.**
 
-NameHero's shared/cPanel plans are the wrong platform for this app:
+### Why not Vercel and a managed Postgres
 
-- Their database documentation covers **only MySQL/MariaDB**; there is no
-  evidence Postgres is available on shared plans.
-- It is a PHP / LiteSpeed / WordPress platform. Node runs, if at all, under a
-  Passenger-based cPanel "Node.js Selector" with constrained RAM and no real
-  control over the process supervisor — a poor fit for Next.js.
-- Their VPS plans (~$5–22/mo, root access) *would* work, but that means doing
-  your own sysadmin against platforms purpose-built for this.
+That was the plan, and reversing it removes the largest single item from the
+roadmap. Vercel cannot keep a file, so the arrangement required porting every
+query in the data layer from synchronous SQLite to asynchronous Postgres — a
+change touching every caller, undertaken for no reason but the platform. The
+application gains nothing from it: a network round trip replaces a page read,
+and code that is correct today becomes code that has to be re-verified.
 
-A registrar and a host do not have to be the same company. Buy the domain at
-NameHero and point the DNS wherever the app lives. This costs nothing extra and
-keeps every option open.
+The rest of the case is ordinary operations. A database that is a file can be
+copied, opened with `sqlite3` over SSH, and restored by putting it back;
+`npm run db:backup` already does exactly that. Resetting is deleting a file.
+None of these are harder in the managed version, but none are easier either,
+and each adds a console and a connection string between the operator and the
+data.
 
-### Recommended starting point
+What is given up: the platform no longer handles TLS, restarts and deploys, so
+those become a Caddyfile, a systemd unit and a shell script. That is one
+evening, once.
+
+### The shape
+
+- **Instance.** AWS Lightsail, 2 GB. The 512 MB tier cannot finish a Next
+  build and 1 GB needs swap to manage it; the build is the only memory-hungry
+  moment in the system, and a deploy that dies halfway is what makes people
+  resent their own infrastructure. EC2 is equivalent and slightly dearer once
+  the separately-billed IPv4 address is counted — worth it for VPC or IAM
+  control, such as letting the backup job assume a role rather than hold a key.
+- **Disk.** The database on the instance's own volume, and **never on EFS or
+  any network filesystem** — SQLite's locking assumes a local disk, and over
+  NFS it can corrupt rather than merely underperform. `GYGES_DB_PATH` chooses
+  the path.
+- **Process.** systemd, `Restart=always`, `systemctl enable`. Crashes and
+  reboots recover unattended.
+- **TLS.** Caddy in front, obtaining and renewing certificates by itself. Ports
+  80 and 443 both open: 443 carries the traffic, 80 answers the certificate
+  challenge.
+- **One process against the file.** Several processes on one host are fine —
+  SQLite locks properly — but never two machines sharing a volume.
+- **Backups.** Cron runs `npm run db:backup` and copies the result to S3, so a
+  copy exists off the machine; instance snapshots cover the whole disk. A
+  snapshot alone is not a backup if the account is what goes wrong.
+- **Watching.** An external uptime ping (Healthchecks.io, UptimeRobot) rather
+  than CloudWatch alone: what matters is whether the site answers, not whether
+  the instance is running.
+- **Domain.** Any registrar; a registrar and a host need not be the same
+  company. One A record for the apex pointing at the **static** IP — a
+  Lightsail static IP or an EC2 Elastic IP, never the default public address,
+  which changes when the instance stops. `www` as a second A record or a CNAME
+  to the apex. Point DNS before starting Caddy, since the certificate challenge
+  needs the name to resolve first.
+- **`GYGES_INSECURE_COOKIES` must stay unset.** It exists so LAN testing over
+  plain http works; set in production it stops session cookies being Secure.
+
+### Cost
 
 | Concern | Choice | Cost |
 |---------|--------|------|
-| App | Vercel Hobby | $0 |
-| Database | Neon free tier | $0 |
+| App and database | Lightsail 2 GB | ~$12/mo |
+| Backups | S3 | pennies |
 | Email | Resend free tier | $0 |
-| Domain | NameHero | ~$10–15/yr |
+| Domain | any registrar | ~$10–15/yr |
 
-Two caveats on this combination, both of which are fine now and worth revisiting
-if the site grows:
-
-1. **Vercel's Hobby tier is designated personal / non-commercial.** The moment
-   this site takes money — subscriptions, ads, anything — it needs Vercel Pro
-   ($20/mo) or a different host.
-2. **Vercel Hobby cron fires at most once per day.** Correspondence games need a
-   periodic job to forfeit players who exceed their move deadline. Once a day is
-   tolerable for a 72-hour deadline, but it is a real constraint. If finer
-   granularity is needed, an alternative is to resolve expiry lazily — check and
-   settle the deadline whenever a game is loaded — with the daily job as a
-   backstop.
+At a registrar the renewal price is what matters, not the first-year promotion.
 
 Notes on the alternatives considered:
 
-- **Neon over Supabase** for the database: Supabase's free tier **pauses a
-  project after one week of inactivity**, requiring manual restore. For a
-  turn-based game with quiet stretches, that is a real hazard. Neon suspends
-  after 5 minutes idle but wakes automatically on the next query, and its paid
-  path scales by usage rather than jumping to a $25/mo tier.
-- **Avoid Render's free tier.** It spins down after 15 minutes without traffic
-  and takes roughly a minute to wake, showing a loading page. The app would feel
-  broken to anyone arriving at a quiet moment.
-- **Railway Hobby ($5/mo)** or **Fly.io (~$2–5/mo)** are better shaped than
-  Vercel if real background workers or sub-daily cron become necessary, because
-  both run ordinary long-lived containers rather than bounded serverless
-  functions.
-- **Fly.io no longer has a free tier** — the free allowances were discontinued
-  in October 2024.
+- **Fly.io or Render with a persistent volume** keep a real disk and a
+  long-lived process, so SQLite works untouched while deploys and certificates
+  stay someone else's problem — a reasonable middle if the sysadmin part is
+  unwelcome. Avoid Render's *free* tier, which spins down after 15 minutes
+  without traffic and takes about a minute to wake; the site would look broken
+  to anyone arriving in a quiet stretch. Fly.io's free allowances ended in
+  October 2024.
+- **A registrar's shared/cPanel hosting** is the wrong platform whatever the
+  database: a PHP/LiteSpeed estate where Node runs, if at all, under a
+  Passenger-based selector with constrained RAM and no real control over the
+  process supervisor.
+- **Serverless generally** — Vercel, Lambda, App Runner, Fargate — is ruled out
+  by one property rather than by price: no durable local disk.
 
-*Pricing verified August 2026 from provider pricing pages; NameHero figures come
-from third-party reviews because their site blocks automated access. Re-check
-before committing money.*
+*Prices are approximate and move; re-check before committing money. AWS bills
+a public IPv4 address separately on EC2, which is the line people forget when
+comparing it against Lightsail's bundled pricing.*
 
 ---
 

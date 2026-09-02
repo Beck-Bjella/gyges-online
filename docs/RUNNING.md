@@ -156,43 +156,46 @@ is always on, with a domain name pointing at it.
 
 | | Your PC now | Hosted later |
 |---|---|---|
-| Where the app runs | `npm run dev` in your terminal | Vercel, always on |
+| Where the app runs | `npm run dev` in your terminal | `npm start` on a rented Linux box, kept up by systemd |
 | Who can reach it | you, or your wifi | anyone, via your domain |
-| Database | SQLite file in `.data/` | Neon Postgres, over the network |
+| Database | SQLite file in `.data/` | the same SQLite file, on that machine's disk |
 | Uptime | while your terminal is open | continuous |
 | Address | `localhost:3000` | `yourdomain.com` |
 
 ### What does not change
 
-The pages, the board, the game logic, the API routes, the schema. Deploying is
-not a rewrite — it is the same program, somewhere else.
+The pages, the board, the game logic, the API routes, the schema — and the
+database. Deploying is not a rewrite and not a port: it is the same program,
+reading the same kind of file, somewhere else. `GYGES_DB_PATH` points it at a
+path on the server instead of `.data/`, and that is the whole of the
+difference.
 
-The one real code change is the database connection. Locally the app opens a
-file; hosted, it connects to Postgres over the network. That is why
-The schema in `migrations/` is deliberately restricted to SQL both understand: the
-tables, columns, and constraints port as-is, and only `lib/db/index.ts` and the
-query calls need adapting.
+This is why the host has to be an ordinary always-on machine rather than a
+serverless platform: serverless gives each request a fresh process with a blank
+disk, and a database that lives in a file needs a disk that persists. See
+ARCHITECTURE.md under "Hosting".
 
 ### The pieces, once deployed
 
 ```
-   Browser
+   Browser  ── plays the bots itself: the engine is wasm, in the page
       │  yourdomain.com
       ▼
 ┌──────────────┐
-│  DNS         │  NameHero: "that name lives at Vercel"
+│  DNS         │  your registrar: "that name lives at 1.2.3.4"
 └──────────────┘
       │
       ▼
-┌──────────────┐        ┌──────────────┐
-│  Vercel      │───────▶│  Neon        │  accounts, games, moves
-│  the app     │        │  Postgres    │
-└──────────────┘        └──────────────┘
+┌─────────────────────────────────────┐
+│  One Linux box (Lightsail 2 GB)     │
+│                                     │
+│   Caddy  ──▶  Next.js  ──▶  gyges.db│  accounts, games, moves
+│   TLS         :3000        on disk  │
+└─────────────────────────────────────┘
       │
       ▼
 ┌──────────────┐
-│  Engine      │  legality now, bot moves later
-│  service     │
+│  S3          │  nightly copy of the file
 └──────────────┘
 ```
 
@@ -259,8 +262,7 @@ Rebuilding it is a separate job in the engine repository, which carries the
 1. **Now** — play over the LAN, find what feels wrong.
 2. **Real accounts** — done; passwords. Required before anyone outside
    your home can reach it.
-3. **Deploy** — Vercel plus Neon, swap SQLite for Postgres, point the domain.
-4. **Engine service** — move legality first, bot play after.
-
-Steps 2 and 3 are independent of step 4. The site is a real site without the
-engine; it just does not enforce the rules yet.
+3. **Deploy** — one Linux box, the SQLite file on its disk, the domain's A
+   record pointed at its static IP. No database port: the same file, moved.
+4. **Engine** — done, and not as a service: it is compiled to WebAssembly and
+   runs in the player's own browser.
