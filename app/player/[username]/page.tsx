@@ -147,7 +147,6 @@ export default async function PlayerPage({
       {ladder && (
         <p className="lede" style={{ marginTop: -14 }}>
           Engine rating <strong>{ladder.rating}</strong>
-          {ladder.provisional && <span className="muted"> (provisional)</span>}
           {ladder.bestBeaten && (
             <>
               {" — best win against "}

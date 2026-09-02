@@ -116,22 +116,31 @@ const WEAK = {
  * lib/rating.ts. They are not invented: they are fitted to the games measured
  * above, using Elo's own scale where 400 points is about nine wins in ten.
  *
- *   Club over Casual, 17-3 (85%)   -> ~300 points, and 1450 - 1100 = 350
- *   Club over Novice, 19-1 (95%)   -> ~500 points, and 1450 -  800 = 650
- *   Sharp over Casual, 20-0        -> more than 600, and 1800 - 1100 = 700
+ *   Club over Casual, 17-3 (85%)   -> the ladder says 87%
+ *   Club over Novice, 19-1 (95%)   -> the ladder says 97%
+ *   Sharp over Casual, 20-0        -> the ladder says 98%
  *
  * Full is set above Sharp on the strength of what it is rather than a measured
  * score: bounded by nodes rather than depth, it gets deeper exactly as the
  * position simplifies, which is where the other four are weakest.
  *
+ * The range is deliberately wide — a thousand points a rung, so the ladder
+ * runs from about 1000 to about 5750 and each bot is a visibly different
+ * altitude rather than a few dozen points along. That is a choice about how
+ * the numbers FEEL, and it is free: RATING_SCALE in lib/rating.ts is widened
+ * to match, so the win probabilities these gaps stand for are unchanged. The
+ * numbers are units, like degrees; the relationships are the physics.
+ *
  * Re-tune these when the bots change. They are the ruler; if the ruler is
- * wrong every number on the ladder is wrong with it.
+ * wrong every number on the ladder is wrong with it. Two rules bind: the
+ * ORDER must match measured results, and every gap must exceed FARM_GAP —
+ * tests/rating.test.ts enforces the second.
  */
 
 export const BOTS: BotSpec[] = [
   {
     username: "Helios-Novice",
-    rating: 800,
+    rating: 1000,
     strength: 20,
     engineBuild: ENGINE_BUILD,
     description:
@@ -140,7 +149,7 @@ export const BOTS: BotSpec[] = [
   },
   {
     username: "Helios-Casual",
-    rating: 1100,
+    rating: 1900,
     strength: 40,
     engineBuild: ENGINE_BUILD,
     description:
@@ -149,7 +158,7 @@ export const BOTS: BotSpec[] = [
   },
   {
     username: "Helios-Club",
-    rating: 1450,
+    rating: 2900,
     strength: 60,
     engineBuild: ENGINE_BUILD,
     description:
@@ -158,7 +167,7 @@ export const BOTS: BotSpec[] = [
   },
   {
     username: "Helios-Sharp",
-    rating: 1800,
+    rating: 3900,
     strength: 80,
     engineBuild: ENGINE_BUILD,
     description:
@@ -167,7 +176,7 @@ export const BOTS: BotSpec[] = [
   },
   {
     username: "Helios-Full",
-    rating: 2200,
+    rating: 5000,
     strength: 100,
     engineBuild: ENGINE_BUILD,
     description:

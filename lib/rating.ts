@@ -59,46 +59,104 @@ export interface EngineResult {
 export interface EngineRating {
   rating: number;
   games: number;
-  /** Too few games to mean much yet — shown, but marked. */
-  provisional: boolean;
 }
 
 /**
- * Where a player starts, before any evidence.
+ * The point spread of the whole ladder.
  *
- * Between Novice and Casual: a beginner who loses to the weakest bot should
- * fall below it, and someone who beats a middling bot first time should not
- * have to climb from the basement to be placed correctly.
+ * Elo's usual 400 is not a law, it is a unit: the number of points that stands
+ * for ten-to-one odds. Widening it and widening the anchors together spreads
+ * the ladder out — a thousand points a rung instead of a few hundred — while
+ * every win probability those gaps represent stays exactly where the measured
+ * games put it. Changing the anchors ALONE would not do that; it would quietly
+ * claim the strongest bot beats the weakest 99.9 times in a hundred, which is
+ * not what the games say.
+ *
+ * So: change this and the anchors together, or neither.
  */
-export const START_RATING = 1000;
+export const RATING_SCALE = 1200;
 
-/** Under this many rated games the number is a guess, and says so. */
-export const PROVISIONAL_GAMES = 5;
+/**
+ * Everyone starts at the bottom.
+ *
+ * Not a statistical prior to be revised — a floor to climb off. Nobody is
+ * credited with a rating they have not won, so the number is only ever a
+ * record of what someone has actually beaten. It also means the ladder needs
+ * no notion of a provisional rating: a low number is not uncertainty, it is
+ * the correct reading of having beaten nothing yet.
+ */
+export const START_RATING = 0;
+
+/**
+ * Early games move you further, so the climb out of the bottom is quick.
+ *
+ * Not a "provisional rating" — the number shown is always the real one. This
+ * is only about how fast the arithmetic travels: everyone starts at zero on a
+ * ladder five thousand points tall, and at a settled K that would take fifty
+ * wins before the rating admitted what the first few already showed.
+ *
+ * The effect is that the first few results PLACE you and the rest refine you.
+ * Five wins over the weakest bot takes you to the top of its rung; nine over
+ * the strongest takes you to the top of the ladder. Both are the right answer
+ * to what those results actually demonstrate.
+ */
+export const EARLY_GAMES = 12;
 
 /**
  * How far above a bot beating it stops being worth anything.
  *
  * Chosen against the anchors rather than in the abstract: it must be strictly
- * SMALLER than the smallest gap between two bots, which is 300, or a rung's
- * ceiling reaches the next rung's rating and the ladder can be farmed one
- * step up. 250 leaves margin, and is about 80% expected — a result you would
- * get four times in five is barely evidence.
+ * SMALLER than the smallest gap between two bots, which is 900, or a rung's
+ * ceiling reaches the next rung's rating and the ladder can be farmed one step
+ * up. 750 leaves margin, and is about 80% expected on this scale — a result
+ * you would get four times in five is barely evidence.
  *
- * It was 400 at first, which was too generous by exactly the amount that
- * mattered: endless wins over the weakest bot reached 1200, dead level with
- * six honest wins over Club. tests/rating.test.ts now checks the relationship
+ * An earlier version used a gap as wide as the rungs themselves, and the
+ * tests caught what that costs: endless wins over the weakest bot drew level
+ * with six honest wins over the middle one, which is the exact outcome this
+ * mechanism exists to prevent. tests/rating.test.ts checks the relationship
  * against the real anchors, so retuning a bot into a smaller gap fails loudly
  * instead of quietly opening the ladder up.
  */
-export const FARM_GAP = 250;
+export const FARM_GAP = 750;
 
-/** Larger while the rating is still a guess, so early games place you fast. */
-const K_PROVISIONAL = 40;
-const K_SETTLED = 24;
+/**
+ * How far one game can move you. Larger while the rating is still a guess, so
+ * early games place you fast.
+ *
+ * Scaled with RATING_SCALE, since a step has to stay the same SHARE of the
+ * ladder — otherwise a wider ladder would just converge three times slower.
+ */
+const K_EARLY = 900;
+const K_SETTLED = 72;
+
+/**
+ * How far this game can move the rating.
+ *
+ * Decays smoothly from K_EARLY to K_SETTLED rather than stepping down at a
+ * threshold. A step meant the twelfth game could still swing a player by
+ * hundreds of points and the thirteenth by tens, so a run of losses arriving
+ * late in the early phase erased a genuine win over a strong bot. Sliding the
+ * weight down instead means the first results place you and each one after
+ * matters a little less than the one before, which is what "settling" ought
+ * to mean.
+ */
+function stepFor(gameNumber: number): number {
+  const settled = Math.min(1, (gameNumber - 1) / EARLY_GAMES);
+  return K_EARLY + (K_SETTLED - K_EARLY) * settled;
+}
+
+/**
+ * Ratings do not go below this, which is where everyone starts.
+ *
+ * Losing to the weakest bot cannot put you below the bottom of the ladder,
+ * because there is nothing below it to describe.
+ */
+const MIN_RATING = 0;
 
 /** Elo's expected score for a player rated `rating` against `anchor`. */
 export function expectedScore(rating: number, anchor: number): number {
-  return 1 / (1 + Math.pow(10, (anchor - rating) / 400));
+  return 1 / (1 + Math.pow(10, (anchor - rating) / RATING_SCALE));
 }
 
 /**
@@ -119,18 +177,14 @@ export function engineRating(results: EngineResult[]): EngineRating {
     // always is — especially that one.
     if (won && rating >= ceiling) continue;
 
-    const k = games <= PROVISIONAL_GAMES ? K_PROVISIONAL : K_SETTLED;
+    const k = stepFor(games);
     const next = rating + k * ((won ? 1 : 0) - expectedScore(rating, anchor));
 
     // A win is also clamped AT the ceiling, not merely stopped once past it.
     // Without this the last win before the stop carries you a whole increment
     // beyond, which is enough to blur the boundary between two rungs.
-    rating = won ? Math.min(next, ceiling) : next;
+    rating = won ? Math.min(next, ceiling) : Math.max(next, MIN_RATING);
   }
 
-  return {
-    rating: Math.round(rating),
-    games,
-    provisional: games < PROVISIONAL_GAMES,
-  };
+  return { rating: Math.round(rating), games };
 }

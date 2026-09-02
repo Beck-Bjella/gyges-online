@@ -76,79 +76,6 @@ export default async function LeaderboardPage() {
         </div>
       )}
 
-      {/*
-        The ladder. Against people a rating needs a pool, and there is not one
-        yet; against the bots it does not, because they never change — so this
-        is the one ranking on the site that means something on day one.
-      */}
-      <div className="section-head">
-        <h2>Against the computer</h2>
-        {ladder.length > 0 && <span className="count">{ladder.length}</span>}
-      </div>
-      <p className="lede">
-        Every bot has a fixed rating, and yours is whatever your results
-        against them say it is. Beating one far below you does not move it —
-        to climb, beat a better one.
-      </p>
-      {ladder.length === 0 ? (
-        <p className="empty">
-          Nobody has finished a game against the computer yet.{" "}
-          <Link href="/games">Take one on.</Link>
-        </p>
-      ) : (
-        <div className="panel" style={{ marginBottom: 34 }}>
-          <table>
-            <thead>
-              <tr>
-                <th style={{ width: 40 }}>#</th>
-                <th>Player</th>
-                <th style={{ textAlign: "right" }}>Rating</th>
-                <th>Best beaten</th>
-                <th style={{ textAlign: "right" }}>Games</th>
-              </tr>
-            </thead>
-            <tbody>
-              {ladder.map((r, i) => (
-                <tr key={r.id} className={r.id === viewer?.id ? "you" : undefined}>
-                  <td className="num" style={{ color: "var(--text-dim)" }}>
-                    {i + 1}
-                  </td>
-                  <td>
-                    <Link href={`/player/${encodeURIComponent(r.username)}`}>
-                      {r.username}
-                    </Link>
-                    {r.id === viewer?.id && (
-                      <span className="tag tag-turn" style={{ marginLeft: 8 }}>
-                        you
-                      </span>
-                    )}
-                  </td>
-                  <td className="num">
-                    {r.rating}
-                    {r.provisional && (
-                      <span className="muted" title="Fewer than five rated games">
-                        {" "}
-                        ?
-                      </span>
-                    )}
-                  </td>
-                  <td>
-                    {r.bestBeaten ? (
-                      <Link href={`/player/${encodeURIComponent(r.bestBeaten)}`}>
-                        {r.bestBeaten}
-                      </Link>
-                    ) : (
-                      <span className="muted">none yet</span>
-                    )}
-                  </td>
-                  <td className="num">{r.games}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
       {bots.length > 0 && (
         <>
           <div className="section-head">
@@ -156,8 +83,9 @@ export default async function LeaderboardPage() {
             <span className="count">{bots.length}</span>
           </div>
           <p className="lede">
-            Each strength is its own account, and plays by the same rules as
-            anyone else. Click one to see its games.
+            Each strength is its own account with a fixed rating, and plays by
+            the same rules as anyone else. Beating one is worth what its rating
+            says it is.
           </p>
           <div className="panel">
             <table>
@@ -198,6 +126,71 @@ export default async function LeaderboardPage() {
               </tbody>
             </table>
           </div>
+
+      {/*
+            The ladder. Against people a rating needs a pool, and there is not one
+            yet; against the bots it does not, because they never change — so this
+            is the one ranking on the site that means something on day one.
+          */}
+          <div className="section-head">
+            <h2>Who has climbed it</h2>
+            {ladder.length > 0 && <span className="count">{ladder.length}</span>}
+          </div>
+          <p className="lede">
+            Everyone starts at nothing and climbs. Each bot has a fixed rating, and
+            yours is what your results against them say it is — but beating one far
+            below you moves nothing, so the only way up is to beat a better one.
+          </p>
+          {ladder.length === 0 ? (
+            <p className="empty">
+              Nobody has finished a game against the computer yet.{" "}
+              <Link href="/games">Take one on.</Link>
+            </p>
+          ) : (
+            <div className="panel" style={{ marginBottom: 34 }}>
+              <table>
+                <thead>
+                  <tr>
+                    <th style={{ width: 40 }}>#</th>
+                    <th>Player</th>
+                    <th style={{ textAlign: "right" }}>Rating</th>
+                    <th>Best beaten</th>
+                    <th style={{ textAlign: "right" }}>Games</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ladder.map((r, i) => (
+                    <tr key={r.id} className={r.id === viewer?.id ? "you" : undefined}>
+                      <td className="num" style={{ color: "var(--text-dim)" }}>
+                        {i + 1}
+                      </td>
+                      <td>
+                        <Link href={`/player/${encodeURIComponent(r.username)}`}>
+                          {r.username}
+                        </Link>
+                        {r.id === viewer?.id && (
+                          <span className="tag tag-turn" style={{ marginLeft: 8 }}>
+                            you
+                          </span>
+                        )}
+                      </td>
+                      <td className="num">{r.rating}</td>
+                      <td>
+                        {r.bestBeaten ? (
+                          <Link href={`/player/${encodeURIComponent(r.bestBeaten)}`}>
+                            {r.bestBeaten}
+                          </Link>
+                        ) : (
+                          <span className="muted">none yet</span>
+                        )}
+                      </td>
+                      <td className="num">{r.games}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </>
       )}
     </>
