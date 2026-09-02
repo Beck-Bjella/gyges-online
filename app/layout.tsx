@@ -40,6 +40,7 @@ export default async function RootLayout({
                 </Link>
               )}
               <Link href="/games">Games</Link>
+              <Link href="/computer">Computer</Link>
               <Link href="/leaderboard">Leaderboard</Link>
               <Link href="/rules">Rules</Link>
             </nav>

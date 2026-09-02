@@ -11,6 +11,7 @@ import {
 import { relativeTime, describeTimeControl, endingSuffix } from "@/lib/format";
 import NewGameForm from "@/components/NewGameForm";
 import QuickGameButton from "@/components/QuickGameButton";
+import CancelGameButton from "@/components/CancelGameButton";
 import StartComputerForm from "@/components/StartComputerForm";
 import { BOTS } from "@/lib/bots";
 import Tabs from "@/components/Tabs";
@@ -40,10 +41,20 @@ export default async function GamesPage() {
   // so a game someone else creates or joins appears here on its own.
   const version = siteVersion();
 
-  // The engine's accounts, shown as rows to challenge — the same table the
-  // leaderboard prints, plus a button. No opponent-picker form: the row
-  // already says who the bot is and how it has done.
+  // Only to fill the opponent picker on the start card. The bots' own page
+  // is /computer, which is where they are actually presented.
   const bots = botLeaderboard();
+
+  // Hosting a table produced no visible result: you pressed the button and the
+  // page looked unchanged, because the outcome was a row in a list you had to
+  // find. Your own tables come out of that list and sit at the top, where
+  // pressing Host obviously did something.
+  const yourTables = user
+    ? openGames.filter((g) => g.player1_id === user.id)
+    : [];
+  const joinable = user
+    ? openGames.filter((g) => g.player1_id !== user.id)
+    : openGames;
 
   return (
     <>
@@ -68,6 +79,41 @@ export default async function GamesPage() {
                 label: "Play",
                 content: (
                   <>
+          {yourTables.length > 0 && (
+            <div className="panel waiting-table">
+              <div className="host-copy">
+                <h2>
+                  {yourTables.length === 1
+                    ? "Your table is waiting"
+                    : `Your ${yourTables.length} tables are waiting`}
+                </h2>
+                <p className="muted">
+                  Listed below for anyone to join. The game starts the moment
+                  someone sits down — nothing more for you to do.
+                </p>
+              </div>
+              <ul className="list waiting-table-list">
+                {yourTables.map((g) => (
+                  <li key={g.id} className="list-item waiting">
+                    <Link
+                      className="stretch-link"
+                      href={`/game/${g.id}`}
+                      aria-label="Open game"
+                    />
+                    <span style={{ flex: 1, minWidth: 0 }}>
+                      <strong>{describeTimeControl(g.move_seconds)}</strong>
+                      <br />
+                      <span className="muted">
+                        hosted {relativeTime(g.created_at)}
+                      </span>
+                    </span>
+                    <CancelGameButton gameId={g.id} />
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           {/*
             Three ways to start, side by side, because they are three answers
             to one question and the old page made you scroll past two of them
@@ -89,6 +135,7 @@ export default async function GamesPage() {
               <NewGameForm />
 
               <StartComputerForm
+                more="/computer"
                 bots={bots.map((b) => ({
                   id: b.id,
                   username: b.username,
@@ -114,21 +161,21 @@ export default async function GamesPage() {
 
           <SectionHead
             title="Open tables"
-            count={openGames.length}
+            count={joinable.length}
             accent="amber"
           />
           <p className="muted" style={{ margin: "0 0 12px", lineHeight: 1.6 }}>
             Hosted by other players and waiting for an opponent. Joining one
             starts it immediately.
           </p>
-          {openGames.length === 0 ? (
+          {joinable.length === 0 ? (
             <Empty>
               Nobody is waiting right now.{" "}
               {user ? "Host a table and see who turns up." : "Sign in to host one."}
             </Empty>
           ) : (
             <ul className="watch-grid">
-              {openGames.map((g) => (
+              {joinable.map((g) => (
                 <li key={g.id} className="game-card list-item">
                   <Link
                     className="stretch-link"
@@ -145,12 +192,10 @@ export default async function GamesPage() {
                       {relativeTime(g.created_at)}
                     </span>
                   </div>
-                  {!user ? (
-                    <span className="muted">sign in to join</span>
-                  ) : g.player1_id === user.id ? (
-                    <span className="tag tag-turn">yours</span>
-                  ) : (
+                  {user ? (
                     <JoinGameButton gameId={g.id} />
+                  ) : (
+                    <span className="muted">sign in to join</span>
                   )}
                 </li>
               ))}

@@ -18,7 +18,14 @@ export interface BotChoice {
  * only number that says what beating one is worth — and choosing an opponent
  * is choosing what you are trying to prove.
  */
-export default function StartComputerForm({ bots }: { bots: BotChoice[] }) {
+export default function StartComputerForm({
+  bots,
+  more,
+}: {
+  bots: BotChoice[];
+  /** Where the full ladder lives, for people who want to choose properly. */
+  more?: string;
+}) {
   const [state, submit, pending] = useActionState(createBotGameAction, initial);
 
   return (
@@ -40,9 +47,16 @@ export default function StartComputerForm({ bots }: { bots: BotChoice[] }) {
         </select>
       </label>
 
-      <button type="submit" className="btn btn-primary" disabled={pending}>
-        {pending ? "…" : "Play"}
-      </button>
+      <div className="row">
+        <button type="submit" className="btn btn-primary" disabled={pending}>
+          {pending ? "…" : "Play"}
+        </button>
+        {more && (
+          <a className="btn" href={more}>
+            The ladder
+          </a>
+        )}
+      </div>
       {state.error && <p className="error">{state.error}</p>}
     </form>
   );

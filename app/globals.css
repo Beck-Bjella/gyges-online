@@ -1395,6 +1395,178 @@ td.num {
   border-color: var(--border-strong);
 }
 
+/* Your own waiting tables, at the top of the lobby so that hosting one has a
+   visible result. Amber, like everything else the site is waiting on. */
+.waiting-table {
+  border-color: rgba(232, 167, 92, 0.4);
+  margin-bottom: clamp(18px, 2vh, 26px);
+}
+.waiting-table-list {
+  margin-top: 14px;
+}
+
+/*
+ * The ladder: the bots as rungs, strongest at the top, because that is what a
+ * ladder looks like and climbing is the point. A beaten rung is marked, and
+ * the viewer's own rating drops in as a line at its own height, so the number
+ * has somewhere to stand instead of floating free of everything.
+ */
+.ladder {
+  list-style: none;
+  margin: 0 0 clamp(26px, 3vh, 38px);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.rung {
+  display: flex;
+  align-items: center;
+  gap: clamp(12px, 1.5vw, 20px);
+  background: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  padding: clamp(14px, 1.5vw, 20px);
+  box-shadow: var(--shadow);
+  transition: border-color 120ms ease;
+}
+.rung:hover {
+  border-color: var(--border-strong);
+}
+
+/* A rung you have cleared, in the same mint the site uses for "done". */
+.rung.beaten {
+  border-color: rgba(111, 216, 180, 0.45);
+  background: linear-gradient(
+    180deg,
+    rgba(111, 216, 180, 0.1),
+    var(--bg-panel) 60%
+  );
+}
+
+.rung-mark {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-darkest);
+  color: var(--accent-mint);
+  font-size: 14px;
+  font-weight: 700;
+}
+.rung.beaten .rung-mark {
+  border-color: rgba(111, 216, 180, 0.5);
+  background: var(--accent-mint-soft);
+}
+
+.rung-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.rung-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.rung-rating {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 620;
+  color: var(--accent-mint);
+}
+
+.rung-desc {
+  margin: 6px 0 0;
+  line-height: 1.55;
+  max-width: 62ch;
+}
+
+.rung .hint {
+  margin-top: 5px;
+}
+
+.rung-action {
+  flex: none;
+}
+
+/* Where you stand, drawn between the rungs it falls between. */
+.ladder-marker {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 2px 0;
+  color: var(--accent-amber);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.ladder-marker::before,
+.ladder-marker::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(232, 167, 92, 0.55),
+    transparent
+  );
+}
+
+/* Your standing, above the ladder: the number, and what to do about it. */
+.standing {
+  display: flex;
+  align-items: center;
+  gap: clamp(16px, 2.5vw, 34px);
+  flex-wrap: wrap;
+  margin-bottom: clamp(18px, 2vh, 26px);
+}
+.standing-figure {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.standing-label {
+  font-size: 11px;
+  font-weight: 620;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.standing-value {
+  font-family: var(--font-mono);
+  font-size: 30px;
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: var(--accent-mint);
+}
+.standing-note {
+  flex: 1 1 320px;
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+@media (max-width: 640px) {
+  .rung {
+    flex-wrap: wrap;
+  }
+  .rung-action {
+    width: 100%;
+  }
+}
+
 /*
  * The three ways to start a game, side by side. Equal columns because they are
  * equal choices — the page should not decide for you which one you came for —
