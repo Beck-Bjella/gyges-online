@@ -135,6 +135,8 @@ export interface MoveRow {
 export interface GameWithPlayers extends Game {
   /** Who the reserved seat is for, when this is a challenge. */
   invited_name: string | null;
+  /** The most recent ordinary move, "from|to[|drop]", for previews. */
+  last_move: string | null;
   player1_name: string | null;
   player2_name: string | null;
 }
@@ -411,7 +413,10 @@ const GAME_COLUMNS = `
   g.created_at, g.started_at, g.finished_at, g.updated_at, g.invited_id,
   g.takeback_offered,
   p1.username AS player1_name, p2.username AS player2_name,
-  inv.username AS invited_name
+  inv.username AS invited_name,
+  (SELECT m.move FROM moves m
+    WHERE m.game_id = g.id AND m.kind = 'move'
+    ORDER BY m.ply DESC LIMIT 1) AS last_move
 `;
 
 const GAME_JOINS = `

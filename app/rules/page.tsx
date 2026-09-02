@@ -3,21 +3,25 @@ export const metadata = { title: "Rules · Gygès" };
 export default function RulesPage() {
   return (
     <>
-      <h1>Rules of Gygès</h1>
-      <p className="lede">
-        Gygès is an abstract game for two players. Nobody owns the pieces — you
-        may only move a piece in the row nearest to you.
-      </p>
+      <header className="page-head">
+        <div>
+          <h1>Rules of Gygès</h1>
+          <p className="lede" style={{ marginBottom: 0 }}>
+            Gygès is an abstract game for two players. Nobody owns the pieces —
+            you may only move a piece in the row nearest to you.
+          </p>
+        </div>
+      </header>
 
-      <div className="panel" style={{ lineHeight: 1.7, maxWidth: "68ch" }}>
+      <div className="panel prose">
         <h2>Object</h2>
-        <p style={{ marginTop: 0 }}>
+        <p>
           Move a piece into your opponent&apos;s goal, the space beyond their
           back row.
         </p>
 
         <h2>Moving</h2>
-        <ul style={{ paddingLeft: 20 }}>
+        <ul>
           <li>
             You may move any piece in your <strong>active line</strong> — the row
             nearest you that still contains pieces.

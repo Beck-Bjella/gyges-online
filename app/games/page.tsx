@@ -15,6 +15,8 @@ import ChallengeEngineButton from "@/components/ChallengeEngineButton";
 import AutoRefresh from "@/components/AutoRefresh";
 import ChatPanel from "@/components/ChatPanel";
 import JoinGameButton from "@/components/JoinGameButton";
+import MiniBoard from "@/components/MiniBoard";
+import { decodeBoard } from "@/lib/db/queries";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Games · Gygès" };
@@ -68,52 +70,25 @@ export default async function GamesPage() {
                 label: "Play",
                 content: (
                   <>
-          <SectionHead
-            title="Waiting for a player"
-            count={openGames.length}
-            accent="amber"
-          />
-          {openGames.length === 0 ? (
-            <Empty>
-              Nobody is waiting right now.{" "}
-              {user ? "Host one and see who turns up." : "Sign in to host one."}
-            </Empty>
+          {user ? (
+            <NewGameForm />
           ) : (
-            <ul className="list">
-              {openGames.map((g) => (
-                <li key={g.id} className="list-item">
-                  <Link
-                    className="stretch-link"
-                    href={`/game/${g.id}`}
-                    aria-label="Open game"
-                  />
-                  <span className="avatar avatar-amber">
-                    {initial(g.player1_name)}
-                  </span>
-                  <span style={{ flex: 1, minWidth: 0 }}>
-                    <strong>{nameLink(g.player1_name)}</strong>
-                    <span className="muted">
-                      {" "}
-                      · {describeTimeControl(g.move_seconds)}
-                    </span>
-                    <br />
-                    <span className="muted">
-                      opened {relativeTime(g.created_at)}
-                    </span>
-                  </span>
-                  {!user ? (
-                    <span className="muted">sign in to join</span>
-                  ) : g.player1_id === user.id ? (
-                    <span className="tag tag-turn">yours</span>
-                  ) : (
-                    <JoinGameButton gameId={g.id} />
-                  )}
-                </li>
-              ))}
-            </ul>
+            <div className="panel host-panel">
+              <div className="host-copy">
+                <h2>Want to play?</h2>
+                <p className="muted">
+                  Pick a name and you can host or join a game. Games are
+                  correspondence-style, so you take your turn whenever suits
+                  you.
+                </p>
+              </div>
+              <Link href="/" className="btn btn-primary">
+                Get started
+              </Link>
+            </div>
           )}
 
-          <SectionHead title="Play the engine" count={0} style={{ marginTop: 34 }} />
+          <SectionHead title="Play the engine" />
           <p className="muted" style={{ margin: "0 0 12px", lineHeight: 1.6 }}>
             Each strength is its own account and plays by the same rules as
             anyone else. The game runs in your browser, and the engine waits as
@@ -156,6 +131,51 @@ export default async function GamesPage() {
               </tbody>
             </table>
           </div>
+
+          <SectionHead
+            title="Waiting for a player"
+            count={openGames.length}
+            accent="amber"
+          />
+          <p className="muted" style={{ margin: "0 0 12px", lineHeight: 1.6 }}>
+            Games other players have hosted and are waiting for an opponent —
+            join one and it starts right away.
+          </p>
+          {openGames.length === 0 ? (
+            <Empty>
+              Nobody is waiting right now.{" "}
+              {user ? "Host one and see who turns up." : "Sign in to host one."}
+            </Empty>
+          ) : (
+            <ul className="watch-grid">
+              {openGames.map((g) => (
+                <li key={g.id} className="game-card list-item">
+                  <Link
+                    className="stretch-link"
+                    href={`/game/${g.id}`}
+                    aria-label="Open game"
+                  />
+                  <MiniBoard board={decodeBoard(g.board)} size={150} />
+                  <div className="game-card-meta">
+                    <div>
+                      <strong>{nameLink(g.player1_name)}</strong>
+                    </div>
+                    <span className="muted">
+                      {describeTimeControl(g.move_seconds)} ·{" "}
+                      {relativeTime(g.created_at)}
+                    </span>
+                  </div>
+                  {!user ? (
+                    <span className="muted">sign in to join</span>
+                  ) : g.player1_id === user.id ? (
+                    <span className="tag tag-turn">yours</span>
+                  ) : (
+                    <JoinGameButton gameId={g.id} />
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
                   </>
                 ),
               },
@@ -171,42 +191,20 @@ export default async function GamesPage() {
           {activeGames.length === 0 ? (
             <Empty>No games are being played right now.</Empty>
           ) : (
-            <ul className="list">
+            <ul className="watch-grid">
               {activeGames.map((g) => (
-                <GameLine
-                  key={g.id}
-                  game={g}
-                  kind="active"
-                  yours={
-                    user
-                      ? g.player1_id === user.id || g.player2_id === user.id
-                      : false
-                  }
-                />
+                <GameCard key={g.id} game={g} kind="active" />
               ))}
             </ul>
           )}
 
-          <SectionHead
-            title="Recently finished"
-            count={recentGames.length}
-            style={{ marginTop: 34 }}
-          />
+          <SectionHead title="Recently finished" count={recentGames.length} />
           {recentGames.length === 0 ? (
             <Empty>No games have finished yet.</Empty>
           ) : (
-            <ul className="list">
+            <ul className="watch-grid">
               {recentGames.map((g) => (
-                <GameLine
-                  key={g.id}
-                  game={g}
-                  kind="finished"
-                  yours={
-                    user
-                      ? g.player1_id === user.id || g.player2_id === user.id
-                      : false
-                  }
-                />
+                <GameCard key={g.id} game={g} kind="finished" />
               ))}
             </ul>
           )}
@@ -216,23 +214,6 @@ export default async function GamesPage() {
             ]}
           />
         </section>
-
-        <aside className="rail">
-          {user ? (
-            <NewGameForm />
-          ) : (
-            <div className="panel">
-              <h2>Want to play?</h2>
-              <p className="muted" style={{ margin: "0 0 14px", lineHeight: 1.6 }}>
-                Pick a name and you can host or join a game. Games are
-                correspondence-style, so you take your turn whenever suits you.
-              </p>
-              <Link href="/" className="btn btn-primary">
-                Get started
-              </Link>
-            </div>
-          )}
-        </aside>
       </div>
     </>
   );
@@ -242,17 +223,16 @@ function SectionHead({
   title,
   count,
   accent,
-  style,
 }: {
   title: string;
-  count: number;
+  /** Omitted where a count would say nothing. */
+  count?: number;
   accent?: "mint" | "amber";
-  style?: React.CSSProperties;
 }) {
   return (
-    <div className="section-head" style={style}>
+    <div className="section-head">
       <h2>{title}</h2>
-      {count > 0 && (
+      {count !== undefined && count > 0 && (
         <span className={accent ? `count count-${accent}` : "count"}>{count}</span>
       )}
     </div>
@@ -263,49 +243,39 @@ function Empty({ children }: { children: React.ReactNode }) {
   return <p className="empty">{children}</p>;
 }
 
-function initial(name: string | null): string {
-  return (name ?? "?").charAt(0).toUpperCase();
-}
-
 /** A player's name as a link to their profile, or a dash for an empty seat. */
 function nameLink(name: string | null) {
   if (!name) return "—";
   return <Link href={`/player/${encodeURIComponent(name)}`}>{name}</Link>;
 }
 
-function GameLine({
+/** A game as a card: the position doing the talking, names underneath. */
+function GameCard({
   game,
   kind,
-  yours,
 }: {
   game: GameWithPlayers;
   kind: "active" | "finished";
-  /** Marked rather than hidden, so the list means the same thing to everyone. */
-  yours: boolean;
 }) {
   const winner =
     game.result === 0 ? null : game.result === 1 ? game.player1_name : game.player2_name;
-
   return (
-    <li className="list-item">
-      <span className={kind === "active" ? "avatar avatar-mint" : "avatar"}>
-        {kind === "active" ? game.ply : "✓"}
-      </span>
+    <li className="game-card list-item">
       <Link className="stretch-link" href={`/game/${game.id}`} aria-label="Open game" />
-      <span style={{ flex: 1, minWidth: 0 }}>
-        <strong>{nameLink(game.player1_name)}</strong>
-        <span className="muted"> vs </span>
-        <strong>{nameLink(game.player2_name)}</strong>
-        {yours && <span className="tag tag-turn" style={{ marginLeft: 8 }}>yours</span>}
-        <br />
+      <MiniBoard board={decodeBoard(game.board)} lastMove={game.last_move} size={160} />
+      <div className="game-card-meta">
+        <div>
+          <strong>{nameLink(game.player1_name)}</strong>
+          <span className="muted"> vs </span>
+          <strong>{nameLink(game.player2_name)}</strong>
+        </div>
         <span className="muted">
           {kind === "active"
-            ? `${game.status === "setup" ? "placing pieces" : `${game.turn === 1 ? game.player1_name : game.player2_name} to move`} · ${relativeTime(game.updated_at)}`
-            : `${winner ? `${winner} won` : "drawn"}${endingSuffix(
-                game.result_reason,
-              )} · ${game.ply} plies`}
+            ? `move ${game.ply} · ${relativeTime(game.updated_at)}`
+            : `${winner ? `${winner} won` : "drawn"}${endingSuffix(game.result_reason)}`}
         </span>
-      </span>
+      </div>
     </li>
   );
 }
+

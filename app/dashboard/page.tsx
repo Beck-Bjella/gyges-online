@@ -18,6 +18,8 @@ import {
 import FriendsPanel from "@/components/FriendsPanel";
 import ChallengesPanel from "@/components/ChallengesPanel";
 import CancelGameButton from "@/components/CancelGameButton";
+import MiniBoard from "@/components/MiniBoard";
+import { decodeBoard } from "@/lib/db/queries";
 import { relativeTime, describeThinkTime, endingSuffix } from "@/lib/format";
 import AutoRefresh from "@/components/AutoRefresh";
 
@@ -220,7 +222,7 @@ function GameSection({
 }) {
   return (
     <>
-      <div className="section-head" style={{ marginTop: 30 }}>
+      <div className="section-head">
         <h2>{title}</h2>
         <span
           className={
@@ -233,7 +235,7 @@ function GameSection({
       {games.length === 0 ? (
         <p className="empty">{empty}</p>
       ) : (
-        <ul className="list">
+        <ul className="watch-grid">
           {games.map((g) => (
             <MyGame key={g.id} game={g} userId={userId} />
           ))}
@@ -317,34 +319,35 @@ function MyGame({
     label = yourTurn ? "your turn" : waitingLabel;
   }
 
-  const avatarClass = yourTurn
-    ? "avatar avatar-mint"
-    : open
-      ? "avatar avatar-amber"
-      : "avatar";
-
   return (
-    <li className={yourTurn ? "list-item urgent" : "list-item"}>
-      <span className={avatarClass}>
-        {(opponent ?? "?").charAt(0).toUpperCase()}
-      </span>
-      <span style={{ flex: 1, minWidth: 0 }}>
-        <Link
-          className="stretch-link"
-          href={`/game/${game.id}`}
-          aria-label="Open game"
-        />
-        {opponent ? (
-          <>
-            vs{" "}
-            <Link href={`/player/${encodeURIComponent(opponent)}`}>
-              <strong>{opponent}</strong>
-            </Link>
-          </>
-        ) : (
-          "Open game"
-        )}
-        <br />
+    <li
+      className={
+        yourTurn
+          ? "game-card list-item urgent"
+          : open
+            ? "game-card list-item waiting"
+            : "game-card list-item"
+      }
+    >
+      <Link
+        className="stretch-link"
+        href={`/game/${game.id}`}
+        aria-label="Open game"
+      />
+      <MiniBoard board={decodeBoard(game.board)} lastMove={game.last_move} size={150} />
+      <div className="game-card-meta">
+        <div>
+          {opponent ? (
+            <>
+              vs{" "}
+              <Link href={`/player/${encodeURIComponent(opponent)}`}>
+                <strong>{opponent}</strong>
+              </Link>
+            </>
+          ) : (
+            "Open game"
+          )}
+        </div>
         <span
           className="muted"
           style={
@@ -357,7 +360,7 @@ function MyGame({
         >
           {label} · {relativeTime(game.updated_at)}
         </span>
-      </span>
+      </div>
       {yourTurn && <span className="tag tag-turn">play</span>}
       {open && <CancelGameButton gameId={game.id} />}
     </li>

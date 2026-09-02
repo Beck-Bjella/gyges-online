@@ -12,6 +12,8 @@ import { relativeTime, endingSuffix } from "@/lib/format";
 import { currentUser } from "@/lib/auth";
 import RenameForm from "@/components/RenameForm";
 import SocialButtons from "@/components/SocialButtons";
+import MiniBoard from "@/components/MiniBoard";
+import { decodeBoard } from "@/lib/db/queries";
 import { friendState, opponentRecords } from "@/lib/db/queries";
 
 export const dynamic = "force-dynamic";
@@ -34,8 +36,14 @@ export default async function PlayerPage({
   if (user.deleted_at) {
     return (
       <>
-        <h1>{user.username}</h1>
-        <p className="lede">This account is closed.</p>
+        <header className="page-head">
+          <div>
+            <h1>{user.username}</h1>
+            <p className="lede" style={{ marginBottom: 0 }}>
+              This account is closed.
+            </p>
+          </div>
+        </header>
       </>
     );
   }
@@ -67,10 +75,14 @@ export default async function PlayerPage({
 
   return (
     <>
-      <h1>{user.username}</h1>
-      <p className="lede">
-        Member since {relativeTime(user.created_at)}.
-      </p>
+      <header className="page-head">
+        <div>
+          <h1>{user.username}</h1>
+          <p className="lede" style={{ marginBottom: 0 }}>
+            Member since {relativeTime(user.created_at)}.
+          </p>
+        </div>
+      </header>
 
       {isMe && (
         <div className="panel" style={{ marginBottom: 24 }}>
@@ -126,21 +138,23 @@ export default async function PlayerPage({
 
       {waiting.length > 0 && (
         <>
-          <h2>Waiting</h2>
-          <ul className="list" style={{ marginBottom: 28 }}>
+          <SectionHead title="Waiting" count={waiting.length} accent="amber" />
+          <ul className="watch-grid" style={{ marginBottom: 28 }}>
             {waiting.map((g) => (
-              <li key={g.id} className="list-item">
-                <span style={{ flex: 1 }}>
-                  <Link href={`/game/${g.id}`}>
-                    {g.invited_name ? `vs ${g.invited_name}` : "Open game"}
-                  </Link>
+              <li key={g.id} className="game-card list-item waiting">
+                <Link
+                  className="stretch-link"
+                  href={`/game/${g.id}`}
+                  aria-label="Open game"
+                />
+                <MiniBoard board={decodeBoard(g.board)} lastMove={g.last_move} size={150} />
+                <div className="game-card-meta">
+                  <div>{g.invited_name ? `vs ${g.invited_name}` : "Open game"}</div>
                   <span className="muted">
-                    {g.invited_name
-                      ? " · challenge sent"
-                      : " · anyone may join"}
+                    {g.invited_name ? "challenge sent" : "anyone may join"} ·{" "}
+                    {relativeTime(g.created_at)}
                   </span>
-                </span>
-                <span className="muted">{relativeTime(g.created_at)}</span>
+                </div>
               </li>
             ))}
           </ul>
@@ -149,18 +163,25 @@ export default async function PlayerPage({
 
       {active.length > 0 && (
         <>
-          <h2>In progress</h2>
-          <ul className="list" style={{ marginBottom: 28 }}>
+          <SectionHead title="In progress" count={active.length} accent="mint" />
+          <ul className="watch-grid" style={{ marginBottom: 28 }}>
             {active.map((g) => {
               const side = sideOf(g, user.id);
               const opponent = side === 1 ? g.player2_name : g.player1_name;
               return (
-                <li key={g.id} className="list-item">
-                  <span style={{ flex: 1 }}>
-                    <Link href={`/game/${g.id}`}>vs {opponent ?? "—"}</Link>
-                    <span className="muted"> · move {g.ply}</span>
-                  </span>
-                  <span className="muted">{relativeTime(g.updated_at)}</span>
+                <li key={g.id} className="game-card list-item">
+                  <Link
+                    className="stretch-link"
+                    href={`/game/${g.id}`}
+                    aria-label="Open game"
+                  />
+                  <MiniBoard board={decodeBoard(g.board)} lastMove={g.last_move} size={150} />
+                  <div className="game-card-meta">
+                    <div>vs {opponent ?? "—"}</div>
+                    <span className="muted">
+                      move {g.ply} · {relativeTime(g.updated_at)}
+                    </span>
+                  </div>
                 </li>
               );
             })}
@@ -170,7 +191,7 @@ export default async function PlayerPage({
 
       {opponents.length > 0 && (
         <>
-          <h2>Opponents</h2>
+          <SectionHead title="Opponents" count={0} />
           <div className="panel" style={{ marginBottom: 28 }}>
             <table>
               <thead>
@@ -207,43 +228,73 @@ export default async function PlayerPage({
         </>
       )}
 
-      <h2>Completed games</h2>
+      <SectionHead title="Completed games" count={finished.length} />
       {finished.length === 0 ? (
         <p className="muted">No completed games yet.</p>
       ) : (
-        <ul className="list">
+        <ul className="watch-grid">
           {finished.map((g) => {
             const side = sideOf(g, user.id);
             const opponent = side === 1 ? g.player2_name : g.player1_name;
             const outcome =
               g.result === 0 ? "Draw" : g.result === side ? "Won" : "Lost";
             return (
-              <li key={g.id} className="list-item">
-                <span
-                  className="tag"
-                  style={
-                    outcome === "Won"
-                      ? { borderColor: "var(--accent-mint)", color: "var(--accent-mint)" }
-                      : undefined
-                  }
-                >
-                  {outcome}
-                </span>
-                <span style={{ flex: 1 }}>
-                  <Link href={`/game/${g.id}`}>vs {opponent ?? "—"}</Link>
+              <li key={g.id} className="game-card list-item">
+                <Link
+                  className="stretch-link"
+                  href={`/game/${g.id}`}
+                  aria-label="Open game"
+                />
+                <MiniBoard board={decodeBoard(g.board)} lastMove={g.last_move} size={150} />
+                <div className="game-card-meta">
+                  <div>
+                    <span
+                      className="tag"
+                      style={
+                        outcome === "Won"
+                          ? {
+                              borderColor: "var(--accent-mint)",
+                              color: "var(--accent-mint)",
+                            }
+                          : undefined
+                      }
+                    >
+                      {outcome}
+                    </span>{" "}
+                    vs {opponent ?? "—"}
+                  </div>
                   <span className="muted">
-                    {" "}
-                    · {g.ply} moves
-                    {endingSuffix(g.result_reason, " · by ")}
+                    {g.ply} moves{endingSuffix(g.result_reason, " · by ")} ·{" "}
+                    {relativeTime(g.updated_at)}
                   </span>
-                </span>
-                <span className="muted">{relativeTime(g.updated_at)}</span>
+                </div>
               </li>
             );
           })}
         </ul>
       )}
     </>
+  );
+}
+
+/** The same section header the lobby uses: real size, count chip beside. */
+function SectionHead({
+  title,
+  count,
+  accent,
+}: {
+  title: string;
+  /** Omitted where a count would say nothing — a table of one thing. */
+  count?: number;
+  accent?: "mint" | "amber";
+}) {
+  return (
+    <div className="section-head">
+      <h2>{title}</h2>
+      {count !== undefined && count > 0 && (
+        <span className={accent ? `count count-${accent}` : "count"}>{count}</span>
+      )}
+    </div>
   );
 }
 

@@ -9,11 +9,20 @@ export default function LeaderboardPage() {
 
   return (
     <>
-      <h1>Leaderboard</h1>
-      <p className="lede">
-        Finished games between people. Games against the engine are not counted
-        here — they appear on each player&apos;s profile instead.
-      </p>
+      <header className="page-head">
+        <div>
+          <h1>Leaderboard</h1>
+          <p className="lede" style={{ marginBottom: 0 }}>
+            Finished games between people. Games against the engine are not
+            counted here — they appear on each player&apos;s profile instead.
+          </p>
+        </div>
+      </header>
+
+      <div className="section-head">
+        <h2>Players</h2>
+        {rows.length > 0 && <span className="count">{rows.length}</span>}
+      </div>
 
       {rows.length === 0 ? (
         <p className="muted">No finished games yet.</p>
@@ -58,7 +67,10 @@ export default function LeaderboardPage() {
 
       {bots.length > 0 && (
         <>
-          <h2 style={{ marginTop: 32 }}>The engine</h2>
+          <div className="section-head">
+            <h2>The engine</h2>
+            <span className="count">{bots.length}</span>
+          </div>
           <p className="lede">
             Each strength is its own account, and plays by the same rules as
             anyone else. Click one to see its games.

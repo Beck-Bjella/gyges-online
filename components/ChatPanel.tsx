@@ -31,14 +31,11 @@ export default function ChatPanel({
   gameId = null,
   title,
   canPost,
-  postHint,
 }: {
   /** Null is the lobby. */
   gameId?: string | null;
   title: string;
   canPost: boolean;
-  /** Shown instead of the input when posting is not available. */
-  postHint?: string;
 }) {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [draft, setDraft] = useState("");
@@ -171,7 +168,7 @@ export default function ChatPanel({
         </form>
       ) : (
         <p className="hint" style={{ margin: 0 }}>
-          {postHint ?? "Sign in to chat."}
+          Sign in to chat.
         </p>
       )}
 

@@ -769,8 +769,326 @@ export default function GameView({
   });
 
   return (
-    <div className="grid-2 game-grid">
-      <aside className="chat-rail">
+    <>
+      <div className="grid-2 game-grid">
+        <div>
+          <PlayerBar {...seat(topSide)} />
+
+          <div className={reviewing ? "board-wrap reviewing" : "board-wrap"}>
+            <Board
+              board={shownBoard}
+              interactive={canMove || exploring}
+              flipped={flipped}
+              onMove={exploring ? exploreMove : stage}
+              highlight={highlight}
+              lastMove={isWalking || exploring ? [] : shownMove}
+              free={exploring}
+              // Marks legal destinations while dragging. A convenience only —
+              // the server validates every move regardless. Passing undefined
+              // rather than null when there is no viewer keeps the hint off for
+              // spectators, who have no side to move for.
+              player={viewerSide ?? undefined}
+              setupSide={yourPlacement ? viewerSide! : undefined}
+              onSetupSquare={setup.placeAt}
+              setupRemaining={setup.remaining}
+              animate={exploring ? null : anim}
+              onSetupDrop={setup.dropAt}
+              onSetupMove={setup.moveSlot}
+            />
+            {/* Explore, review and the staged move all speak from the same
+                banner in the same spot — the pill over the board's lower edge.
+                One place where the current mode explains itself and offers its
+                controls. */}
+            {splash && game.status === "finished" && viewerSide !== null && (
+              <div className="result-splash" role="alertdialog" aria-live="assertive">
+                <div
+                  className={
+                    game.result === 0
+                      ? "result-card"
+                      : game.result === viewerSide
+                        ? "result-card won"
+                        : "result-card lost"
+                  }
+                >
+                  <div className="result-word">
+                    {game.result === 0
+                      ? "Drawn"
+                      : game.result === viewerSide
+                        ? "You won"
+                        : "You lost"}
+                  </div>
+                  <div className="muted">
+                    {game.resultReason === "resign"
+                      ? "by resignation"
+                      : game.resultReason === "timeout"
+                        ? "on time"
+                        : "at the goal"}
+                  </div>
+                  <button
+                    className="btn btn-primary"
+                    style={{ marginTop: 14 }}
+                    onClick={dismissSplash}
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            )}
+            {exploring && (
+              <div className="review-banner">
+                <span>Exploring — will not affect the game</span>
+                <button className="btn" onClick={resetExplore}>
+                  Reset
+                </button>
+                <button className="btn btn-primary" onClick={exitExplore}>
+                  Done
+                </button>
+              </div>
+            )}
+            {/* The staged move's buttons, floated over the board's empty lower
+                band — where the setup tray sits before play. The move itself is
+                already drawn as an arrow; repeating its notation said nothing
+                the board was not saying better. */}
+            {staged && viewingPly === null && !exploring && (
+              <div className="review-banner">
+                <button
+                  className="btn btn-primary"
+                  onClick={() => submit(staged)}
+                  disabled={pending}
+                >
+                  {pending ? "…" : "Submit move"}
+                </button>
+                <button className="btn" onClick={resetStaged} disabled={pending}>
+                  Reset
+                </button>
+              </div>
+            )}
+            {!exploring && reviewing && (
+              <div className="review-banner">
+                <span>
+                  {viewingPly === 0
+                    ? "Empty board"
+                    : describePly(history, viewingPly!, game.ply)}{" "}
+                  — you cannot play from here
+                </span>
+                <button className="btn btn-primary" onClick={() => goToPly(null)}>
+                  Back to live
+                </button>
+              </div>
+            )}
+          </div>
+
+          <PlayerBar {...seat(bottomSide)} />
+
+        </div>
+
+        <aside className="rail">
+          {yourPlacement && (
+            <SetupPanel
+              side={viewerSide!}
+              pending={pending}
+              error={error}
+              setup={setup}
+              onSubmit={submitSetupArrangement}
+            />
+          )}
+
+          {(bot.thinking || bot.error) && (
+            <div className="panel">
+              <h2>{bot.botName ?? game.botName ?? "The engine"}</h2>
+              {bot.thinking ? (
+                <>
+                  <p className="muted" style={{ margin: 0, lineHeight: 1.6 }}>
+                    Thinking… <strong>{bot.elapsed.toFixed(1)}s</strong>
+                  </p>
+                  <p className="hint" style={{ marginTop: 8 }}>
+                    The engine is running in this tab. Leaving now discards the
+                    search — it starts again from the beginning next time, so the
+                    move you get is the same either way.
+                  </p>
+                </>
+              ) : (
+                <p className="error" style={{ margin: 0 }}>{bot.error}</p>
+              )}
+            </div>
+          )}
+
+          <div className="panel">
+            <h2>Status</h2>
+            <Status
+              game={game}
+              viewerSide={viewerSide}
+              yourTurn={yourTurnOrPlacement}
+              signedIn={signedIn}
+            />
+            {game.status === "open" && viewerSide === 1 && (
+              <div className="row" style={{ marginTop: 14 }}>
+                <button className="btn btn-danger" onClick={cancel} disabled={pending}>
+                  Cancel game
+                </button>
+              </div>
+            )}
+            {game.status === "open" && game.youAreInvited && (
+              <div className="row" style={{ marginTop: 14 }}>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => answerChallenge(true)}
+                  disabled={pending}
+                >
+                  Accept challenge
+                </button>
+                <button className="btn" onClick={() => answerChallenge(false)} disabled={pending}>
+                  Decline
+                </button>
+              </div>
+            )}
+            {game.status === "finished" && viewerSide !== null && signedIn && (
+              <div className="row" style={{ marginTop: 14 }}>
+                <button className="btn btn-primary" onClick={playAgain} disabled={pending}>
+                  {game.botSide !== null ? "Play again" : "Offer a rematch"}
+                </button>
+                {game.resultReason === "goal" &&
+                  game.botSide === null &&
+                  viewerSide === game.result &&
+                  !game.takebackOffered && (
+                    <button className="btn" onClick={() => takeback("offer")} disabled={pending}>
+                      Offer takeback
+                    </button>
+                  )}
+                {game.takebackOffered && viewerSide === game.result && (
+                  <span className="muted">Takeback offered — their call.</span>
+                )}
+                {game.takebackOffered && viewerSide !== game.result && (
+                  <>
+                    <button
+                      className="btn btn-primary"
+                      onClick={() => takeback("accept")}
+                      disabled={pending}
+                    >
+                      Accept takeback
+                    </button>
+                    <button className="btn" onClick={() => takeback("decline")} disabled={pending}>
+                      Decline
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+            {game.status === "setup" && viewerSide !== null && (
+              <div className="row" style={{ marginTop: 14 }}>
+                <button className="btn btn-danger" onClick={abandon} disabled={pending}>
+                  Abandon game
+                </button>
+              </div>
+            )}
+            {canClaim && (
+              <div className="row" style={{ marginTop: 14 }}>
+                <button className="btn btn-primary" onClick={claim} disabled={pending}>
+                  Claim win on time
+                </button>
+              </div>
+            )}
+            {game.status === "active" && viewerSide !== null && (
+              <div className="row" style={{ marginTop: 14 }}>
+                {canGiveBack && (
+                  <button className="btn" onClick={giveBack} disabled={pending}>
+                    {game.botSide === null ? "Give back their turn" : "Take back move"}
+                  </button>
+                )}
+                <button
+                  className="btn btn-danger"
+                  onClick={resign}
+                  disabled={pending}
+                >
+                  Resign
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="panel">
+            <h2>Tools</h2>
+            <div className="row">
+              <button className="btn" onClick={() => setFlipped((f) => !f)}>
+                Flip board
+              </button>
+              {(game.status === "active" || game.status === "finished") && !exploring && (
+                <button
+                  className="btn"
+                  onClick={enterExplore}
+                  title="Push pieces around freely to test an idea, then come back"
+                >
+                  Explore
+                </button>
+              )}
+              <span className="control-divider" aria-hidden="true" />
+              <button
+                className="btn"
+                onClick={() => goToPly(openingPly)}
+                disabled={openingPly === null || viewingPly === openingPly}
+                title="Both home rows placed, before the first move"
+              >
+                Opening
+              </button>
+              <button
+                className="btn"
+                onClick={() => goToPly(null)}
+                disabled={!reviewing}
+              >
+                Latest
+              </button>
+            </div>
+            <p className="hint" style={{ margin: "10px 0 0" }}>
+              {reviewing
+                ? `Reviewing move ${viewingPly} of ${game.ply}`
+                : "← → to review history"}
+            </p>
+            {error && <p className="error" style={{ margin: "10px 0 0" }}>{error}</p>}
+          </div>
+          <div className="panel moves-panel">
+            <h2>Moves</h2>
+            {history.length === 0 ? (
+              <p className="muted moves-empty">No moves yet.</p>
+            ) : (
+              <ol className="moves-list">
+                {history.map((h) => {
+                  const active = (viewingPly ?? game.ply) === h.ply;
+                  return (
+                    <li key={h.ply}>
+                      <button
+                        className={active ? "move-row active" : "move-row"}
+                        onClick={() => goToPly(h.ply === game.ply ? null : h.ply)}
+                      >
+                        <span className="move-ply">{h.ply}.</span>
+                        <span className="move-side">
+                          {h.player === 1 ? "P1" : "P2"}
+                        </span>
+                        <span className="move-text">
+                          {h.kind === "setup"
+                            ? `set ${h.move.join("")}`
+                            : moveToNotation(h.move)}
+                        </span>
+                        <span className="move-time">
+                          {describeThinkTime(h.thinkMs)}
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ol>
+            )}
+          </div>
+
+        </aside>
+      </div>
+
+      {/*
+        The chat is a band across the foot of the page rather than a column
+        beside the board: it is the one thing here that is read left to right,
+        and the board never has to give up width for it. Whatever joins it
+        later — a game's notes, an analysis strip — belongs in this band too.
+      */}
+      <section className="game-chat">
         {canChat ? (
           <ChatPanel gameId={game.id} title="Table talk" canPost />
         ) : (
@@ -785,343 +1103,8 @@ export default function GameView({
             </p>
           </div>
         )}
-      </aside>
-      <div>
-        <PlayerBar {...seat(topSide)} />
-
-        <div className={reviewing ? "board-wrap reviewing" : "board-wrap"}>
-          <Board
-            board={shownBoard}
-            interactive={canMove || exploring}
-            flipped={flipped}
-            onMove={exploring ? exploreMove : stage}
-            highlight={highlight}
-            lastMove={isWalking || exploring ? [] : shownMove}
-            free={exploring}
-            // Marks legal destinations while dragging. A convenience only —
-            // the server validates every move regardless. Passing undefined
-            // rather than null when there is no viewer keeps the hint off for
-            // spectators, who have no side to move for.
-            player={viewerSide ?? undefined}
-            setupSide={yourPlacement ? viewerSide! : undefined}
-            onSetupSquare={setup.placeAt}
-            setupRemaining={setup.remaining}
-            animate={exploring ? null : anim}
-            onSetupDrop={setup.dropAt}
-            onSetupMove={setup.moveSlot}
-          />
-          {/* Explore, review and the staged move all speak from the same
-              banner in the same spot — the pill over the board's lower edge.
-              One place where the current mode explains itself and offers its
-              controls. */}
-          {splash && game.status === "finished" && viewerSide !== null && (
-            <div className="result-splash" role="alertdialog" aria-live="assertive">
-              <div
-                className={
-                  game.result === 0
-                    ? "result-card"
-                    : game.result === viewerSide
-                      ? "result-card won"
-                      : "result-card lost"
-                }
-              >
-                <div className="result-word">
-                  {game.result === 0
-                    ? "Drawn"
-                    : game.result === viewerSide
-                      ? "You won"
-                      : "You lost"}
-                </div>
-                <div className="muted">
-                  {game.resultReason === "resign"
-                    ? "by resignation"
-                    : game.resultReason === "timeout"
-                      ? "on time"
-                      : "at the goal"}
-                </div>
-                <button
-                  className="btn btn-primary"
-                  style={{ marginTop: 14 }}
-                  onClick={dismissSplash}
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          )}
-          {exploring && (
-            <div className="review-banner">
-              <span>Exploring — will not affect the game</span>
-              <button className="btn" onClick={resetExplore}>
-                Reset
-              </button>
-              <button className="btn btn-primary" onClick={exitExplore}>
-                Done
-              </button>
-            </div>
-          )}
-          {/* The staged move's buttons, floated over the board's empty lower
-              band — where the setup tray sits before play. The move itself is
-              already drawn as an arrow; repeating its notation said nothing
-              the board was not saying better. */}
-          {staged && viewingPly === null && !exploring && (
-            <div className="review-banner">
-              <button
-                className="btn btn-primary"
-                onClick={() => submit(staged)}
-                disabled={pending}
-              >
-                {pending ? "…" : "Submit move"}
-              </button>
-              <button className="btn" onClick={resetStaged} disabled={pending}>
-                Reset
-              </button>
-            </div>
-          )}
-          {!exploring && reviewing && (
-            <div className="review-banner">
-              <span>
-                {viewingPly === 0
-                  ? "Empty board"
-                  : describePly(history, viewingPly!, game.ply)}{" "}
-                — you cannot play from here
-              </span>
-              <button className="btn btn-primary" onClick={() => goToPly(null)}>
-                Back to live
-              </button>
-            </div>
-          )}
-        </div>
-
-        <PlayerBar {...seat(bottomSide)} />
-
-      </div>
-
-      <aside style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        <div className="panel">
-          <h2>Tools</h2>
-          <div className="row">
-            <button className="btn" onClick={() => setFlipped((f) => !f)}>
-              Flip board
-            </button>
-            {(game.status === "active" || game.status === "finished") && !exploring && (
-              <button
-                className="btn"
-                onClick={enterExplore}
-                title="Push pieces around freely to test an idea, then come back"
-              >
-                Explore
-              </button>
-            )}
-            <span className="control-divider" aria-hidden="true" />
-            <button
-              className="btn"
-              onClick={() => goToPly(openingPly)}
-              disabled={openingPly === null || viewingPly === openingPly}
-              title="Both home rows placed, before the first move"
-            >
-              Opening
-            </button>
-            <button
-              className="btn"
-              onClick={() => goToPly(null)}
-              disabled={!reviewing}
-            >
-              Latest
-            </button>
-          </div>
-          <p className="hint" style={{ margin: "10px 0 0" }}>
-            {reviewing
-              ? `Reviewing move ${viewingPly} of ${game.ply}`
-              : "← → to review history"}
-          </p>
-          {error && <p className="error" style={{ margin: "10px 0 0" }}>{error}</p>}
-        </div>
-        {yourPlacement && (
-          <SetupPanel
-            side={viewerSide!}
-            pending={pending}
-            error={error}
-            setup={setup}
-            onSubmit={submitSetupArrangement}
-          />
-        )}
-
-        {(bot.thinking || bot.error) && (
-          <div className="panel">
-            <h2>{bot.botName ?? game.botName ?? "The engine"}</h2>
-            {bot.thinking ? (
-              <>
-                <p className="muted" style={{ margin: 0, lineHeight: 1.6 }}>
-                  Thinking… <strong>{bot.elapsed.toFixed(1)}s</strong>
-                </p>
-                <p className="hint" style={{ marginTop: 8 }}>
-                  The engine is running in this tab. Leaving now discards the
-                  search — it starts again from the beginning next time, so the
-                  move you get is the same either way.
-                </p>
-              </>
-            ) : (
-              <p className="error" style={{ margin: 0 }}>{bot.error}</p>
-            )}
-          </div>
-        )}
-
-        <div className="panel">
-          <h2>Status</h2>
-          <Status
-            game={game}
-            viewerSide={viewerSide}
-            yourTurn={yourTurnOrPlacement}
-            signedIn={signedIn}
-          />
-          {game.status === "open" && viewerSide === 1 && (
-            <div className="row" style={{ marginTop: 14 }}>
-              <button className="btn btn-danger" onClick={cancel} disabled={pending}>
-                Cancel game
-              </button>
-            </div>
-          )}
-          {game.status === "open" && game.youAreInvited && (
-            <div className="row" style={{ marginTop: 14 }}>
-              <button
-                className="btn btn-primary"
-                onClick={() => answerChallenge(true)}
-                disabled={pending}
-              >
-                Accept challenge
-              </button>
-              <button className="btn" onClick={() => answerChallenge(false)} disabled={pending}>
-                Decline
-              </button>
-            </div>
-          )}
-          {game.status === "finished" && viewerSide !== null && signedIn && (
-            <div className="row" style={{ marginTop: 14 }}>
-              <button className="btn btn-primary" onClick={playAgain} disabled={pending}>
-                {game.botSide !== null ? "Play again" : "Offer a rematch"}
-              </button>
-              {game.resultReason === "goal" &&
-                game.botSide === null &&
-                viewerSide === game.result &&
-                !game.takebackOffered && (
-                  <button className="btn" onClick={() => takeback("offer")} disabled={pending}>
-                    Offer takeback
-                  </button>
-                )}
-              {game.takebackOffered && viewerSide === game.result && (
-                <span className="muted">Takeback offered — their call.</span>
-              )}
-              {game.takebackOffered && viewerSide !== game.result && (
-                <>
-                  <button
-                    className="btn btn-primary"
-                    onClick={() => takeback("accept")}
-                    disabled={pending}
-                  >
-                    Accept takeback
-                  </button>
-                  <button className="btn" onClick={() => takeback("decline")} disabled={pending}>
-                    Decline
-                  </button>
-                </>
-              )}
-            </div>
-          )}
-          {game.status === "setup" && viewerSide !== null && (
-            <div className="row" style={{ marginTop: 14 }}>
-              <button className="btn btn-danger" onClick={abandon} disabled={pending}>
-                Abandon game
-              </button>
-            </div>
-          )}
-          {canClaim && (
-            <div className="row" style={{ marginTop: 14 }}>
-              <button className="btn btn-primary" onClick={claim} disabled={pending}>
-                Claim win on time
-              </button>
-            </div>
-          )}
-          {game.status === "active" && viewerSide !== null && (
-            <div className="row" style={{ marginTop: 14 }}>
-              {canGiveBack && (
-                <button className="btn" onClick={giveBack} disabled={pending}>
-                  {game.botSide === null ? "Give back their turn" : "Take back move"}
-                </button>
-              )}
-              <button
-                className="btn btn-danger"
-                onClick={resign}
-                disabled={pending}
-              >
-                Resign
-              </button>
-            </div>
-          )}
-        </div>
-
-        <div className="panel">
-          <h2>Moves</h2>
-          {history.length === 0 ? (
-            <p className="muted" style={{ margin: 0 }}>
-              No moves yet.
-            </p>
-          ) : (
-            <ol
-              style={{
-                margin: 0,
-                padding: 0,
-                listStyle: "none",
-                maxHeight: 320,
-                overflowY: "auto",
-                fontFamily: "var(--font-mono)",
-                fontSize: 13,
-              }}
-            >
-              {history.map((h) => {
-                const active = (viewingPly ?? game.ply) === h.ply;
-                return (
-                  <li key={h.ply}>
-                    <button
-                      onClick={() =>
-                        goToPly(h.ply === game.ply ? null : h.ply)
-                      }
-                      style={{
-                        display: "flex",
-                        width: "100%",
-                        gap: 10,
-                        padding: "6px 8px",
-                        background: active ? "var(--bg-panel-active)" : "none",
-                        border: "none",
-                        borderRadius: 4,
-                        color: active ? "var(--accent-mint)" : "var(--text-secondary)",
-                        textAlign: "left",
-                      }}
-                    >
-                      <span style={{ color: "var(--text-dim)", minWidth: 24 }}>
-                        {h.ply}.
-                      </span>
-                      <span style={{ minWidth: 22 }}>
-                        {h.player === 1 ? "P1" : "P2"}
-                      </span>
-                      <span style={{ flex: 1 }}>
-                        {h.kind === "setup"
-                          ? `set ${h.move.join("")}`
-                          : moveToNotation(h.move)}
-                      </span>
-                      <span style={{ color: "var(--text-dim)" }}>
-                        {describeThinkTime(h.thinkMs)}
-                      </span>
-                    </button>
-                  </li>
-                );
-              })}
-            </ol>
-          )}
-        </div>
-
-      </aside>
-    </div>
+      </section>
+    </>
   );
 }
 
