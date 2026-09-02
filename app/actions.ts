@@ -7,6 +7,7 @@ import {
   createBotGame,
   createGame,
   joinGame,
+  oldestJoinableGame,
   renameUser,
   GameError,
   createChallenge,
@@ -136,6 +137,39 @@ export async function createGameAction(
   // wrong. The dashboard shows it waiting, next to everything else of yours.
   revalidatePath("/games");
   redirect("/dashboard");
+}
+
+/**
+ * Sit down at whichever public table has waited longest.
+ *
+ * Joins only. It deliberately does not host one when there is nothing to
+ * join: wanting a game now and being willing to wait for one are different
+ * intentions, and quietly doing the second leaves someone looking at an empty
+ * board wondering what they started. When nobody is waiting it says so, and
+ * hosting is the button underneath.
+ */
+export async function quickGameAction(
+  _prev: ActionState,
+  _formData: FormData,
+): Promise<ActionState> {
+  const user = await currentUser();
+  if (!user) return { error: "Sign in first." };
+
+  const table = oldestJoinableGame(user.id);
+  if (!table) {
+    return { error: "No open tables right now — host one and see who turns up." };
+  }
+
+  try {
+    joinGame(table.id, user.id);
+  } catch (err) {
+    // Someone else took the seat between the query and the join. That is the
+    // race this button invites, and the honest answer is to say so rather
+    // than to loop looking for another.
+    if (err instanceof GameError) return { error: err.message };
+    return { error: "Could not join that game." };
+  }
+  redirect(`/game/${table.id}`);
 }
 
 /**

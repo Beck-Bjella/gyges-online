@@ -1153,7 +1153,12 @@ export default function GameView({
       */}
       <section className="game-chat chat-band">
         {canChat ? (
-          <ChatPanel gameId={game.id} title="Table talk" canPost />
+          <ChatPanel
+            gameId={game.id}
+            title="Table talk"
+            canPost
+            note="Private to the two of you — nobody watching this game can read it."
+          />
         ) : (
           <div className="panel chat-panel">
             <h2>Table talk</h2>

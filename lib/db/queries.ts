@@ -334,6 +334,50 @@ export function setUserEmail(userId: string, email: string): void {
   db.prepare("UPDATE users SET email = ? WHERE id = ?").run(trimmed || null, userId);
 }
 
+/**
+ * Count recent failed sign-ins in one scope.
+ *
+ * See migrations/0009. The scope is either an account ("user:beck") or a
+ * source ("ip:1.2.3.4"); the caller decides the window and the limit, because
+ * those are policy and policy lives in lib/auth.ts.
+ */
+export function failedSignInsSince(scope: string, since: number): number {
+  const row = getDb()
+    .prepare("SELECT COUNT(*) AS n FROM sign_in_attempts WHERE scope = ? AND at >= ?")
+    .get(scope, since) as { n: number };
+  return row.n;
+}
+
+/**
+ * Record one failure against each scope it belongs to, and take the chance to
+ * drop rows nobody will count again.
+ *
+ * Pruning here rather than on a timer keeps the table proportional to recent
+ * activity without anything having to remember to run.
+ */
+export function recordFailedSignIn(scopes: string[], keepSince: number): void {
+  const db = getDb();
+  const at = now();
+  const insert = db.prepare("INSERT INTO sign_in_attempts (scope, at) VALUES (?, ?)");
+  transaction(() => {
+    for (const scope of scopes) insert.run(scope, at);
+    db.prepare("DELETE FROM sign_in_attempts WHERE at < ?").run(keepSince);
+  });
+}
+
+/**
+ * Forget the failures in these scopes — the sign-in worked.
+ *
+ * Only ever called with the account's own scope. Clearing the SOURCE scope on
+ * success would hand an attacker the reset button: sign in to an account they
+ * own, and the spray counter goes back to zero.
+ */
+export function clearFailedSignIns(scopes: string[]): void {
+  const db = getDb();
+  const stmt = db.prepare("DELETE FROM sign_in_attempts WHERE scope = ?");
+  for (const scope of scopes) stmt.run(scope);
+}
+
 export function findUserByName(username: string): User | null {
   return toUser(
     getDb()
@@ -571,6 +615,25 @@ export function listOpenGames(): GameWithPlayers[] {
         WHERE g.status = 'open' AND g.invited_id IS NULL ORDER BY g.created_at DESC LIMIT 50`,
     )
     .all() as GameWithPlayers[];
+}
+
+/**
+ * The public table that has waited longest, for the quick-game button.
+ *
+ * Oldest first, which is the fair order — the person who has been waiting
+ * gets the game. Excludes your own tables and reserved seats; joinGame checks
+ * all of this again, since this only chooses a candidate.
+ */
+export function oldestJoinableGame(userId: string): GameWithPlayers | null {
+  const row = getDb()
+    .prepare(
+      `SELECT ${GAME_COLUMNS} ${GAME_JOINS}
+        WHERE g.status = 'open' AND g.invited_id IS NULL
+          AND g.player2_id IS NULL AND g.player1_id <> ?
+        ORDER BY g.created_at ASC LIMIT 1`,
+    )
+    .get(userId) as GameWithPlayers | undefined;
+  return row ?? null;
 }
 
 /**

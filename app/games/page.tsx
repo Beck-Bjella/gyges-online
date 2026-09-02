@@ -10,6 +10,7 @@ import {
 } from "@/lib/db/queries";
 import { relativeTime, describeTimeControl, endingSuffix } from "@/lib/format";
 import NewGameForm from "@/components/NewGameForm";
+import QuickGameButton from "@/components/QuickGameButton";
 import Tabs from "@/components/Tabs";
 import ChallengeEngineButton from "@/components/ChallengeEngineButton";
 import AutoRefresh from "@/components/AutoRefresh";
@@ -66,6 +67,13 @@ export default async function GamesPage() {
                 label: "Play",
                 content: (
                   <>
+          {user && (
+            <div className="quick-row">
+              <QuickGameButton />
+              <span className="muted">Joins the longest-waiting table.</span>
+            </div>
+          )}
+
           {user ? (
             <NewGameForm />
           ) : (

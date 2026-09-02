@@ -31,11 +31,14 @@ export default function ChatPanel({
   gameId = null,
   title,
   canPost,
+  note,
 }: {
   /** Null is the lobby. */
   gameId?: string | null;
   title: string;
   canPost: boolean;
+  /** A line under the title, for saying who can read this. */
+  note?: string;
 }) {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [draft, setDraft] = useState("");
@@ -128,6 +131,7 @@ export default function ChatPanel({
   return (
     <div className="panel chat-panel">
       <h2>{title}</h2>
+      {note && <p className="chat-note">{note}</p>}
 
       <div className="chat-messages" ref={listRef} onScroll={onScroll}>
         {messages.length === 0 ? (

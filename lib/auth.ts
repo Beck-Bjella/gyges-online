@@ -21,13 +21,16 @@
  * safe to leave passwordless.
  */
 
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import {
   createSession,
   createUser,
   deleteSession,
   deleteSessionsForUser,
   findUserByName,
+  failedSignInsSince,
+  recordFailedSignIn,
+  clearFailedSignIns,
   passwordHashFor,
   purgeExpiredSessions,
   setPasswordHash,
@@ -113,23 +116,87 @@ export async function signUp(username: string, password: string): Promise<User> 
 }
 
 /**
+ * How many failures are allowed, and over what window.
+ *
+ * Two limits, because they stop different attacks. The per-account one stops
+ * a million guesses at one password; the per-source one stops one guess each
+ * at a million accounts, which no per-account limit can see.
+ *
+ * Generous enough that a person who has genuinely forgotten which password
+ * they used will not meet it, and small enough that guessing is hopeless: a
+ * password worth having has far more than a few hundred candidates.
+ */
+const ATTEMPT_WINDOW_SECONDS = 15 * 60;
+const MAX_PER_ACCOUNT = 8;
+const MAX_PER_SOURCE = 30;
+
+/**
+ * The client's address, as far as it can be known.
+ *
+ * Behind Caddy the connection is from localhost, so the header is where the
+ * real address lives — and the first entry is the one the proxy observed.
+ * Absent or unreadable, sign-in still works; only the per-source limit is
+ * lost, and the per-account limit is the one that protects an account.
+ */
+async function clientSource(): Promise<string | null> {
+  try {
+    const h = await headers();
+    const forwarded = h.get("x-forwarded-for");
+    const ip = forwarded?.split(",")[0]?.trim() || h.get("x-real-ip")?.trim();
+    return ip ? `ip:${ip}` : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Sign in to an existing account.
  *
  * Two outcomes: the password verifies, or it does not. An account with no
  * stored password — which today means a bot — can never be signed in to, since
  * verifyPassword refuses a null hash outright.
+ *
+ * Rate limited, and deliberately *before* the name is looked up: the limit has
+ * to apply to names that do not exist, or "you are being throttled" would
+ * itself answer the question of which names are real. For the same reason the
+ * refusal is worded without reference to the account.
  */
 export async function signIn(username: string, password: string): Promise<User> {
-  if (!password) throw new GameError(BAD_CREDENTIALS);
+  const account = `user:${username.trim().toLowerCase()}`;
+  const source = await clientSource();
+  const since = Math.floor(Date.now() / 1000) - ATTEMPT_WINDOW_SECONDS;
+
+  if (
+    failedSignInsSince(account, since) >= MAX_PER_ACCOUNT ||
+    (source !== null && failedSignInsSince(source, since) >= MAX_PER_SOURCE)
+  ) {
+    throw new GameError(
+      "Too many sign-in attempts. Wait fifteen minutes and try again.",
+      429,
+    );
+  }
+
+  const scopes = source ? [account, source] : [account];
+  const fail = () => {
+    recordFailedSignIn(scopes, since);
+    return new GameError(BAD_CREDENTIALS);
+  };
+
+  if (!password) throw fail();
 
   const user = findUserByName(username);
-  if (!user || user.deleted_at) throw new GameError(BAD_CREDENTIALS);
+  if (!user || user.deleted_at) throw fail();
 
   const stored = passwordHashFor(user.id);
 
   if (!(await verifyPassword(password, stored))) {
-    throw new GameError(BAD_CREDENTIALS);
+    throw fail();
   }
+
+  // Only the account's own count is forgiven. Clearing the source count on a
+  // success would hand an attacker the reset button: sign in to an account
+  // they own between sprays, and the limit never arrives.
+  clearFailedSignIns([account]);
 
   // Upgrade a hash made with older, cheaper parameters. This is the only moment
   // the plaintext exists to re-hash with, and it is invisible to the player.

@@ -48,6 +48,10 @@ const {
   claimTimeout,
   sideOf,
   leaderboard,
+  oldestJoinableGame,
+  failedSignInsSince,
+  recordFailedSignIn,
+  clearFailedSignIns,
   offerDraw,
   answerDraw,
   createSession,
@@ -754,6 +758,104 @@ test("between people, a move is never taken back unilaterally", () => {
   // The instant takeback is for bot games; between people it is an offer,
   // made by the winner once the game ends at the goal.
   assert.throws(() => undoTurn(gameId, b.id), /offered/i);
+});
+
+// --- the quick game -------------------------------------------------------
+
+test("the quick game takes the table that has waited longest", () => {
+  const host = createUser(uniqueName("host"));
+  const later = createUser(uniqueName("later"));
+  const seeker = createUser(uniqueName("seeker"));
+
+  const first = createGame(host.id, 3600);
+  const second = createGame(later.id, 3600);
+  // created_at has one-second resolution, so the ordering is set explicitly
+  // rather than left to how fast the test runs.
+  getDb().prepare("UPDATE games SET created_at = ? WHERE id = ?").run(1000, first.id);
+  getDb().prepare("UPDATE games SET created_at = ? WHERE id = ?").run(2000, second.id);
+
+  assert.equal(oldestJoinableGame(seeker.id)?.id, first.id, "oldest first");
+
+  // Your own table is not something to join.
+  assert.equal(oldestJoinableGame(host.id)?.id, second.id);
+});
+
+// These two share the suite's database with everything else, so rather than
+// asserting "nothing is joinable" they make the game under test the OLDEST
+// one there is: if it were joinable, it is what would come back.
+
+test("the quick game does not offer a reserved seat", () => {
+  const host = createUser(uniqueName("host"));
+  const invited = createUser(uniqueName("invited"));
+  const stranger = createUser(uniqueName("stranger"));
+
+  const challenge = createChallenge(host.id, invited.id);
+  getDb().prepare("UPDATE games SET created_at = ? WHERE id = ?").run(1, challenge.id);
+
+  assert.notEqual(
+    oldestJoinableGame(stranger.id)?.id,
+    challenge.id,
+    "a challenge is not a public table",
+  );
+});
+
+test("a joined table stops being joinable", () => {
+  const host = createUser(uniqueName("host"));
+  const joiner = createUser(uniqueName("joiner"));
+  const third = createUser(uniqueName("third"));
+
+  const g = createGame(host.id, 3600);
+  getDb().prepare("UPDATE games SET created_at = ? WHERE id = ?").run(2, g.id);
+  joinGame(g.id, joiner.id);
+
+  assert.notEqual(oldestJoinableGame(third.id)?.id, g.id, "the seat is taken");
+});
+
+// --- sign-in attempts -----------------------------------------------------
+//
+// The policy — how many, over what window — lives in lib/auth.ts, which needs
+// request headers and a cookie store. What is testable here is the counting it
+// rests on.
+
+test("failed sign-ins are counted per scope and forgotten on success", () => {
+  const account = `user:${uniqueName("target")}`;
+  const source = "ip:198.51.100.7";
+  const since = 0;
+
+  assert.equal(failedSignInsSince(account, since), 0);
+
+  recordFailedSignIn([account, source], since);
+  recordFailedSignIn([account, source], since);
+  recordFailedSignIn([source], since);
+
+  assert.equal(failedSignInsSince(account, since), 2);
+  assert.equal(failedSignInsSince(source, since), 3, "the source sees them all");
+
+  // A success forgives the account and deliberately leaves the source alone —
+  // otherwise signing in to your own account resets a spray.
+  clearFailedSignIns([account]);
+  assert.equal(failedSignInsSince(account, since), 0);
+  assert.equal(failedSignInsSince(source, since), 3);
+});
+
+test("attempts outside the window do not count, and are pruned", () => {
+  const account = `user:${uniqueName("old")}`;
+  const nowish = Math.floor(Date.now() / 1000);
+
+  recordFailedSignIn([account], 0);
+  getDb()
+    .prepare("UPDATE sign_in_attempts SET at = ? WHERE scope = ?")
+    .run(nowish - 3600, account);
+
+  assert.equal(failedSignInsSince(account, nowish - 900), 0, "an hour ago is not recent");
+
+  // Writing a new failure drops anything older than the window it is given.
+  const other = `user:${uniqueName("other")}`;
+  recordFailedSignIn([other], nowish - 900);
+  const left = getDb()
+    .prepare("SELECT COUNT(*) AS n FROM sign_in_attempts WHERE scope = ?")
+    .get(account) as { n: number };
+  assert.equal(left.n, 0, "the stale row was pruned");
 });
 
 // --- draws ----------------------------------------------------------------
