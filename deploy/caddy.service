@@ -1,0 +1,29 @@
+# Caddy's own unit, from its official distribution.
+#
+# Only used where Caddy is installed from its release binary — Amazon Linux
+# and the rest of the RPM family, which its packaging does not cover. On
+# Debian and Ubuntu the apt package ships this file itself and setup.sh does
+# not touch it.
+
+[Unit]
+Description=Caddy
+Documentation=https://caddyserver.com/docs/
+After=network.target network-online.target
+Requires=network-online.target
+
+[Service]
+Type=notify
+User=caddy
+Group=caddy
+ExecStart=/usr/bin/caddy run --environ --config /etc/caddy/Caddyfile
+ExecReload=/usr/bin/caddy reload --config /etc/caddy/Caddyfile --force
+TimeoutStopSec=5s
+LimitNOFILE=1048576
+PrivateTmp=true
+ProtectSystem=full
+# Binding to 80 and 443 as a non-root user takes this one capability and no
+# other.
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+
+[Install]
+WantedBy=multi-user.target
