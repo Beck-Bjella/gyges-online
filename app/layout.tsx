@@ -55,7 +55,8 @@ export default async function RootLayout({
           */}
           <header className="topbar">
             <Link href={user ? "/dashboard" : "/"} className="brand">
-              <span className="brand-mark" aria-hidden />
+              {/* The same file the browser tab shows — one mark, two places. */}
+              <img src="/icon.svg" alt="" className="brand-mark" width={20} height={20} />
               Gygès
             </Link>
             <nav>
