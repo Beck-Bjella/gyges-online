@@ -4,9 +4,35 @@ import { currentUser } from "@/lib/auth";
 import { gamesAwaitingUser } from "@/lib/db/queries";
 import "./globals.css";
 
+/**
+ * What a shared link looks like. The title is written the way game sites
+ * write theirs — the action first — because that is the line people see in a
+ * chat or a search result, and "play X online from your browser" is the whole
+ * pitch in one string.
+ */
 export const metadata: Metadata = {
-  title: "Gygès Online",
-  description: "Play Gygès online, correspondence style.",
+  metadataBase: new URL("https://playgyges.com"),
+  title: {
+    default: "Play Gygès online from your browser",
+    template: "%s",
+  },
+  description:
+    "Play the board game Gygès in your browser — against other people or the computer. Free, no download, take your turns whenever you like.",
+  openGraph: {
+    title: "Play Gygès online from your browser",
+    description:
+      "Against other people or the computer. Free, no download, take your turns whenever you like.",
+    url: "/",
+    siteName: "playgyges.com",
+    type: "website",
+  },
+  twitter: {
+    card: "summary",
+  },
+};
+
+export const viewport = {
+  themeColor: "#12100e",
 };
 
 export default async function RootLayout({
