@@ -3,6 +3,7 @@ import { leaderboard } from "@/lib/db/queries";
 import { currentUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
+export const metadata = { title: "Leaderboard · Gygès" };
 
 export default async function LeaderboardPage() {
   const rows = leaderboard();

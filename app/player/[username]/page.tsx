@@ -23,6 +23,15 @@ import { friendState, opponentRecords } from "@/lib/db/queries";
 
 export const dynamic = "force-dynamic";
 
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ username: string }>;
+}) {
+  const { username } = await params;
+  return { title: `${decodeURIComponent(username)} · Gygès` };
+}
+
 export default async function PlayerPage({
   params,
 }: {

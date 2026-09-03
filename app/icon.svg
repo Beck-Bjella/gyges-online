@@ -1,7 +1,22 @@
-<!-- The two-ring piece, as the site's icon: a gold disc with its ring
-     grooves, drawn flat and thick so it still reads at sixteen pixels. -->
+<!-- The two-ring piece exactly as the board draws it: open rings in the pale
+     piece colour with the square showing through the middle, lit from the
+     upper left by the same gradient the game uses. It sits on its dark grid
+     spot, which is both true to the site and what keeps the pale gold legible
+     on a light browser tab. Geometry is Board.tsx's, scaled 1:1 —
+     PIECE_RADIUS 32, RING_WIDTH 6, RING_GAP 3.8. -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <circle cx="32" cy="32" r="30" fill="#d4c498"/>
-  <circle cx="32" cy="32" r="29" fill="none" stroke="#1a1108" stroke-width="4"/>
-  <circle cx="32" cy="32" r="16" fill="none" stroke="#1a1108" stroke-width="5"/>
+  <defs>
+    <radialGradient id="ring" gradientUnits="userSpaceOnUse" cx="21" cy="19" r="48">
+      <stop offset="0%" stop-color="#f4ead0"/>
+      <stop offset="55%" stop-color="#d4c498"/>
+      <stop offset="100%" stop-color="#8a7550"/>
+    </radialGradient>
+    <radialGradient id="spot" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0%" stop-color="#3e3122"/>
+      <stop offset="100%" stop-color="#2c2218"/>
+    </radialGradient>
+  </defs>
+  <circle cx="32" cy="32" r="31" fill="url(#spot)"/>
+  <circle cx="32" cy="32" r="29" fill="none" stroke="url(#ring)" stroke-width="6"/>
+  <circle cx="32" cy="32" r="19.2" fill="none" stroke="url(#ring)" stroke-width="6"/>
 </svg>

@@ -12,6 +12,22 @@ import GameView from "@/components/GameView";
 
 export const dynamic = "force-dynamic";
 
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  const game = getGame(id);
+  if (!game) return { title: "Game · Gygès" };
+  const p1 = game.player1_name ?? "Open seat";
+  const p2 = game.player2_name ?? "open seat";
+  return {
+    title: `${p1} vs ${p2} · Gygès`,
+    description: "Watch or play this game of Gygès.",
+  };
+}
+
 export default async function GamePage({
   params,
 }: {
