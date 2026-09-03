@@ -36,7 +36,7 @@ export default async function RootLayout({
               {user && (
                 <Link href="/dashboard">
                   Dashboard
-                  {waiting > 0 && <span className="badge">{waiting}</span>}
+                  {waiting > 0 && <span className="nav-count">{waiting}</span>}
                 </Link>
               )}
               <Link href="/games">Games</Link>

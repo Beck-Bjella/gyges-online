@@ -201,7 +201,7 @@ function FinishedGame({
       <Link className="stretch-link" href={`/game/${game.id}`} aria-label="Open game" />
       <span className={outcome === "Won" ? "tag tag-turn" : "tag"}>{outcome}</span>
       <span style={{ flex: 1, minWidth: 0 }}>
-        vs{" "}
+        You vs{" "}
         {opponent ? (
           <Link href={`/player/${encodeURIComponent(opponent)}`}>
             <strong>{opponent}</strong>
@@ -372,7 +372,7 @@ function MyGame({
         <div>
           {opponent ? (
             <>
-              vs{" "}
+              You vs{" "}
               <Link href={`/player/${encodeURIComponent(opponent)}`}>
                 <strong>{opponent}</strong>
               </Link>

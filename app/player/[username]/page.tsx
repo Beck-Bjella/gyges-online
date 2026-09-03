@@ -11,7 +11,7 @@ import {
   type Record_,
 } from "@/lib/db/queries";
 import { relativeTime } from "@/lib/format";
-import { engineRatingFor } from "@/lib/ladder";
+import { BOTS } from "@/lib/bots";
 import { currentUser } from "@/lib/auth";
 import RenameForm from "@/components/RenameForm";
 import EmailForm from "@/components/EmailForm";
@@ -58,9 +58,18 @@ export default async function PlayerPage({
   // opponents table.
   const finished = finishedGamesForUser(user.id);
   const opponents = opponentRecords(user.id);
-  // Bots are rated by their fixed anchor, not by playing; the ladder is for
-  // the people climbing it.
-  const ladder = isBot ? null : engineRatingFor(user.id);
+  // One badge per computer opponent beaten, easiest first. Earned for good:
+  // a badge is an achievement, not a rating, so it never goes away.
+  const badges = isBot
+    ? []
+    : [...BOTS]
+        .sort((a, b) => a.rating - b.rating)
+        .map((spec) => ({
+          name: spec.username,
+          earned:
+            (opponents.find((o) => o.username === spec.username)?.wins ?? 0) > 0,
+        }));
+  const showBadges = badges.some((b) => b.earned) || isMe;
   // Only meaningful on your own profile, where the account panel prints it.
   const seats = isMe ? openSeatCount(user.id) : 0;
 
@@ -123,7 +132,7 @@ export default async function PlayerPage({
           <div className="account-field">
             <span className="account-label">This account</span>
             <p style={{ margin: "0 0 14px", fontSize: 15 }}>
-              Tables in use:{" "}
+              Games in use:{" "}
               <strong
                 style={{
                   color:
@@ -142,22 +151,6 @@ export default async function PlayerPage({
 
       {viewer && !isMe && user.bot_strength === null && (
         <SocialButtons userId={user.id} state={friendState(viewer.id, user.id)} />
-      )}
-
-      {ladder && (
-        <p className="lede" style={{ marginTop: -14 }}>
-          Engine rating <strong>{ladder.rating}</strong>
-          {ladder.bestBeaten && (
-            <>
-              {" — best win against "}
-              <Link href={`/player/${encodeURIComponent(ladder.bestBeaten)}`}>
-                {ladder.bestBeaten}
-              </Link>
-            </>
-          )}
-          {". "}
-          <Link href="/leaderboard">See the ladder.</Link>
-        </p>
       )}
 
       {/* Against people. This is the record — the one the leaderboard ranks. */}
@@ -190,6 +183,28 @@ export default async function PlayerPage({
           As player 1: {recordLine(stats.asP1)} · as player 2:{" "}
           {recordLine(stats.asP2)}
         </p>
+      )}
+
+      {showBadges && (
+        <>
+          <div className="section-head">
+            <h2>Computer badges</h2>
+          </div>
+          <p className="muted" style={{ margin: "0 0 12px", lineHeight: 1.6 }}>
+            Which of the computer opponents this player has beaten.
+          </p>
+          <div className="badges" style={{ marginBottom: 26 }}>
+            {badges.map((b) => (
+              <span
+                key={b.name}
+                className={b.earned ? "badge earned" : "badge"}
+                title={b.earned ? `Has beaten ${b.name}` : `Has not beaten ${b.name} yet`}
+              >
+                {b.name}
+              </span>
+            ))}
+          </div>
+        </>
       )}
 
       {h2h && h2h.played > 0 && (

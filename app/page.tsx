@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { currentUser } from "@/lib/auth";
 import SignInForm from "@/components/SignInForm";
 import Board from "@/components/Board";
@@ -34,12 +33,6 @@ export default async function HomePage() {
         </p>
 
         <SignInForm />
-
-        <p className="splash-links">
-          <Link href="/rules">How to play</Link>
-          <Link href="/games">Watch a game</Link>
-          <Link href="/computer">The computer</Link>
-        </p>
       </div>
     </div>
   );

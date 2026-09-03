@@ -133,6 +133,21 @@ button {
   cursor: pointer;
 }
 
+/*
+ * Focus in the site's own colour. Without this every clicked button and link
+ * flashed the browser's default blue ring, which is nobody's palette — and
+ * keyboard focus still deserves a visible mark, so it is restyled rather than
+ * removed: mint for the keyboard, nothing for a mouse click.
+ */
+:focus-visible {
+  outline: 2px solid var(--accent-mint);
+  outline-offset: 2px;
+}
+button:focus:not(:focus-visible),
+a:focus:not(:focus-visible) {
+  outline: none;
+}
+
 input {
   font: inherit;
 }
@@ -317,7 +332,10 @@ h2 {
 
 .page-head {
   display: flex;
-  align-items: flex-start;
+  /* Centred, so a button on the right sits level with the title instead of
+     floating above it — top-aligning put the button's top at the h1's line
+     box, which starts a leading's worth above the visible letters. */
+  align-items: center;
   justify-content: space-between;
   gap: 20px;
   flex-wrap: wrap;
@@ -723,6 +741,54 @@ tr.you td:first-child {
   box-shadow: inset 2px 0 0 var(--accent-mint);
 }
 
+/*
+ * Computer badges: one per opponent beaten, worn on the profile for good — a
+ * badge is an achievement, not a rating. Earned ones light up; the rest sit
+ * dim, which on your own profile reads as the to-do list it is. Led by the
+ * piece motif, so they look like they belong to the game.
+ */
+.badges {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 12px 5px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle);
+  font-size: 12.5px;
+  font-weight: 560;
+  color: var(--text-dim);
+  opacity: 0.6;
+}
+.badge::before {
+  content: "";
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--bg-darkest);
+  box-shadow: inset 0 0 0 2px var(--border-strong);
+}
+.badge.earned {
+  opacity: 1;
+  color: var(--accent-mint);
+  border-color: rgba(111, 216, 180, 0.4);
+  background: var(--accent-mint-soft);
+}
+.badge.earned::before {
+  background: radial-gradient(
+    circle at 35% 30%,
+    var(--piece-light),
+    var(--piece-mid) 55%,
+    var(--piece-dark)
+  );
+  box-shadow: inset 0 0 0 2px var(--piece-ring);
+}
+
 .tag {
   font-size: 10.5px;
   font-weight: 600;
@@ -739,7 +805,7 @@ tr.you td:first-child {
   color: var(--accent-mint);
   background: var(--accent-mint-soft);
 }
-.badge {
+.nav-count {
   display: inline-block;
   margin-left: 7px;
   min-width: 17px;
@@ -1036,9 +1102,13 @@ td.num {
   display: flex;
   align-items: center;
   justify-content: center;
-  /* Fills the first screen: viewport minus the top bar, main's padding and a
-     little of the footer's approach. */
-  min-height: min(860px, calc(100dvh - 200px));
+  /* The hero owns everything under the top bar: main's padding is cancelled
+     so the box runs from the bar to the viewport bottom, and the board and
+     the sign-in centre on that. The acknowledgements footer falls below the
+     fold, where it belongs. */
+  margin-top: calc(-1 * var(--page-vpad));
+  min-height: calc(100dvh - 58px);
+  overflow: hidden;
 }
 
 .splash-bg {
@@ -1051,24 +1121,20 @@ td.num {
   user-select: none;
 }
 .splash-bg .board {
-  max-width: min(94%, calc(100dvh - 150px));
-  /* Scenery, not the subject: dimmed enough that the panel on top of it
-     reads first, still crisp enough to look like the game it is. */
-  opacity: 0.45;
+  /* Sized by HEIGHT, spanning nearly the whole hero. On a narrow screen that
+     makes it wider than the viewport, which is fine — the hero clips it, and
+     a board bleeding off the sides reads better than a small one floating. */
+  height: calc(100dvh - 90px);
+  width: auto;
+  max-width: none;
+  /* Scenery, not the subject: dimmed enough that the panel on top reads
+     first. Its own canvas — the dark rounded square the SVG paints behind
+     the diamond — is stripped, because over the page background and under a
+     scrim it read as three stacked slabs of slightly different dark. The
+     diamond floats on the page itself, one tint, no layers. */
+  opacity: 0.22;
+  background: none;
   box-shadow: none;
-}
-/* A pool of shade behind the centred content, so the title and panel sit on
-   something calmer than piece rings. */
-.splash-bg::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(
-    ellipse 480px 560px at 50% 50%,
-    rgba(18, 16, 14, 0.82),
-    rgba(18, 16, 14, 0.35) 65%,
-    transparent
-  );
 }
 
 .splash-fg {
@@ -1080,7 +1146,7 @@ td.num {
 }
 
 .splash-title {
-  font-size: clamp(52px, 8vh, 76px);
+  font-size: clamp(64px, 11vh, 104px);
   font-weight: 700;
   letter-spacing: -0.035em;
   margin: 0;
@@ -1088,6 +1154,11 @@ td.num {
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+  /* The letters are the same gold as the pieces behind them, so they carry
+     their own darkness: a tight edge shadow and a wide soft one, following
+     the glyphs rather than boxing them. */
+  filter: drop-shadow(0 1px 2px rgba(10, 8, 6, 0.95))
+    drop-shadow(0 6px 26px rgba(10, 8, 6, 0.9));
 }
 
 .splash-line {
@@ -1102,20 +1173,6 @@ td.num {
      grid spots read through the input fields. */
   background: var(--bg-panel);
   border-color: var(--border-strong);
-}
-
-.splash-links {
-  display: flex;
-  justify-content: center;
-  gap: 22px;
-  margin: 16px 0 0;
-  font-size: 14px;
-}
-.splash-links a {
-  color: var(--text-secondary);
-}
-.splash-links a:hover {
-  color: var(--accent-mint);
 }
 
 /* --- board -------------------------------------------------------------- */
@@ -1474,6 +1531,7 @@ td.num {
 }
 
 .rung {
+  position: relative;
   display: flex;
   align-items: center;
   gap: clamp(12px, 1.5vw, 20px);
@@ -1482,10 +1540,24 @@ td.num {
   border-radius: var(--radius);
   padding: clamp(14px, 1.5vw, 20px);
   box-shadow: var(--shadow);
-  transition: border-color 120ms ease;
+  transition: border-color 120ms ease, background 120ms ease;
 }
+/* The whole card is the play button, and hovering says so. */
 .rung:hover {
-  border-color: var(--border-strong);
+  border-color: rgba(111, 216, 180, 0.5);
+  background: var(--bg-panel-hover);
+}
+
+/* The Play button's hit area, spread over the card; the visible button stays
+   where it is. Links inside lift above it, same as the game cards. */
+.stretch-btn::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+.rung a {
+  position: relative;
+  z-index: 1;
 }
 
 /* A rung you have cleared, in the same mint the site uses for "done". */
@@ -1496,25 +1568,6 @@ td.num {
     rgba(111, 216, 180, 0.1),
     var(--bg-panel) 60%
   );
-}
-
-.rung-mark {
-  flex: none;
-  width: 28px;
-  height: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  border: 1px solid var(--border-subtle);
-  background: var(--bg-darkest);
-  color: var(--accent-mint);
-  font-size: 14px;
-  font-weight: 700;
-}
-.rung.beaten .rung-mark {
-  border-color: rgba(111, 216, 180, 0.5);
-  background: var(--accent-mint-soft);
 }
 
 .rung-body {
@@ -1530,7 +1583,6 @@ td.num {
 }
 
 .rung-rating {
-  margin-left: auto;
   font-family: var(--font-mono);
   font-size: 15px;
   font-weight: 620;
@@ -1549,31 +1601,6 @@ td.num {
 
 .rung-action {
   flex: none;
-}
-
-/* Where you stand, drawn between the rungs it falls between. */
-.ladder-marker {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: 2px 0;
-  color: var(--accent-amber);
-  font-family: var(--font-mono);
-  font-size: 12px;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-.ladder-marker::before,
-.ladder-marker::after {
-  content: "";
-  flex: 1;
-  height: 1px;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(232, 167, 92, 0.55),
-    transparent
-  );
 }
 
 /* Your standing, above the ladder: the number, and what to do about it. */

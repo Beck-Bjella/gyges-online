@@ -1530,7 +1530,7 @@ export function offerDraw(gameId: string, userId: string): GameWithPlayers {
     const side = sideOf(game, userId);
     if (side === null) throw new GameError("You are not a player in this game.", 403);
     if (game.draw_offered_by === side) {
-      throw new GameError("Your draw offer is already on the table.");
+      throw new GameError("You have already offered a draw.");
     }
     // Their offer stands and you are entitled to answer it, but silently
     // turning "offer" into "accept" is not something a button should do.
@@ -1879,7 +1879,7 @@ export function gamesAwaitingUser(userId: string): number {
  * Bots are excluded, and so are **games against them**. They are real accounts
  * with real records, but ranking a calibration point against people is a
  * category error: a bot's score says what the engine was configured to do, not
- * how well it played. And a player who beat Helios-Glance forty times has not
+ * how well it played. And a player who beat some rookie bot forty times has not
  * out-performed one who beat a person twice — counting those together would
  * make the board a measure of persistence rather than skill.
  *

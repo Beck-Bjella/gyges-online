@@ -2,7 +2,7 @@ import Link from "next/link";
 import { currentUser } from "@/lib/auth";
 import { botLeaderboard, opponentRecords } from "@/lib/db/queries";
 import { BOTS } from "@/lib/bots";
-import { engineLadder, engineRatingFor } from "@/lib/ladder";
+import { engineRatingFor } from "@/lib/ladder";
 import ChallengeEngineButton from "@/components/ChallengeEngineButton";
 
 export const dynamic = "force-dynamic";
@@ -19,7 +19,6 @@ export const metadata = { title: "Play the computer · Gygès" };
 export default async function ComputerPage() {
   const user = await currentUser();
   const bots = botLeaderboard();
-  const ladder = engineLadder();
   const standing = user ? engineRatingFor(user.id) : null;
 
   // The viewer's record against each opponent.
@@ -94,28 +93,14 @@ export default async function ComputerPage() {
         </div>
       )}
 
-      {/* Your rating drops in as a line at its own height, so the number means
-          a place on the ladder rather than floating free. */}
       <ol className="ladder">
-        {user && standing !== null && rating >= (rungs[0]?.rating ?? 0) && (
-          <YouAreHere rating={rating} />
-        )}
         {rungs.map((rung, i) => {
           const record = records.get(rung.username);
           const beaten = (record?.wins ?? 0) > 0;
-          const below = rungs[i + 1];
-          const markerHere =
-            user !== null &&
-            standing !== null &&
-            rating < rung.rating &&
-            (below === undefined || rating >= below.rating);
 
           return (
             <li key={rung.id}>
               <div className={beaten ? "rung beaten" : "rung"}>
-                <span className="rung-mark" aria-hidden>
-                  {beaten ? "✓" : ""}
-                </span>
                 <div className="rung-body">
                   <div className="rung-head">
                     <Link href={`/player/${encodeURIComponent(rung.username)}`}>
@@ -142,7 +127,9 @@ export default async function ComputerPage() {
                 </div>
                 <div className="rung-action">
                   {user ? (
-                    <ChallengeEngineButton botId={rung.id} />
+                    /* Stretched over the whole rung: the card IS the play
+                       button. The name link stays clickable on top of it. */
+                    <ChallengeEngineButton botId={rung.id} stretch />
                   ) : (
                     <Link href="/" className="btn">
                       Sign in
@@ -150,75 +137,11 @@ export default async function ComputerPage() {
                   )}
                 </div>
               </div>
-              {markerHere && <YouAreHere rating={rating} />}
             </li>
           );
         })}
       </ol>
 
-      <div className="section-head">
-        <h2>Rankings</h2>
-        {ladder.length > 0 && <span className="count">{ladder.length}</span>}
-      </div>
-      <p className="muted" style={{ margin: "0 0 12px", lineHeight: 1.6 }}>
-        Every player who has finished a game against the computer, best first.
-      </p>
-      {ladder.length === 0 ? (
-        <p className="empty">No one has played the computer yet.</p>
-      ) : (
-        <div className="panel">
-          <table>
-            <thead>
-              <tr>
-                <th style={{ width: 40 }}>#</th>
-                <th>Player</th>
-                <th>Best win</th>
-                <th style={{ textAlign: "right" }}>Rating</th>
-                <th style={{ textAlign: "right" }}>Games</th>
-              </tr>
-            </thead>
-            <tbody>
-              {ladder.map((r, i) => (
-                <tr key={r.id} className={r.id === user?.id ? "you" : undefined}>
-                  <td className="num" style={{ color: "var(--text-dim)" }}>
-                    {i + 1}
-                  </td>
-                  <td>
-                    <Link href={`/player/${encodeURIComponent(r.username)}`}>
-                      {r.username}
-                    </Link>
-                    {r.id === user?.id && (
-                      <span className="tag tag-turn" style={{ marginLeft: 8 }}>
-                        you
-                      </span>
-                    )}
-                  </td>
-                  <td>
-                    {r.bestBeaten ? (
-                      <Link href={`/player/${encodeURIComponent(r.bestBeaten)}`}>
-                        <strong>{r.bestBeaten}</strong>
-                      </Link>
-                    ) : (
-                      <span className="muted">none yet</span>
-                    )}
-                  </td>
-                  <td className="num">{r.rating}</td>
-                  <td className="num">{r.games}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
     </>
-  );
-}
-
-/** The line on the ladder where the viewer currently stands. */
-function YouAreHere({ rating }: { rating: number }) {
-  return (
-    <div className="ladder-marker">
-      <span>you · {rating}</span>
-    </div>
   );
 }

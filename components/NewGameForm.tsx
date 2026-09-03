@@ -6,7 +6,7 @@ import { createGameAction, type ActionState } from "@/app/actions";
 const initial: ActionState = {};
 
 /**
- * Host a table and wait for an opponent.
+ * Host an open game and wait for an opponent.
  *
  * One of the three ways to start a game, and the only one that does not begin
  * immediately — which is the thing the copy has to convey, since a table that
@@ -18,9 +18,9 @@ export default function NewGameForm() {
 
   return (
     <form action={formAction} className="panel start-card">
-      <h2>Host a table</h2>
+      <h2>Host a game</h2>
       <p className="muted">
-        Creates an open table. It waits in the list below until another player
+        Creates an open game that waits in the list below until another player
         joins it.
       </p>
 
@@ -37,7 +37,7 @@ export default function NewGameForm() {
       </label>
 
       <button type="submit" className="btn btn-primary" disabled={pending}>
-        {pending ? "…" : "Host table"}
+        {pending ? "…" : "Host game"}
       </button>
       {state.error && <p className="error">{state.error}</p>}
     </form>

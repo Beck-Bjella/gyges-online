@@ -575,7 +575,7 @@ export default function GameView({
     [game.id, router],
   );
 
-  /** Withdraw an open table before anyone joins. The game is deleted. */
+  /** Withdraw an open game before anyone joins. The game is deleted. */
   const cancel = useCallback(async () => {
     if (!confirm("Cancel this game? It will be removed.")) return;
     setPending(true);
@@ -1094,19 +1094,19 @@ export default function GameView({
         {canChat ? (
           <ChatPanel
             gameId={game.id}
-            title="Table talk"
+            title="Chat"
             canPost
             note="Private to the two of you — nobody watching this game can read it."
           />
         ) : (
           <div className="panel chat-panel">
-            <h2>Table talk</h2>
+            <h2>Chat</h2>
             <p className="muted" style={{ margin: 0 }}>
               {game.botSide !== null
                 ? "The computer does not chat. It is thinking about other things."
                 : signedIn
-                  ? "The table talk is private to the players."
-                  : "The table talk is private to the players. Sign in to chat in your own games."}
+                  ? "The chat is private to the players."
+                  : "The chat is private to the players. Sign in to chat in your own games."}
             </p>
           </div>
         )}

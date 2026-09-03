@@ -157,7 +157,7 @@ export async function quickGameAction(
 
   const table = oldestJoinableGame(user.id);
   if (!table) {
-    return { error: "No open tables right now — host one and see who turns up." };
+    return { error: "No open games right now — host one and wait for a challenger." };
   }
 
   try {

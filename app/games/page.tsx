@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { currentUser } from "@/lib/auth";
 import {
-  botLeaderboard,
   listActiveGames,
   listOpenGames,
   listRecentFinishedGames,
@@ -12,8 +11,6 @@ import { relativeTime, describeTimeControl, endingSuffix } from "@/lib/format";
 import NewGameForm from "@/components/NewGameForm";
 import QuickGameButton from "@/components/QuickGameButton";
 import CancelGameButton from "@/components/CancelGameButton";
-import StartComputerForm from "@/components/StartComputerForm";
-import { BOTS } from "@/lib/bots";
 import Tabs from "@/components/Tabs";
 import AutoRefresh from "@/components/AutoRefresh";
 import ChatPanel from "@/components/ChatPanel";
@@ -41,10 +38,6 @@ export default async function GamesPage() {
   // so a game someone else creates or joins appears here on its own.
   const version = siteVersion();
 
-  // Only to fill the opponent picker on the start card. The bots' own page
-  // is /computer, which is where they are actually presented.
-  const bots = botLeaderboard();
-
   // Hosting a table produced no visible result: you pressed the button and the
   // page looked unchanged, because the outcome was a row in a list you had to
   // find. Your own tables come out of that list and sit at the top, where
@@ -63,8 +56,8 @@ export default async function GamesPage() {
         <div>
           <h1>Games</h1>
           <p className="lede" style={{ marginBottom: 0 }}>
-            Join someone&apos;s open table, host your own, or play the
-            computer. Anyone can watch the games in progress.
+            Join an open game, start your own, or play the computer. Anyone
+            can watch the games in progress.
           </p>
         </div>
       </header>
@@ -84,12 +77,11 @@ export default async function GamesPage() {
               <div className="host-copy">
                 <h2>
                   {yourTables.length === 1
-                    ? "Your table is waiting"
-                    : `Your ${yourTables.length} tables are waiting`}
+                    ? "Your game is waiting for an opponent"
+                    : `Your ${yourTables.length} games are waiting for opponents`}
                 </h2>
                 <p className="muted">
-                  Anyone can join it. The game starts as soon as someone does —
-                  nothing more for you to do until then.
+                  Anyone can join. The game starts as soon as someone does.
                 </p>
               </div>
               <ul className="list waiting-table-list">
@@ -126,7 +118,7 @@ export default async function GamesPage() {
               <div className="panel start-card">
                 <h2>Quick match</h2>
                 <p className="muted">
-                  Joins an open table for you. The game starts right away.
+                  Joins an open game for you. It starts right away.
                 </p>
                 <div className="start-spacer" />
                 <QuickGameButton />
@@ -134,23 +126,28 @@ export default async function GamesPage() {
 
               <NewGameForm />
 
-              <StartComputerForm
-                more="/computer"
-                bots={bots.map((b) => ({
-                  id: b.id,
-                  username: b.username,
-                  rating: BOTS.find((spec) => spec.username === b.username)?.rating ?? 0,
-                }))}
-              />
+              {/* Deliberately not a form: every computer game starts from the
+                  computer page, so there is exactly one place that flow lives
+                  and this card only points at it. */}
+              <div className="panel start-card">
+                <h2>Play the computer</h2>
+                <p className="muted">
+                  Five opponents, from easiest to hardest. Starts right away.
+                </p>
+                <div className="start-spacer" />
+                <Link href="/computer" className="btn btn-primary">
+                  Choose an opponent
+                </Link>
+              </div>
             </div>
           ) : (
             <div className="panel host-panel">
               <div className="host-copy">
                 <h2>Want to play?</h2>
                 <p className="muted">
-                  Pick a name and you can host a table, join one, or take on the
-                  computer. Games are correspondence-style, so you take your turn
-                  whenever suits you.
+                  Pick a name and you can start a game, join one, or play the
+                  computer. Take your turn whenever suits you — nobody has to be
+                  online at the same time.
                 </p>
               </div>
               <Link href="/" className="btn btn-primary">
@@ -160,18 +157,18 @@ export default async function GamesPage() {
           )}
 
           <SectionHead
-            title="Open tables"
+            title="Open games"
             count={joinable.length}
             accent="amber"
           />
           <p className="muted" style={{ margin: "0 0 12px", lineHeight: 1.6 }}>
-            Tables other players have hosted. Join one and the game starts
-            right away.
+            Games other players have started. Join one and it begins right
+            away.
           </p>
           {joinable.length === 0 ? (
             <Empty>
-              No open tables right now.{" "}
-              {user ? "Host one and wait for a challenger." : "Sign in to host one."}
+              No open games right now.{" "}
+              {user ? "Start one and wait for a challenger." : "Sign in to start one."}
             </Empty>
           ) : (
             <ul className="watch-grid">

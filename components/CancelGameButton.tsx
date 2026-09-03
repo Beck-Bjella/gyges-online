@@ -1,10 +1,10 @@
 "use client";
 
 /**
- * Withdraw an open table from a dashboard row.
+ * Withdraw an open game from a dashboard row.
  *
  * The same route the game page's cancel uses; this is the short path, sitting
- * on the row so an abandoned table can be cleared without visiting it.
+ * on the row so an abandoned game can be cleared without visiting it.
  */
 
 import { useCallback, useState } from "react";

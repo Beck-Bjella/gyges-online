@@ -14,13 +14,23 @@ import { createBotGameAction, type ActionState } from "@/app/actions";
 
 const initial: ActionState = {};
 
-export default function ChallengeEngineButton({ botId }: { botId: string }) {
+export default function ChallengeEngineButton({
+  botId,
+  stretch = false,
+}: {
+  botId: string;
+  /** Blanket the nearest positioned ancestor, so the whole card plays. */
+  stretch?: boolean;
+}) {
   const [state, submit, pending] = useActionState(createBotGameAction, initial);
 
   return (
     <form action={submit}>
       <input type="hidden" name="bot_id" value={botId} />
-      <button className="btn btn-primary" disabled={pending}>
+      <button
+        className={stretch ? "btn btn-primary stretch-btn" : "btn btn-primary"}
+        disabled={pending}
+      >
         {pending ? "…" : "Play"}
       </button>
       {state.error && <p className="error">{state.error}</p>}

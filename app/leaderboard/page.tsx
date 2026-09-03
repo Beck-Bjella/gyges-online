@@ -15,8 +15,7 @@ export default async function LeaderboardPage() {
         <div>
           <h1>Leaderboard</h1>
           <p className="lede" style={{ marginBottom: 0 }}>
-            Finished games between people, and only between people. The
-            computer keeps its own ladder.
+            Finished games between people.
           </p>
         </div>
       </header>
@@ -72,10 +71,6 @@ export default async function LeaderboardPage() {
         </div>
       )}
 
-      <p className="hint" style={{ marginTop: 18 }}>
-        Games against the computer are not counted here. They have their own
-        ladder — <Link href="/computer">see who has climbed it</Link>.
-      </p>
     </>
   );
 }

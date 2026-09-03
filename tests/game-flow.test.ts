@@ -894,7 +894,7 @@ test("an offerer may withdraw their own draw offer", () => {
   const { a, gameId } = twoPlayerGame();
   submitMove(gameId, a.id, P1_OPENING);
   offerDraw(gameId, a.id);
-  assert.throws(() => offerDraw(gameId, a.id), /already on the table/i);
+  assert.throws(() => offerDraw(gameId, a.id), /already offered a draw/i);
 
   const withdrawn = answerDraw(gameId, a.id, false);
   assert.equal(withdrawn.draw_offered_by, null);
