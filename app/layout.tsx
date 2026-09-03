@@ -11,7 +11,7 @@ import "./globals.css";
  * pitch in one string.
  */
 export const metadata: Metadata = {
-  metadataBase: new URL("https://playgyges.com"),
+  metadataBase: new URL("https://gyges.app"),
   // Written to never need changing: no counts, no feature names — nothing
   // that a redesign or a new bot lineup could make untrue.
   title: {
@@ -61,8 +61,8 @@ export default async function RootLayout({
               "@context": "https://schema.org",
               "@type": "WebSite",
               name: "Gygès Online",
-              alternateName: "playgyges.com",
-              url: "https://playgyges.com/",
+              alternateName: "gyges.app",
+              url: "https://gyges.app/",
             }),
           }}
         />
