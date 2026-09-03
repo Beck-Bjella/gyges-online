@@ -838,11 +838,13 @@ tr.you td:first-child {
  * The teeth of the board's priority: it demands its height-derived width from
  * the grid, capped by what the viewport can actually give once the rail is at
  * its 250px floor (plus the gap, the gutters and slack for the scrollbar
- * ≈ 420). The 212px chrome constant matches the board's own max-width rule.
+ * ≈ 420). The 258px chrome constant matches the board's own max-width
+ * rule: the two player bars, the control bar beneath them, and the gap
+ * that keeps the same air above the board as below it.
  */
 .grid-2.game-grid .board {
-  min-width: min(calc(100vh - 212px), calc(100vw - 420px));
-  min-width: min(calc(100dvh - 212px), calc(100vw - 420px));
+  min-width: min(calc(100vh - 258px), calc(100vw - 420px));
+  min-width: min(calc(100dvh - 258px), calc(100vw - 420px));
 }
 
 /*
@@ -900,18 +902,6 @@ tr.you td:first-child {
   list-style: none;
   font-family: var(--font-mono);
   font-size: 13px;
-}
-
-/* The ends of the list, ruled off from it: part of the moves panel, not part
-   of the moves. Never shrinks — the list above it is what gives. */
-.moves-controls {
-  flex: none;
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid var(--border-subtle);
-}
-.moves-controls .hint {
-  margin-top: 9px;
 }
 
 .move-row {
@@ -1100,8 +1090,8 @@ td.num {
      the board floats with the same air on both sides of it. dvh where the
      browser has it: on phones vh includes the retracting URL bar, and a board
      sized against it overflows until the bar hides. */
-  max-width: min(100%, max(340px, calc(100vh - 212px)));
-  max-width: min(100%, max(340px, calc(100dvh - 212px)));
+  max-width: min(100%, max(340px, calc(100vh - 258px)));
+  max-width: min(100%, max(340px, calc(100dvh - 258px)));
   height: auto;
   display: block;
   margin: 0 auto;
@@ -1145,6 +1135,64 @@ td.num {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-weight: 550;
+}
+
+/*
+ * The board's own controls: one slim row under it, the same width as the
+ * board, holding what actually gets pressed while a game is being played.
+ *
+ * The rail beside the board is arranged by category — status, tools, moves —
+ * and that split cannot tell "I press this every turn" from "I will press this
+ * once, at the end, maybe never". So when the rail drops below the board on a
+ * narrow or square screen, which is right for the board, it took the flip and
+ * the history jumps down with it. Sorted by use instead, these belong to the
+ * board: living in its column they scale with it and travel with it, and no
+ * screen shape can put them under the fold.
+ */
+.board-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  max-width: 620px;
+  margin: 8px auto 0;
+  padding: 8px 10px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+}
+
+/* Separates looking at the board from moving through the game. */
+.board-controls-gap {
+  width: 1px;
+  align-self: stretch;
+  margin: 0 3px;
+  background: var(--border-subtle);
+}
+
+.board-controls-hint {
+  margin-left: auto;
+  color: var(--text-dim);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.btn-small {
+  padding: 5px 11px;
+  font-size: 13px;
+}
+
+/* Edge to edge with the board, which is already full-bleed here. */
+@media (max-width: 640px) {
+  .board-controls {
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+    margin-top: 0;
+  }
+  .board-controls-hint {
+    display: none;
+  }
 }
 
 /* --- reviewing history --------------------------------------------------- */

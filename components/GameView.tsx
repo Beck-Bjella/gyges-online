@@ -907,6 +907,51 @@ export default function GameView({
 
           <PlayerBar {...seat(bottomSide)} />
 
+          {/*
+            The controls that get used while playing, attached to the board
+            rather than filed in the rail beside it.
+
+            The rail is arranged by category — status, tools, moves — and that
+            split does not distinguish "I press this every turn" from "I will
+            press this once, at the end, maybe never". So when the rail drops
+            below the board on a narrow or square screen, which is the right
+            thing for the board, it took the flip and the history controls with
+            it. Sorted by use instead, these four belong to the board and the
+            rest does not: they inherit its width, scale with it, and cannot
+            end up under the fold.
+          */}
+          <div className="board-controls">
+            <button className="btn btn-small" onClick={() => setFlipped((f) => !f)}>
+              Flip
+            </button>
+            {(game.status === "active" || game.status === "finished") && !exploring && (
+              <button
+                className="btn btn-small"
+                onClick={enterExplore}
+                title="Push pieces around freely to test an idea, then come back"
+              >
+                Explore
+              </button>
+            )}
+            <span className="board-controls-gap" />
+            <button
+              className="btn btn-small"
+              onClick={() => goToPly(openingPly)}
+              disabled={openingPly === null || viewingPly === openingPly}
+              title="Both home rows placed, before the first move"
+            >
+              Opening
+            </button>
+            <button
+              className="btn btn-small"
+              onClick={() => goToPly(null)}
+              disabled={!reviewing}
+            >
+              Latest
+            </button>
+            <span className="board-controls-hint">← → to review</span>
+          </div>
+
         </div>
 
         <aside className="rail">
@@ -1061,29 +1106,10 @@ export default function GameView({
             {error && <p className="error">{error}</p>}
           </div>
 
-          <div className="panel">
-            <h2>Tools</h2>
-            <div className="row">
-              <button className="btn" onClick={() => setFlipped((f) => !f)}>
-                Flip board
-              </button>
-              {(game.status === "active" || game.status === "finished") && !exploring && (
-                <button
-                  className="btn"
-                  onClick={enterExplore}
-                  title="Push pieces around freely to test an idea, then come back"
-                >
-                  Explore
-                </button>
-              )}
-            </div>
-          </div>
           {/*
-            The list and the two jumps that move around it are one thing:
-            Opening and Latest are the ends of this list, and the arrow keys
-            walk it. They lived under Tools, which is for how the board is
-            looked at — flipping it, exploring on it — not for where in the
-            game you are.
+            The list, and only the list. Reading which move was played is
+            something you consult; going to one is something you do while
+            playing, so the jumps moved to the board's own control bar.
           */}
           <div className="panel moves-panel">
             <h2>Moves</h2>
@@ -1117,29 +1143,6 @@ export default function GameView({
                 })}
               </ol>
             )}
-            <div className="moves-controls">
-              <div className="row">
-                <button
-                  className="btn"
-                  onClick={() => goToPly(openingPly)}
-                  disabled={openingPly === null || viewingPly === openingPly}
-                  title="Both home rows placed, before the first move"
-                >
-                  Opening
-                </button>
-                <button
-                  className="btn"
-                  onClick={() => goToPly(null)}
-                  disabled={!reviewing}
-                >
-                  Latest
-                </button>
-              </div>
-              {/* Always the same line. Which move is being reviewed is on the
-                  board and in its banner already, and a hint that changes into
-                  a status reads as something having gone wrong. */}
-              <p className="hint">← → to review history</p>
-            </div>
           </div>
 
         </aside>
