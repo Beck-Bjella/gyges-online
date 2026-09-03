@@ -120,7 +120,7 @@ const WEAK = {
  */
 export const BOTS: BotSpec[] = [
   {
-    username: "Rookie",
+    username: "Rookie Bot",
     rating: 1000,
     strength: 20,
     engineBuild: ENGINE_BUILD,
@@ -129,7 +129,7 @@ export const BOTS: BotSpec[] = [
     options: { ...COMMON, maxPly: 1, ...WEAK },
   },
   {
-    username: "Casual",
+    username: "Casual Bot",
     rating: 1900,
     strength: 40,
     engineBuild: ENGINE_BUILD,
@@ -138,7 +138,7 @@ export const BOTS: BotSpec[] = [
     options: { ...COMMON, maxPly: 3, ...WEAK },
   },
   {
-    username: "Hard",
+    username: "Hard Bot",
     rating: 2900,
     strength: 60,
     engineBuild: ENGINE_BUILD,
@@ -147,7 +147,7 @@ export const BOTS: BotSpec[] = [
     options: { ...COMMON, maxPly: 1 },
   },
   {
-    username: "Expert",
+    username: "Expert Bot",
     rating: 3900,
     strength: 80,
     engineBuild: ENGINE_BUILD,
@@ -156,7 +156,7 @@ export const BOTS: BotSpec[] = [
     options: { ...COMMON, maxPly: 3 },
   },
   {
-    username: "Master",
+    username: "Master Bot",
     rating: 5000,
     strength: 100,
     engineBuild: ENGINE_BUILD,
