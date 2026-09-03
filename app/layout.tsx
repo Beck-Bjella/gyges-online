@@ -19,11 +19,11 @@ export const metadata: Metadata = {
     template: "%s",
   },
   description:
-    "Play the board game Gygès in your browser. See how strong a computer you can beat, or play other people — no download, take your turns whenever you like.",
+    "Play the board game Gygès in your browser. See how strong a computer you can beat, or play other people.",
   openGraph: {
     title: "Play Gygès online — take on the computer or other players!",
     description:
-      "How strong a computer can you beat? In your browser, no download.",
+      "See how strong a computer you can beat, or play other people.",
     url: "/",
     siteName: "playgyges.com",
     type: "website",
