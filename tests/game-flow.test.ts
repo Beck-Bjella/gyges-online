@@ -751,6 +751,25 @@ test("the first move goes to a random side", () => {
   assert.deepEqual([...starters].sort(), [-1, 1], "both sides should start some games");
 });
 
+test("chat has a pace limit beyond the per-second gate", () => {
+  const chatty = createUser(uniqueName("chatty"));
+  // Ten messages, each backdated a couple of seconds so the existing
+  // one-per-second gate passes — all still inside the one-minute window.
+  for (let i = 0; i < 10; i++) {
+    const m = postChatMessage(chatty.id, null, `hello ${i}`);
+    getDb()
+      .prepare("UPDATE chat_messages SET created_at = ? WHERE id = ?")
+      .run(Date.now() - (10 - i) * 2000, m.id);
+  }
+  assert.throws(() => postChatMessage(chatty.id, null, "one more"), /a lot of messages/i);
+
+  // It is a pace, not a cap: messages older than the window stop counting.
+  getDb()
+    .prepare("UPDATE chat_messages SET created_at = created_at - 120000 WHERE user_id = ?")
+    .run(chatty.id);
+  postChatMessage(chatty.id, null, "back again");
+});
+
 // --- the quick game -------------------------------------------------------
 
 test("the quick game takes the table that has waited longest", () => {

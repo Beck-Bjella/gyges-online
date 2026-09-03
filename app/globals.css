@@ -323,6 +323,21 @@ h2 {
   letter-spacing: 0.07em;
 }
 
+/* The error and not-found pages: centred, calm, and offering a way out. */
+.oops {
+  max-width: 480px;
+  margin: 0 auto;
+  padding-top: clamp(40px, 12vh, 120px);
+  text-align: center;
+}
+.oops .lede {
+  margin-left: auto;
+  margin-right: auto;
+}
+.oops .row {
+  justify-content: center;
+}
+
 .page-head {
   display: flex;
   /* Centred, so a button on the right sits level with the title instead of

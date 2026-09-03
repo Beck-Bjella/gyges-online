@@ -936,6 +936,18 @@ export function postChatMessage(
       throw new GameError(`Messages are capped at ${CHAT_MAX_LENGTH} characters.`);
     }
 
+    // A pace limit, using the messages themselves as the record — no separate
+    // counter to keep in step. Ten in a minute is well past any conversation
+    // and well short of what a paste-bot manages.
+    const recent = db
+      .prepare(
+        "SELECT COUNT(*) AS n FROM chat_messages WHERE user_id = ? AND created_at > ?",
+      )
+      .get(userId, nowMs() - 60_000) as { n: number };
+    if (recent.n >= 10) {
+      throw new GameError("That is a lot of messages — give it a minute.", 429);
+    }
+
     if (gameId !== null) {
       const game = db.prepare("SELECT * FROM games WHERE id = ?").get(gameId) as
         | Game
