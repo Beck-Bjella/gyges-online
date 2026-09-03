@@ -89,7 +89,7 @@ const COMMON: Record<string, string | number | boolean> = {
  *     ply1 perfect 17 -  3  ply3 weak
  *
  * So choosing well matters more than seeing further: a perfect one-ply bot beats
- * a handicapped three-ply one comfortably, which puts Club above Casual despite
+ * a handicapped three-ply one comfortably, which puts Hard above Casual despite
  * looking half as deep. Ordering these by depth alone would list them wrong.
  *
  * Depth cannot be the ladder on its own here. Iterative deepening runs odd
@@ -116,7 +116,7 @@ const WEAK = {
  * ladder and the badges, easiest to hardest, and is never shown to a player.
  * The ORDER is measured, not assumed — see the games above — and it is not
  * the order of search depth: a perfect one-ply bot beats a handicapped
- * three-ply one comfortably, which is what puts Club above Casual.
+ * three-ply one comfortably, which is what puts Hard above Casual.
  */
 export const BOTS: BotSpec[] = [
   {
@@ -138,7 +138,7 @@ export const BOTS: BotSpec[] = [
     options: { ...COMMON, maxPly: 3, ...WEAK },
   },
   {
-    username: "Club",
+    username: "Hard",
     rating: 2900,
     strength: 60,
     engineBuild: ENGINE_BUILD,
