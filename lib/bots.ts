@@ -139,7 +139,7 @@ const WEAK = {
 
 export const BOTS: BotSpec[] = [
   {
-    username: "Helios-Novice",
+    username: "Rookie",
     rating: 1000,
     strength: 20,
     engineBuild: ENGINE_BUILD,
@@ -148,7 +148,7 @@ export const BOTS: BotSpec[] = [
     options: { ...COMMON, maxPly: 1, ...WEAK },
   },
   {
-    username: "Helios-Casual",
+    username: "Casual",
     rating: 1900,
     strength: 40,
     engineBuild: ENGINE_BUILD,
@@ -157,7 +157,7 @@ export const BOTS: BotSpec[] = [
     options: { ...COMMON, maxPly: 3, ...WEAK },
   },
   {
-    username: "Helios-Club",
+    username: "Club",
     rating: 2900,
     strength: 60,
     engineBuild: ENGINE_BUILD,
@@ -166,7 +166,7 @@ export const BOTS: BotSpec[] = [
     options: { ...COMMON, maxPly: 1 },
   },
   {
-    username: "Helios-Sharp",
+    username: "Expert",
     rating: 3900,
     strength: 80,
     engineBuild: ENGINE_BUILD,
@@ -175,7 +175,7 @@ export const BOTS: BotSpec[] = [
     options: { ...COMMON, maxPly: 3 },
   },
   {
-    username: "Helios-Full",
+    username: "Master",
     rating: 5000,
     strength: 100,
     engineBuild: ENGINE_BUILD,

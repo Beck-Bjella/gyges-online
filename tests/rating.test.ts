@@ -41,13 +41,13 @@ test("the anchors still say what the measured games said", () => {
   // lib/bots.ts, and they are what the anchors were fitted to.
   const anchor = (name: string) => BOTS.find((b) => b.username === name)!.rating;
 
-  const clubOverCasual = expectedScore(anchor("Helios-Club"), anchor("Helios-Casual"));
+  const clubOverCasual = expectedScore(anchor("Club"), anchor("Casual"));
   assert.ok(
     clubOverCasual > 0.8 && clubOverCasual < 0.92,
     `Club over Casual was measured at 85%, ladder says ${Math.round(clubOverCasual * 100)}%`,
   );
 
-  const sharpOverCasual = expectedScore(anchor("Helios-Sharp"), anchor("Helios-Casual"));
+  const sharpOverCasual = expectedScore(anchor("Expert"), anchor("Casual"));
   assert.ok(
     sharpOverCasual > 0.95,
     `Sharp over Casual was measured at 100%, ladder says ${Math.round(sharpOverCasual * 100)}%`,
@@ -56,11 +56,11 @@ test("the anchors still say what the measured games said", () => {
   // And the order is the measured one, which is not the order of depth.
   const names = [...BOTS].sort((a, b) => a.rating - b.rating).map((b) => b.username);
   assert.deepEqual(names, [
-    "Helios-Novice",
-    "Helios-Casual",
-    "Helios-Club",
-    "Helios-Sharp",
-    "Helios-Full",
+    "Rookie",
+    "Casual",
+    "Club",
+    "Expert",
+    "Master",
   ]);
 });
 
