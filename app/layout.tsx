@@ -15,15 +15,15 @@ export const metadata: Metadata = {
   // Written to never need changing: no counts, no feature names — nothing
   // that a redesign or a new bot lineup could make untrue.
   title: {
-    default: "Play Gygès online — take on the computer or other players",
+    default: "Play Gygès online — take on the computer or other players!",
     template: "%s",
   },
   description:
-    "Play the board game Gygès free in your browser. No download, and no rush — take your turns whenever you like.",
+    "Play the board game Gygès in your browser. See how strong a computer you can beat, or play other people — no download, take your turns whenever you like.",
   openGraph: {
-    title: "Play Gygès online — take on the computer or other players",
+    title: "Play Gygès online — take on the computer or other players!",
     description:
-      "Free, in your browser, no download. Take your turns whenever you like.",
+      "How strong a computer can you beat? In your browser, no download.",
     url: "/",
     siteName: "playgyges.com",
     type: "website",
