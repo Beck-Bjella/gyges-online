@@ -482,41 +482,6 @@ export default function GameView({
   );
 
   /**
-   * Whether the player to move can hand the last move back.
-   *
-   * Against a person that returns the opponent's move to them; against the
-   * engine it takes back your own move (with the bot's reply on top). The
-   * server re-checks all of this — the condition here only decides whether
-   * the button is worth showing.
-   */
-  const canGiveBack =
-    game.status === "active" &&
-    game.botSide !== null &&
-    viewerSide !== null &&
-    viewerSide === game.turn &&
-    history.length > 1 &&
-    history[history.length - 1].kind === "move" &&
-    history[history.length - 1].player !== viewerSide &&
-    history[history.length - 2].kind === "move" &&
-    history[history.length - 2].player === viewerSide;
-
-  const giveBack = useCallback(async () => {
-    if (!confirm("Take back your last move and the computer's reply?")) return;
-    setPending(true);
-    try {
-      const res = await fetch(`/api/games/${game.id}/undo`, { method: "POST" });
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
-        setError(body.error ?? "Could not take that back.");
-      } else {
-        router.refresh();
-      }
-    } finally {
-      setPending(false);
-    }
-  }, [game.id, game.botSide, router]);
-
-  /**
    * The same opponent again. Against the engine the game starts at once;
    * against a person this creates a challenge they accept from their
    * dashboard, and lands you on the new game's page to wait.
@@ -1042,11 +1007,6 @@ export default function GameView({
             )}
             {game.status === "active" && viewerSide !== null && (
               <div className="row" style={{ marginTop: 14 }}>
-                {canGiveBack && (
-                  <button className="btn" onClick={giveBack} disabled={pending}>
-                    {game.botSide === null ? "Give back their turn" : "Take back move"}
-                  </button>
-                )}
                 {/* A draw is the only ending neither player can reach alone,
                     so it is the only one that needs both buttons. Against the
                     engine there is nobody to agree with. */}

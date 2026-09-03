@@ -26,7 +26,6 @@ const {
   joinGame,
   submitSetup,
   submitMove,
-  undoTurn,
   offerTakeback,
   answerTakeback,
   createBot,
@@ -750,14 +749,6 @@ test("the first move goes to a random side", () => {
     starters.add(submitSetup(gameId, b.id, STANDARD).turn);
   }
   assert.deepEqual([...starters].sort(), [-1, 1], "both sides should start some games");
-});
-
-test("between people, a move is never taken back unilaterally", () => {
-  const { a, b, gameId } = twoPlayerGame();
-  submitMove(gameId, a.id, [0, 13]);
-  // The instant takeback is for bot games; between people it is an offer,
-  // made by the winner once the game ends at the goal.
-  assert.throws(() => undoTurn(gameId, b.id), /offered/i);
 });
 
 // --- the quick game -------------------------------------------------------

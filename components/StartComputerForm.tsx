@@ -14,9 +14,8 @@ export interface BotChoice {
 /**
  * Play the computer, starting immediately.
  *
- * The opponents carry their ladder rating in the list, because that is the
- * only number that says what beating one is worth — and choosing an opponent
- * is choosing what you are trying to prove.
+ * Each opponent shows its rating in the list, because that is the number that
+ * says how hard it is.
  */
 export default function StartComputerForm({
   bots,
@@ -32,8 +31,7 @@ export default function StartComputerForm({
     <form action={submit} className="panel start-card">
       <h2>Play the computer</h2>
       <p className="muted">
-        Starts at once, and it waits as long as you do. Take a move back and
-        the game stops counting towards your rating.
+        Starts right away, and the computer waits as long as you need.
       </p>
 
       <label className="start-field">
@@ -53,7 +51,7 @@ export default function StartComputerForm({
         </button>
         {more && (
           <a className="btn" href={more}>
-            The ladder
+            All opponents
           </a>
         )}
       </div>

@@ -129,13 +129,15 @@ export interface Game {
    */
   rated: number;
   /**
-   * How many times this game has been rewound.
+   * How many times this game was rewound, back when that was possible.
    *
-   * Against the engine a player may take a move back whenever they like, and
-   * undoTurn deletes the rows — so nothing else would show it happened. This
-   * is what keeps the ladder honest without forbidding anything: rewind a
-   * game and it stops counting, which is the whole price of the rewind. See
-   * migrations/0010.
+   * Taking a move back against the engine was REMOVED entirely (2026-09-02):
+   * with the ladder rating those games, a rewind either had to disqualify the
+   * game or corrupt the rating, and a button whose real cost was "this game
+   * stops counting" confused more than it helped. Nothing increments this any
+   * more. It stays because games played before the removal could be rewound
+   * without trace — the rows were deleted, not marked — and this count is the
+   * only thing that says which of THOSE games were played straight through.
    */
   takebacks_used: number;
 }
@@ -1475,88 +1477,6 @@ export function resignGame(gameId: string, userId: string): GameWithPlayers {
 }
 
 /**
- * Take your own last move back, in a game against the engine.
- *
- * Bot games only. Undoes two plies — the bot's reply and your move beneath
- * it, since undoing only the reply would have the bot immediately replay it:
- * a bot's choice is a function of the position. A bot needs no consent, which
- * is exactly why this is instant here and an offer between people — see
- * offerTakeback.
- *
- * History is genuinely rewritten — the rows are deleted, not marked. Keeping
- * a retracted move around would make every consumer of history reason about
- * whether a ply "really happened".
- */
-export function undoTurn(gameId: string, userId: string): GameWithPlayers {
-  return transaction(() => {
-    const db = getDb();
-    const game = db.prepare("SELECT * FROM games WHERE id = ?").get(gameId) as
-      | Game
-      | undefined;
-    if (!game) throw new GameError("Game not found.", 404);
-    if (game.status !== "active") throw new GameError("That game is not in progress.");
-
-    const side = sideOf(game, userId);
-    if (side === null) throw new GameError("You are not a player in this game.", 403);
-    if (side !== game.turn) {
-      throw new GameError("Only the player to move can give a turn back.", 409);
-    }
-
-    const last = db
-      .prepare(
-        `SELECT ply, player, kind FROM moves
-          WHERE game_id = ? ORDER BY ply DESC LIMIT 2`,
-      )
-      .all(gameId) as { ply: number; player: Player; kind: string }[];
-
-    const bot = botInGame(game);
-    if (bot === null) {
-      throw new GameError("Against a person, takebacks are offered — from the winner, when the game ends.", 409);
-    }
-    const removed = 2;
-
-    // Every removed row must be an ordinary move by the expected side; setup
-    // cannot be taken back. Against a person: the opponent's move. Against the
-    // engine: its reply and then your own move underneath.
-    if (last.length < removed) throw new GameError("Nothing to take back.");
-    if (last[0].kind !== "move" || last[0].player !== -side) {
-      throw new GameError("Nothing to take back.");
-    }
-    if (removed === 2 && (last[1].kind !== "move" || last[1].player !== side)) {
-      throw new GameError("Nothing to take back.");
-    }
-
-    const cutoff = game.ply - removed;
-    const before = db
-      .prepare("SELECT board_after FROM moves WHERE game_id = ? AND ply = ?")
-      .get(gameId, cutoff) as { board_after: string } | undefined;
-    // The setup plies always exist beneath any move, so this cannot miss.
-    if (!before) throw new GameError("Nothing to take back.");
-
-    db.prepare("DELETE FROM moves WHERE game_id = ? AND ply > ?").run(gameId, cutoff);
-    // Counted because the rows are gone: after this, nothing else would show
-    // the game was rewound, and the engine ladder has to be able to tell.
-    db.prepare(
-      `UPDATE games
-          SET board = ?, ply = ?, turn = ?, deadline_at = ?, updated_at = ?,
-              takebacks_used = takebacks_used + 1
-        WHERE id = ?`,
-    ).run(
-      before.board_after,
-      cutoff,
-      // The side whose move was removed plays again: the opponent against a
-      // person, yourself against the engine.
-      bot === null ? -side : side,
-      now() + game.move_seconds,
-      now(),
-      gameId,
-    );
-
-    return getGame(gameId)!;
-  });
-}
-
-/**
  * Offer the loser a rewind, from a game that just ended at the goal.
  *
  * The winner's gesture for a game decided by a simple blunder: an OFFER the
@@ -2057,13 +1977,11 @@ export interface EngineGameRow {
 /**
  * Every finished bot game that counts towards the engine ladder, oldest first.
  *
- * The exclusion that matters is **rewound games**. Against the engine a
- * player may take back a move as often as they like, so a game played with
- * takebacks says nothing about who would have won — undo until you win and
- * every game is a win. Taking a move back stays allowed; it just costs the
- * game its place on the ladder.
- *
- * `rated` is checked too, though nothing sets it to 0 today — see the column.
+ * The exclusion that matters is **rewound games**, from before taking moves
+ * back against the engine was removed: a game undone until it was won says
+ * nothing about who would have won. No new game can be rewound; the filter is
+ * for the old ones. `rated` is checked too, though nothing sets it to 0
+ * today — see the column.
  * - **Games against a retired bot**, filtered by the caller: an anchor it no
  *   longer has is an anchor nobody can rate against.
  *
