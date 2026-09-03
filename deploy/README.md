@@ -8,11 +8,15 @@ serverless platform and a managed Postgres is in `docs/ARCHITECTURE.md` under
 ## The whole thing
 
 ```sh
-# on a fresh Ubuntu instance
+# on a fresh instance (Ubuntu or Amazon Linux)
 git clone https://github.com/<you>/gyges-online.git
 cd gyges-online
 DOMAIN=gyges.example.com bash deploy/setup.sh
 ```
+
+If the repository is private, plain https cloning will ask for credentials —
+use a GitHub personal access token as the password, or add the box's SSH key
+as a deploy key on the repo. `deploy.sh` pulls the same way it was cloned.
 
 That is the deploy. `setup.sh` installs swap, Node, Caddy and the service,
 builds the site, and starts it. It is safe to re-run.
@@ -25,11 +29,12 @@ bash deploy/deploy.sh
 
 ## Before the first run
 
-1. **An instance.** Lightsail, Ubuntu LTS — the *plain OS* blueprint, not the
-   Node.js one. The Node blueprints are Bitnami stacks with their own bundled
-   Apache, their own directory layout under `/opt/bitnami`, and a Node version
-   that tends to lag; you would spend the time you saved fighting a reverse
-   proxy you did not ask for.
+1. **An instance.** Lightsail, from the *plain OS* blueprints — **Ubuntu LTS
+   or Amazon Linux 2023 both work**; `setup.sh` detects which and does the
+   right thing (on Amazon Linux, Caddy comes from its release binary since
+   there is no RPM repo for it). Avoid the Node.js blueprint: it is a Bitnami
+   stack with its own bundled Apache and MariaDB, a directory layout under
+   `/opt/bitnami`, and a Node version that tends to lag.
 
    The $5 tier (512 MB) works because `setup.sh` adds swap — without it the
    build gets OOM-killed, which looks like a crash rather than a shortage. If

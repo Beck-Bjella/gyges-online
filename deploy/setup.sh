@@ -88,6 +88,19 @@ if ! command -v node >/dev/null || [[ "$(node -v | cut -d. -f1)" != "v${NODE_MAJ
 fi
 echo "==> node $(node -v)"
 
+# --- aws cli ----------------------------------------------------------------
+# For backup.sh's copy to S3. Amazon Linux ships it; Ubuntu does not, and a
+# backup cron that fails months later for a missing binary is the worst way
+# to find that out.
+if ! command -v aws >/dev/null; then
+  echo "==> installing the AWS CLI (for backups)"
+  if [[ "$PKG" == apt ]]; then
+    sudo apt-get install -y -qq awscli || echo "!! could not install awscli — backups to S3 will need it later"
+  else
+    sudo dnf -y -q install awscli aws-cli 2>/dev/null || true
+  fi
+fi
+
 # --- caddy ------------------------------------------------------------------
 # Debian and Ubuntu have an official apt repository, so upgrades arrive with
 # everything else. The RPM family does not, so there Caddy comes from its
