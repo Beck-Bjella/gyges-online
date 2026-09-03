@@ -822,7 +822,32 @@ export default function GameView({
               onSetupDrop={setup.dropAt}
               onSetupMove={setup.moveSlot}
             />
-            {/* Explore, review and the staged move all speak from the same
+            {/*
+              The two controls used while playing, sitting ON the board rather
+              than under it.
+
+              The board's canvas is square and its plate is a diamond, so the
+              corners are empty — real estate that scales with the board and
+              covers no square. The banner's spot at the bottom CENTRE is not
+              free: the goal is there, and a permanent bar would sit on top of
+              the one square the game is about.
+            */}
+            <div className="board-tools">
+              <button className="btn btn-small" onClick={() => setFlipped((f) => !f)}>
+                Flip
+              </button>
+              {(game.status === "active" || game.status === "finished") && !exploring && (
+                <button
+                  className="btn btn-small"
+                  onClick={enterExplore}
+                  title="Push the pieces around freely to test an idea, then come back"
+                >
+                  Analyze
+                </button>
+              )}
+            </div>
+
+            {/* Analysis, review and the staged move all speak from the same
                 banner in the same spot — the pill over the board's lower edge.
                 One place where the current mode explains itself and offers its
                 controls. */}
@@ -863,7 +888,7 @@ export default function GameView({
             )}
             {exploring && (
               <div className="review-banner">
-                <span>Exploring — will not affect the game</span>
+                <span>Analyzing — will not affect the game</span>
                 <button className="btn" onClick={resetExplore}>
                   Reset
                 </button>
@@ -906,51 +931,6 @@ export default function GameView({
           </div>
 
           <PlayerBar {...seat(bottomSide)} />
-
-          {/*
-            The controls that get used while playing, attached to the board
-            rather than filed in the rail beside it.
-
-            The rail is arranged by category — status, tools, moves — and that
-            split does not distinguish "I press this every turn" from "I will
-            press this once, at the end, maybe never". So when the rail drops
-            below the board on a narrow or square screen, which is the right
-            thing for the board, it took the flip and the history controls with
-            it. Sorted by use instead, these four belong to the board and the
-            rest does not: they inherit its width, scale with it, and cannot
-            end up under the fold.
-          */}
-          <div className="board-controls">
-            <button className="btn btn-small" onClick={() => setFlipped((f) => !f)}>
-              Flip
-            </button>
-            {(game.status === "active" || game.status === "finished") && !exploring && (
-              <button
-                className="btn btn-small"
-                onClick={enterExplore}
-                title="Push pieces around freely to test an idea, then come back"
-              >
-                Explore
-              </button>
-            )}
-            <span className="board-controls-gap" />
-            <button
-              className="btn btn-small"
-              onClick={() => goToPly(openingPly)}
-              disabled={openingPly === null || viewingPly === openingPly}
-              title="Both home rows placed, before the first move"
-            >
-              Opening
-            </button>
-            <button
-              className="btn btn-small"
-              onClick={() => goToPly(null)}
-              disabled={!reviewing}
-            >
-              Latest
-            </button>
-            <span className="board-controls-hint">← → to review</span>
-          </div>
 
         </div>
 
