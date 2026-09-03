@@ -654,7 +654,19 @@ export default function Board({
 
   const snapTarget = (() => {
     if (drag.kind === "piece") return nearestIndex(drag.x, drag.y, view, false);
-    if (drag.kind === "displaced") return nearestIndex(drag.x, drag.y, view, true);
+    if (drag.kind === "displaced") {
+      // NOT onlyEmpty, for the same reason onPointerDown spells out: the
+      // square the mover came from still holds it in `view` — it is only
+      // visually vacated — so asking for empty squares skipped the one drop
+      // target that most needs the ring. Nearest first, then the same
+      // acceptance test the click uses, so the ring never promises a drop
+      // the click would refuse.
+      const t = nearestIndex(drag.x, drag.y, view, false);
+      if (t === null) return null;
+      return dropTargets.has(t) || (free && (view[t] === 0 || t === drag.from))
+        ? t
+        : null;
+    }
     return null;
   })();
 
@@ -674,9 +686,17 @@ export default function Board({
         ? legalTargets
         : new Set<number>();
 
-  /** Split by what is there: a bare square gets a dot, a piece gets one on top. */
-  const markedEmpty = [...marked].filter((i) => view[i] === 0);
-  const markedPieces = [...marked].filter((i) => view[i] !== 0);
+  /**
+   * Split by what the player SEES there: a bare square gets the soft dot, a
+   * piece gets the small ringed one on top. Judged against the drawn board,
+   * not the array — during a displacement the mover's origin is still
+   * recorded in `view` but drawn empty, and giving it the on-a-piece style
+   * made one drop target a different colour from all the others.
+   */
+  const drawnEmpty = (i: number) =>
+    view[i] === 0 || (drag.kind === "displaced" && i === drag.from);
+  const markedEmpty = [...marked].filter(drawnEmpty);
+  const markedPieces = [...marked].filter((i) => !drawnEmpty(i));
 
   /** Whether the piece in hand is one this player is allowed to move at all. */
   const holdingIllegally =
@@ -824,9 +844,11 @@ export default function Board({
             key={`dot${i}`}
             cx={cx}
             cy={cy}
-            r="8"
+            r="7"
             fill="var(--accent-mint)"
-            opacity="0.38"
+            stroke="var(--piece-ring)"
+            strokeWidth="1.2"
+            opacity="0.8"
             pointerEvents="none"
           />
         );
@@ -939,10 +961,11 @@ export default function Board({
         </g>
         );
       })}
-      {/* Dots that belong on a piece — one the piece in hand may land on and
-          displace. Drawn after the pieces so they are not hidden beneath them,
-          and ringed in the board's dark tone so a mint dot stays legible
-          against the pale piece. */}
+      {/* The SAME dot as the empty squares get — one meaning, one mark. The
+          split into two lists survives only for draw order: these sit on
+          pieces, so they are drawn after them or they would be hidden
+          beneath. The dark ring is what keeps mint legible on a pale piece,
+          and the empty squares wear it too so the two are identical. */}
       {markedPieces.map((i) => {
         const { cx, cy } = idxToCenter(i);
         return (
@@ -950,7 +973,7 @@ export default function Board({
             key={`pdot${i}`}
             cx={cx}
             cy={cy}
-            r="6"
+            r="7"
             fill="var(--accent-mint)"
             stroke="var(--piece-ring)"
             strokeWidth="1.2"
