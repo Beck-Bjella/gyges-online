@@ -25,7 +25,7 @@ export const metadata: Metadata = {
     description:
       "See how strong a computer you can beat, or play other people.",
     url: "/",
-    siteName: "playgyges.com",
+    siteName: "Gygès Online",
     type: "website",
   },
   twitter: {
@@ -48,6 +48,24 @@ export default async function RootLayout({
   return (
     <html lang="en">
       <body>
+        {/*
+          What puts a site NAME above the URL in a Google result — the way
+          "Board Game Arena" appears over theirs. Google reads it from
+          schema.org WebSite data on the homepage; og:site_name and the title
+          are fallbacks, so all three agree here.
+        */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "WebSite",
+              name: "Gygès Online",
+              alternateName: "playgyges.com",
+              url: "https://playgyges.com/",
+            }),
+          }}
+        />
         <div className="site">
           {/*
             Three parts, and the middle one is centred on the PAGE rather than
