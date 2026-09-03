@@ -12,16 +12,18 @@ import "./globals.css";
  */
 export const metadata: Metadata = {
   metadataBase: new URL("https://playgyges.com"),
+  // Written to never need changing: no counts, no feature names — nothing
+  // that a redesign or a new bot lineup could make untrue.
   title: {
-    default: "Play Gygès online — take on the computer in your browser",
+    default: "Play Gygès online — take on the computer or other players",
     template: "%s",
   },
   description:
-    "Play the board game Gygès in your browser. Climb five levels of computer opponents, or play other people. Free, no download, take your turns whenever you like.",
+    "Play the board game Gygès free in your browser. No download, and no rush — take your turns whenever you like.",
   openGraph: {
-    title: "Play Gygès online — take on the computer in your browser",
+    title: "Play Gygès online — take on the computer or other players",
     description:
-      "Climb five levels of computer opponents, or play other people. Free, no download.",
+      "Free, in your browser, no download. Take your turns whenever you like.",
     url: "/",
     siteName: "playgyges.com",
     type: "website",
