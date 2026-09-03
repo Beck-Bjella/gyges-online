@@ -788,34 +788,30 @@ export default function GameView({
               onSetupMove={setup.moveSlot}
             />
             {/*
-              The two controls used while playing, sitting ON the board rather
-              than under it.
-
-              The board's canvas is square and its plate is a diamond, so the
-              corners are empty — real estate that scales with the board and
-              covers no square. The banner's spot at the bottom CENTRE is not
-              free: the goal is there, and a permanent bar would sit on top of
-              the one square the game is about.
+              Everything at the board's lower edge speaks from the same pill in
+              the same spot, one thing at a time. At rest it holds the two
+              controls used while playing — Flip and Analyze; the moment a mode
+              needs the spot, that mode's banner takes it over: a staged move,
+              a reviewed position, an analysis in progress. Hidden while pieces
+              are being placed, because the setup tray lives in that band of
+              the board.
             */}
-            <div className="board-tools">
-              <button className="btn btn-small" onClick={() => setFlipped((f) => !f)}>
-                Flip
-              </button>
-              {(game.status === "active" || game.status === "finished") && !exploring && (
-                <button
-                  className="btn btn-small"
-                  onClick={enterExplore}
-                  title="Push the pieces around freely to test an idea, then come back"
-                >
-                  Analyze
+            {!exploring && !staged && !reviewing && !yourPlacement && (
+              <div className="review-banner resting">
+                <button className="btn" onClick={() => setFlipped((f) => !f)}>
+                  Flip
                 </button>
-              )}
-            </div>
-
-            {/* Analysis, review and the staged move all speak from the same
-                banner in the same spot — the pill over the board's lower edge.
-                One place where the current mode explains itself and offers its
-                controls. */}
+                {(game.status === "active" || game.status === "finished") && (
+                  <button
+                    className="btn"
+                    onClick={enterExplore}
+                    title="Push the pieces around freely to test an idea, then come back"
+                  >
+                    Analyze
+                  </button>
+                )}
+              </div>
+            )}
             {splash && game.status === "finished" && viewerSide !== null && (
               <div className="result-splash" role="alertdialog" aria-live="assertive">
                 <div

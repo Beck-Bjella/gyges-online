@@ -122,7 +122,7 @@ export default async function DashboardPage() {
         <ChallengesPanel incoming={incoming} outgoing={outgoing} />
 
         <GameSection
-          title="Games"
+          title="Games in progress"
           games={active}
           userId={user.id}
           accent={yourMoveCount > 0 ? "mint" : undefined}

@@ -6,7 +6,7 @@ import { createGameAction, type ActionState } from "@/app/actions";
 const initial: ActionState = {};
 
 /**
- * Host a table and wait for whoever turns up.
+ * Host a table and wait for an opponent.
  *
  * One of the three ways to start a game, and the only one that does not begin
  * immediately — which is the thing the copy has to convey, since a table that
@@ -20,7 +20,8 @@ export default function NewGameForm() {
     <form action={formAction} className="panel start-card">
       <h2>Host a table</h2>
       <p className="muted">
-        Waits in the list below until someone sits down.
+        Creates an open table. It waits in the list below until another player
+        joins it.
       </p>
 
       <label className="start-field">

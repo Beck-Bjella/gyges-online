@@ -6,16 +6,15 @@ import { engineLadder, engineRatingFor } from "@/lib/ladder";
 import ChallengeEngineButton from "@/components/ChallengeEngineButton";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "The computer · Gygès" };
+export const metadata = { title: "Play the computer · Gygès" };
 
 /**
- * The engine's home.
+ * The computer opponents, as a ladder to climb.
  *
- * It used to live in a dropdown on the lobby and a row on the leaderboard,
- * which is a strange place to keep the one thing this site has that nothing
- * else does. Here the bots are rungs: strongest at the top, because that is
- * what a ladder looks like and climbing is the point. Each says what it is,
- * what beating it is worth, how you have done against it, and offers a game.
+ * The copy here is deliberately plain. An earlier version explained the rating
+ * mechanics in its own vocabulary — anchors, rungs, farm ceilings — and read
+ * as nonsense to anyone who had not built it. The mechanics have not changed;
+ * they are just described in words a visitor already has.
  */
 export default async function ComputerPage() {
   const user = await currentUser();
@@ -23,8 +22,7 @@ export default async function ComputerPage() {
   const ladder = engineLadder();
   const standing = user ? engineRatingFor(user.id) : null;
 
-  // Your record against each of them: the column that makes a rung personal
-  // rather than a specification.
+  // The viewer's record against each opponent.
   const records = new Map(
     user
       ? opponentRecords(user.id)
@@ -33,8 +31,7 @@ export default async function ComputerPage() {
       : [],
   );
 
-  // Strongest first, by rating — which is the measured order, and not the
-  // order of search depth. See lib/bots.ts.
+  // Hardest at the top, easiest at the bottom — and each end says so.
   const rungs = bots
     .map((b) => ({
       ...b,
@@ -43,7 +40,8 @@ export default async function ComputerPage() {
     .sort((a, b) => b.rating - a.rating);
 
   const rating = standing?.rating ?? 0;
-  /** The weakest rung not yet beaten: the one worth trying next. */
+  const easiest = rungs[rungs.length - 1];
+  /** The easiest opponent not beaten yet. */
   const next = [...rungs]
     .reverse()
     .find((r) => (records.get(r.username)?.wins ?? 0) === 0);
@@ -52,12 +50,11 @@ export default async function ComputerPage() {
     <>
       <header className="page-head">
         <div>
-          <h1>The computer</h1>
+          <h1>Play the computer</h1>
           <p className="lede" style={{ marginBottom: 0 }}>
-            Five strengths of the same engine, each its own account with a fixed
-            rating. Yours is what your results against them say it is — and
-            beating one far below you moves nothing, so the only way up is to
-            beat a better one.
+            Five computer opponents, from easiest to hardest. Winning raises
+            your rating — but wins against opponents far below you count for
+            nothing, so the only way up is to beat the next one.
           </p>
         </div>
       </header>
@@ -71,35 +68,34 @@ export default async function ComputerPage() {
           <p className="standing-note">
             {standing === null ? (
               <>
-                No finished games against the computer yet. Start at the bottom:{" "}
-                <strong>{rungs[rungs.length - 1]?.username}</strong> is the one
-                to beat first.
+                You haven&apos;t played the computer yet. Start with{" "}
+                <strong>{easiest?.username}</strong>.
               </>
             ) : standing.bestBeaten ? (
               <>
-                Best win against <strong>{standing.bestBeaten}</strong>
+                Best win: <strong>{standing.bestBeaten}</strong>.
                 {next ? (
                   <>
-                    {" · next rung up: "}
-                    <strong>{next.username}</strong>
+                    {" "}
+                    Next one up: <strong>{next.username}</strong>.
                   </>
                 ) : (
-                  <> · you have beaten every one of them.</>
+                  <> You have beaten all five.</>
                 )}
               </>
             ) : (
               <>
-                {standing.games} game{standing.games === 1 ? "" : "s"} played,
-                none won yet. <strong>{next?.username}</strong> is the rung to
-                take first.
+                No wins yet from {standing.games} game
+                {standing.games === 1 ? "" : "s"}. Start with{" "}
+                <strong>{next?.username}</strong>.
               </>
             )}
           </p>
         </div>
       )}
 
-      {/* The ladder. A marker drops in at the height of your rating, so the
-          number has somewhere to stand rather than floating free. */}
+      {/* Your rating drops in as a line at its own height, so the number means
+          a place on the ladder rather than floating free. */}
       <ol className="ladder">
         {user && standing !== null && rating >= (rungs[0]?.rating ?? 0) && (
           <YouAreHere rating={rating} />
@@ -125,21 +121,23 @@ export default async function ComputerPage() {
                     <Link href={`/player/${encodeURIComponent(rung.username)}`}>
                       <strong>{rung.username}</strong>
                     </Link>
-                    <span className="rung-rating">{rung.rating}</span>
+                    {i === 0 && <span className="tag">hardest</span>}
+                    {i === rungs.length - 1 && <span className="tag">easiest</span>}
                     {beaten && <span className="tag tag-turn">beaten</span>}
                     {user && !beaten && next?.username === rung.username && (
-                      <span className="tag tag-waiting">next up</span>
+                      <span className="tag tag-waiting">next</span>
                     )}
+                    <span className="rung-rating">{rung.rating}</span>
                   </div>
                   {rung.description && (
                     <p className="muted rung-desc">{rung.description}</p>
                   )}
                   <p className="hint">
                     {record && record.played > 0
-                      ? `You: ${record.wins}W – ${record.losses}L in ${record.played} game${record.played === 1 ? "" : "s"}`
+                      ? `Your record: ${record.wins} won, ${record.losses} lost`
                       : user
-                        ? "You have not played this one."
-                        : `${rung.wins} won, ${rung.losses} lost against everyone`}
+                        ? "Not played yet."
+                        : `Players have won ${rung.losses} and lost ${rung.wins} against it`}
                   </p>
                 </div>
                 <div className="rung-action">
@@ -158,19 +156,15 @@ export default async function ComputerPage() {
         })}
       </ol>
 
-      {/*
-        Who has climbed it, and the rung leads rather than the number: "beat
-        Helios-Sharp" is what someone tells a friend, while 3900 means nothing
-        until you know what the rungs are.
-      */}
       <div className="section-head">
-        <h2>Who has climbed it</h2>
+        <h2>Rankings</h2>
         {ladder.length > 0 && <span className="count">{ladder.length}</span>}
       </div>
+      <p className="muted" style={{ margin: "0 0 12px", lineHeight: 1.6 }}>
+        Every player who has finished a game against the computer, best first.
+      </p>
       {ladder.length === 0 ? (
-        <p className="empty">
-          Nobody has finished a game against the computer yet. Be first.
-        </p>
+        <p className="empty">No one has played the computer yet.</p>
       ) : (
         <div className="panel">
           <table>
@@ -178,7 +172,7 @@ export default async function ComputerPage() {
               <tr>
                 <th style={{ width: 40 }}>#</th>
                 <th>Player</th>
-                <th>Highest beaten</th>
+                <th>Best win</th>
                 <th style={{ textAlign: "right" }}>Rating</th>
                 <th style={{ textAlign: "right" }}>Games</th>
               </tr>

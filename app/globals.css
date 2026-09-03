@@ -56,6 +56,10 @@
      width cap re-uses it, so a full-bleed band lines up with ordinary
      content instead of nearly lining up. */
   --page-gutter: clamp(18px, 3vw, 40px);
+  /* The page's top padding — and, on the game page, the air deliberately left
+     under the bottom player bar so the board stack floats between equal gaps
+     instead of sitting on the viewport's bottom edge. */
+  --page-vpad: clamp(26px, 3.5vh, 48px);
 
   --radius: 10px;
   --radius-sm: 6px;
@@ -279,7 +283,7 @@ main {
      monitors get more tile columns rather than more emptiness. */
   max-width: 1880px;
   margin: 0 auto;
-  padding: clamp(26px, 3.5vh, 48px) var(--page-gutter) 72px;
+  padding: var(--page-vpad) var(--page-gutter) 72px;
 }
 
 .site-foot {
@@ -838,11 +842,15 @@ tr.you td:first-child {
  * The teeth of the board's priority: it demands its height-derived width from
  * the grid, capped by what the viewport can actually give once the rail is at
  * its 250px floor (plus the gap, the gutters and slack for the scrollbar
- * ≈ 420). The 212px chrome constant matches the board's own max-width rule.
+ * ≈ 420). The height budget matches the board's own max-width rule: 158px of
+ * chrome (top bar 58, two player bars, the board's margins) plus one
+ * --page-vpad of air above the top player bar and one below the bottom one —
+ * the second of which is the whole point, since without it the bottom bar sat
+ * flush on the viewport edge while the top had the page's padding over it.
  */
 .grid-2.game-grid .board {
-  min-width: min(calc(100vh - 212px), calc(100vw - 420px));
-  min-width: min(calc(100dvh - 212px), calc(100vw - 420px));
+  min-width: min(calc(100vh - 158px - 2 * var(--page-vpad)), calc(100vw - 420px));
+  min-width: min(calc(100dvh - 158px - 2 * var(--page-vpad)), calc(100vw - 420px));
 }
 
 /*
@@ -856,6 +864,13 @@ tr.you td:first-child {
  */
 .chat-band {
   margin-top: clamp(18px, 2.2vh, 30px);
+}
+/* On the game page the chat waits BELOW the fold. The board stack now ends a
+   --page-vpad above the viewport edge, and that air is the point — so the
+   chat's top margin is the same vpad, which lands its top border exactly at
+   the edge of the first screen instead of poking up into the gap. */
+.game-chat.chat-band {
+  margin-top: var(--page-vpad);
 }
 .chat-band .chat-messages {
   min-height: 200px;
@@ -1009,61 +1024,98 @@ td.num {
   text-align: right;
 }
 
-/* --- landing ------------------------------------------------------------ */
+/* --- the splash ---------------------------------------------------------- */
 
-.landing {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 380px;
-  gap: 52px;
-  /* Centred against each other: the board-and-signin column runs taller than
-     the hero text, and top-aligning left the text floating awkwardly high. */
+/*
+ * The signed-out front door: the board as the backdrop, the name and the
+ * sign-in floating over its centre. The one thing a visitor can do here is
+ * front and centre instead of below the fold.
+ */
+.splash {
+  position: relative;
+  display: flex;
   align-items: center;
-  padding-top: 22px;
+  justify-content: center;
+  /* Fills the first screen: viewport minus the top bar, main's padding and a
+     little of the footer's approach. */
+  min-height: min(860px, calc(100dvh - 200px));
 }
 
-/* The decorative board above the sign-in form. Not for playing with. */
-.landing-board {
+.splash-bg {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   pointer-events: none;
-  margin-bottom: 18px;
+  user-select: none;
+}
+.splash-bg .board {
+  max-width: min(94%, calc(100dvh - 150px));
+  /* Scenery, not the subject: dimmed enough that the panel on top of it
+     reads first, still crisp enough to look like the game it is. */
+  opacity: 0.45;
+  box-shadow: none;
+}
+/* A pool of shade behind the centred content, so the title and panel sit on
+   something calmer than piece rings. */
+.splash-bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    ellipse 480px 560px at 50% 50%,
+    rgba(18, 16, 14, 0.82),
+    rgba(18, 16, 14, 0.35) 65%,
+    transparent
+  );
 }
 
-@media (max-width: 900px) {
-  .landing {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 28px;
-  }
+.splash-fg {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 380px;
+  text-align: center;
 }
 
-.hero-title {
-  font-size: 54px;
+.splash-title {
+  font-size: clamp(52px, 8vh, 76px);
   font-weight: 700;
   letter-spacing: -0.035em;
-  margin: 0 0 14px;
+  margin: 0;
   background: linear-gradient(135deg, #f4ead0 15%, #d4c498 55%, #9a8259);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
 
-.hero-sub {
-  font-size: 17px;
-  line-height: 1.65;
+.splash-line {
+  margin: 4px 0 18px;
+  font-size: 15px;
   color: var(--text-secondary);
-  max-width: 46ch;
-  margin: 0 0 26px;
 }
 
-.hero-actions {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-bottom: 30px;
+.splash-fg .panel {
+  text-align: left;
+  /* Solid over the board, where the panel's usual translucency would let the
+     grid spots read through the input fields. */
+  background: var(--bg-panel);
+  border-color: var(--border-strong);
 }
 
-.landing-side {
+.splash-links {
   display: flex;
-  flex-direction: column;
-  gap: 16px;
+  justify-content: center;
+  gap: 22px;
+  margin: 16px 0 0;
+  font-size: 14px;
+}
+.splash-links a {
+  color: var(--text-secondary);
+}
+.splash-links a:hover {
+  color: var(--accent-mint);
 }
 
 /* --- board -------------------------------------------------------------- */
@@ -1088,8 +1140,8 @@ td.num {
      the board floats with the same air on both sides of it. dvh where the
      browser has it: on phones vh includes the retracting URL bar, and a board
      sized against it overflows until the bar hides. */
-  max-width: min(100%, max(340px, calc(100vh - 212px)));
-  max-width: min(100%, max(340px, calc(100dvh - 212px)));
+  max-width: min(100%, max(340px, calc(100vh - 158px - 2 * var(--page-vpad))));
+  max-width: min(100%, max(340px, calc(100dvh - 158px - 2 * var(--page-vpad))));
   height: auto;
   display: block;
   margin: 0 auto;
@@ -1135,63 +1187,16 @@ td.num {
   font-weight: 550;
 }
 
-/*
- * The controls used while playing, laid ON the board in a corner it does not
- * use.
- *
- * The rail beside the board is arranged by category — status, moves, the rare
- * actions — and that split cannot tell "I press this every turn" from "I will
- * press this once, at the end, maybe never". So when the rail drops below the
- * board on a narrow or square screen, which is right for the board, it took
- * the flip down with it.
- *
- * Here they cannot be separated from the board at all, and cost it no height:
- * the canvas is square and the plate is a diamond, so its corners are empty.
- * Bottom LEFT specifically — the bottom centre is where the goal sits, and is
- * also where the banner appears, so nothing permanent belongs there.
- */
-.board-tools {
-  position: absolute;
-  left: 14px;
-  bottom: 14px;
-  display: flex;
-  gap: 6px;
-  z-index: 2;
-}
-
-.btn-small {
-  padding: 5px 11px;
-  font-size: 13px;
-}
-
-/* On the board rather than on the page, so they read as sitting on the wood:
-   darker than a panel button, and translucent enough to belong to it. */
-.board-tools .btn {
-  background: rgba(18, 16, 14, 0.82);
-  border-color: rgba(69, 61, 51, 0.9);
-  backdrop-filter: blur(4px);
-}
-.board-tools .btn:hover:not(:disabled) {
-  background: rgba(38, 33, 25, 0.92);
-}
-
-/* A small board has small corners; the buttons follow it down. */
-@media (max-width: 640px) {
-  .board-tools {
-    left: 8px;
-    bottom: 8px;
-  }
-  .board-tools .btn {
-    padding: 4px 9px;
-    font-size: 12px;
-  }
-}
-
 /* --- reviewing history --------------------------------------------------- */
 
 .board-wrap {
   position: relative;
-  margin: 8px 0;
+  /* Unequal on purpose, to LOOK equal. The numbers were 8px both sides and
+     the diamond is dead-centre in its own canvas — but the board's drop
+     shadow is cast downward (dy 14 plus blur, in board units), so the gap
+     under the board reads smaller than the one above it. The extra bottom
+     margin is the shadow's height given back. */
+  margin: 4px 0 16px;
 }
 
 /* While reviewing, the board is a record, not a place to act. Desaturating it
@@ -1259,6 +1264,14 @@ td.num {
 .review-banner .btn {
   padding: 5px 11px;
   font-size: 13px;
+}
+
+/* The pill at rest: the same shape and place as every mode banner, holding
+   Flip and Analyze until a mode needs the spot. Quieter than a banner that is
+   telling you something, because at rest nothing is being told. */
+.review-banner.resting {
+  border-color: var(--border-strong);
+  color: var(--text-secondary);
 }
 
 /*
@@ -1517,6 +1530,7 @@ td.num {
 }
 
 .rung-rating {
+  margin-left: auto;
   font-family: var(--font-mono);
   font-size: 15px;
   font-weight: 620;
@@ -1736,7 +1750,8 @@ td.num {
 @media (max-width: 640px) {
   main {
     --page-gutter: 14px;
-    padding: 20px var(--page-gutter) 48px;
+    --page-vpad: 20px;
+    padding: var(--page-vpad) var(--page-gutter) 48px;
   }
 
   .topbar {
@@ -1753,8 +1768,8 @@ td.num {
   h1 {
     font-size: 22px;
   }
-  .hero-title {
-    font-size: 40px;
+  .splash-title {
+    font-size: 44px;
   }
 
   .board {
@@ -1772,48 +1787,3 @@ td.num {
   }
 
 }
-
-/* --- landing points ------------------------------------------------------ */
-
-.hero-points {
-  list-style: none;
-  margin: 0 0 30px;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  max-width: 50ch;
-}
-
-.hero-points li {
-  position: relative;
-  padding-left: 22px;
-  color: var(--text-secondary);
-  line-height: 1.6;
-  font-size: 14.5px;
-}
-
-/* A small ringed disc, echoing the pieces. */
-.hero-points li::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 7px;
-  width: 11px;
-  height: 11px;
-  border-radius: 50%;
-  background: radial-gradient(
-    circle at 35% 30%,
-    var(--piece-light),
-    var(--piece-mid) 55%,
-    var(--piece-dark)
-  );
-  box-shadow: inset 0 0 0 2px var(--piece-ring);
-}
-
-.hero-points strong {
-  color: var(--text-primary);
-  font-weight: 600;
-}
-
-

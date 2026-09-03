@@ -63,8 +63,8 @@ export default async function GamesPage() {
         <div>
           <h1>Games</h1>
           <p className="lede" style={{ marginBottom: 0 }}>
-            Join a table, host one, or take on the computer. Games in progress
-            are open to watch.
+            Join someone&apos;s open table, host your own, or play the
+            computer. Anyone can watch the games in progress.
           </p>
         </div>
       </header>
@@ -88,8 +88,8 @@ export default async function GamesPage() {
                     : `Your ${yourTables.length} tables are waiting`}
                 </h2>
                 <p className="muted">
-                  Listed below for anyone to join. The game starts the moment
-                  someone sits down — nothing more for you to do.
+                  Anyone can join it. The game starts as soon as someone does —
+                  nothing more for you to do until then.
                 </p>
               </div>
               <ul className="list waiting-table-list">
@@ -126,7 +126,7 @@ export default async function GamesPage() {
               <div className="panel start-card">
                 <h2>Quick match</h2>
                 <p className="muted">
-                  Sits you down at the table that has waited longest.
+                  Joins an open table for you. The game starts right away.
                 </p>
                 <div className="start-spacer" />
                 <QuickGameButton />
@@ -165,13 +165,13 @@ export default async function GamesPage() {
             accent="amber"
           />
           <p className="muted" style={{ margin: "0 0 12px", lineHeight: 1.6 }}>
-            Hosted by other players and waiting for an opponent. Joining one
-            starts it immediately.
+            Tables other players have hosted. Join one and the game starts
+            right away.
           </p>
           {joinable.length === 0 ? (
             <Empty>
-              Nobody is waiting right now.{" "}
-              {user ? "Host a table and see who turns up." : "Sign in to host one."}
+              No open tables right now.{" "}
+              {user ? "Host one and wait for a challenger." : "Sign in to host one."}
             </Empty>
           ) : (
             <ul className="watch-grid">
