@@ -119,25 +119,20 @@ export interface Game {
   /** The side offering a draw, while one is on offer. Null otherwise. */
   draw_offered_by: Player | null;
   /**
-   * Whether this game counts towards ratings. Always 1 today.
-   *
-   * There was briefly a casual mode, and it was taken out rather than kept:
-   * with this few players, two kinds of game means two thinner pools and
-   * every list shorter. The column stays because it costs nothing and the
-   * question it asks may come back with more players — but nothing sets it to
-   * 0, and the ladder still filters on it, so that day needs no new plumbing.
+   * Whether this game counts. Always 1 today: casual mode was tried and taken
+   * out (too few players to split into two pools), and the player-rating
+   * system it later served was retired in favour of badges. The column stays
+   * because it costs nothing and the question may return with more players.
    */
   rated: number;
   /**
    * How many times this game was rewound, back when that was possible.
    *
-   * Taking a move back against the engine was REMOVED entirely (2026-09-02):
-   * with the ladder rating those games, a rewind either had to disqualify the
-   * game or corrupt the rating, and a button whose real cost was "this game
-   * stops counting" confused more than it helped. Nothing increments this any
-   * more. It stays because games played before the removal could be rewound
-   * without trace — the rows were deleted, not marked — and this count is the
-   * only thing that says which of THOSE games were played straight through.
+   * Taking a move back against the engine was removed entirely (2026-09-02),
+   * and nothing increments or reads this today. It stays because games from
+   * before the removal could be rewound without trace — the rows were
+   * deleted, not marked — and this count is the only record of it, should
+   * anything ever need to care again.
    */
   takebacks_used: number;
 }
@@ -1964,66 +1959,14 @@ export function botLeaderboard(): BotRow[] {
  * Deliberately has no password: verifyPassword refuses a null hash, so a bot's
  * account cannot be signed in to at all.
  */
-/** One rated game against the engine, as the ladder needs it. */
-export interface EngineGameRow {
-  user_id: string;
-  username: string;
-  bot_username: string;
-  /** 1 if the human won. */
-  won: number;
-  finished_at: number;
-}
-
-/**
- * Every finished bot game that counts towards the engine ladder, oldest first.
- *
- * The exclusion that matters is **rewound games**, from before taking moves
- * back against the engine was removed: a game undone until it was won says
- * nothing about who would have won. No new game can be rewound; the filter is
- * for the old ones. `rated` is checked too, though nothing sets it to 0
- * today — see the column.
- * - **Games against a retired bot**, filtered by the caller: an anchor it no
- *   longer has is an anchor nobody can rate against.
- *
- * Ordered by when they ended, because a rating is a replay and a replay needs
- * an order. Deleted accounts are dropped — their games survive, but there is
- * nobody to rank.
- */
-export function engineGamesForLadder(): EngineGameRow[] {
-  return getDb()
-    .prepare(
-      `SELECT
-         human.id       AS user_id,
-         human.username AS username,
-         bot.username    AS bot_username,
-         CASE WHEN (g.player1_id = human.id AND g.result = 1)
-                OR (g.player2_id = human.id AND g.result = -1)
-              THEN 1 ELSE 0 END AS won,
-         g.finished_at  AS finished_at
-       FROM games g
-       JOIN users bot   ON bot.id IN (g.player1_id, g.player2_id)
-                       AND bot.bot_strength IS NOT NULL
-       JOIN users human ON human.id IN (g.player1_id, g.player2_id)
-                       AND human.bot_strength IS NULL
-                       AND human.deleted_at IS NULL
-      WHERE g.status = 'finished'
-        AND g.result IS NOT NULL
-        AND g.result <> 0
-        AND g.rated = 1
-        AND g.takebacks_used = 0
-      ORDER BY g.finished_at ASC, g.id ASC`,
-    )
-    .all() as EngineGameRow[];
-}
-
 export interface BotSpec {
   username: string;
   /** Engine skill setting. */
   strength: number;
   /**
-   * This bot's fixed rating, the anchor the engine ladder measures players
-   * against. Configuration rather than data: it is never stored, so it can be
-   * re-tuned and every rating on the site is right on the next page load.
+   * Difficulty, as a number: orders the ladder and the badges, easiest to
+   * hardest. Never stored and never shown — the tags and the order are what a
+   * player sees.
    */
   rating: number;
   /**

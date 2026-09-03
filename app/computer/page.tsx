@@ -2,7 +2,6 @@ import Link from "next/link";
 import { currentUser } from "@/lib/auth";
 import { botLeaderboard, opponentRecords } from "@/lib/db/queries";
 import { BOTS } from "@/lib/bots";
-import { engineRatingFor } from "@/lib/ladder";
 import ChallengeEngineButton from "@/components/ChallengeEngineButton";
 
 export const dynamic = "force-dynamic";
@@ -19,7 +18,6 @@ export const metadata = { title: "Play the computer · Gygès" };
 export default async function ComputerPage() {
   const user = await currentUser();
   const bots = botLeaderboard();
-  const standing = user ? engineRatingFor(user.id) : null;
 
   // The viewer's record against each opponent.
   const records = new Map(
@@ -38,8 +36,9 @@ export default async function ComputerPage() {
     }))
     .sort((a, b) => b.rating - a.rating);
 
-  const rating = standing?.rating ?? 0;
   const easiest = rungs[rungs.length - 1];
+  /** The best badge earned, by difficulty. */
+  const best = [...rungs].find((r) => (records.get(r.username)?.wins ?? 0) > 0);
   /** The easiest opponent not beaten yet. */
   const next = [...rungs]
     .reverse()
@@ -51,28 +50,18 @@ export default async function ComputerPage() {
         <div>
           <h1>Play the computer</h1>
           <p className="lede" style={{ marginBottom: 0 }}>
-            Five computer opponents, from easiest to hardest. Winning raises
-            your rating — but wins against opponents far below you count for
-            nothing, so the only way up is to beat the next one.
+            Five computer opponents, from easiest to hardest. Beat one and its
+            badge is on your profile for good.
           </p>
         </div>
       </header>
 
       {user && (
         <div className="panel standing">
-          <div className="standing-figure">
-            <span className="standing-label">Your rating</span>
-            <span className="standing-value">{rating}</span>
-          </div>
           <p className="standing-note">
-            {standing === null ? (
+            {best ? (
               <>
-                You haven&apos;t played the computer yet. Start with{" "}
-                <strong>{easiest?.username}</strong>.
-              </>
-            ) : standing.bestBeaten ? (
-              <>
-                Best win: <strong>{standing.bestBeaten}</strong>.
+                Best win: <strong>{best.username}</strong>.
                 {next ? (
                   <>
                     {" "}
@@ -84,9 +73,8 @@ export default async function ComputerPage() {
               </>
             ) : (
               <>
-                No wins yet from {standing.games} game
-                {standing.games === 1 ? "" : "s"}. Start with{" "}
-                <strong>{next?.username}</strong>.
+                You haven&apos;t beaten the computer yet. Start with{" "}
+                <strong>{easiest?.username}</strong>.
               </>
             )}
           </p>
@@ -112,7 +100,6 @@ export default async function ComputerPage() {
                     {user && !beaten && next?.username === rung.username && (
                       <span className="tag tag-waiting">next</span>
                     )}
-                    <span className="rung-rating">{rung.rating}</span>
                   </div>
                   {rung.description && (
                     <p className="muted rung-desc">{rung.description}</p>

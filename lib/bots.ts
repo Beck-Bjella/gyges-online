@@ -112,31 +112,12 @@ const WEAK = {
 };
 
 /*
- * The `rating` on each bot is its anchor on the engine ladder — see
- * lib/rating.ts. They are not invented: they are fitted to the games measured
- * above, using Elo's own scale where 400 points is about nine wins in ten.
- *
- *   Club over Casual, 17-3 (85%)   -> the ladder says 87%
- *   Club over Novice, 19-1 (95%)   -> the ladder says 97%
- *   Sharp over Casual, 20-0        -> the ladder says 98%
- *
- * Full is set above Sharp on the strength of what it is rather than a measured
- * score: bounded by nodes rather than depth, it gets deeper exactly as the
- * position simplifies, which is where the other four are weakest.
- *
- * The range is deliberately wide — a thousand points a rung, so the ladder
- * runs from about 1000 to about 5750 and each bot is a visibly different
- * altitude rather than a few dozen points along. That is a choice about how
- * the numbers FEEL, and it is free: RATING_SCALE in lib/rating.ts is widened
- * to match, so the win probabilities these gaps stand for are unchanged. The
- * numbers are units, like degrees; the relationships are the physics.
- *
- * Re-tune these when the bots change. They are the ruler; if the ruler is
- * wrong every number on the ladder is wrong with it. Two rules bind: the
- * ORDER must match measured results, and every gap must exceed FARM_GAP —
- * tests/rating.test.ts enforces the second.
+ * The `rating` on each bot is its difficulty as a number: it orders the
+ * ladder and the badges, easiest to hardest, and is never shown to a player.
+ * The ORDER is measured, not assumed — see the games above — and it is not
+ * the order of search depth: a perfect one-ply bot beats a handicapped
+ * three-ply one comfortably, which is what puts Club above Casual.
  */
-
 export const BOTS: BotSpec[] = [
   {
     username: "Rookie",

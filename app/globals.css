@@ -1582,13 +1582,6 @@ td.num {
   flex-wrap: wrap;
 }
 
-.rung-rating {
-  font-family: var(--font-mono);
-  font-size: 15px;
-  font-weight: 620;
-  color: var(--accent-mint);
-}
-
 .rung-desc {
   margin: 6px 0 0;
   line-height: 1.55;
@@ -1603,7 +1596,7 @@ td.num {
   flex: none;
 }
 
-/* Your standing, above the ladder: the number, and what to do about it. */
+/* Your progress, above the ladder: what you have beaten, what is next. */
 .standing {
   display: flex;
   align-items: center;
@@ -1611,30 +1604,9 @@ td.num {
   flex-wrap: wrap;
   margin-bottom: clamp(18px, 2vh, 26px);
 }
-.standing-figure {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.standing-label {
-  font-size: 11px;
-  font-weight: 620;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-  color: var(--text-dim);
-}
-.standing-value {
-  font-family: var(--font-mono);
-  font-size: 30px;
-  font-weight: 600;
-  line-height: 1.1;
-  letter-spacing: -0.02em;
-  color: var(--accent-mint);
-}
 .standing-note {
-  flex: 1 1 320px;
   margin: 0;
-  font-size: 14px;
+  font-size: 14.5px;
   line-height: 1.6;
   color: var(--text-secondary);
 }
