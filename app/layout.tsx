@@ -13,15 +13,15 @@ import "./globals.css";
 export const metadata: Metadata = {
   metadataBase: new URL("https://playgyges.com"),
   title: {
-    default: "Play Gygès online from your browser",
+    default: "Play Gygès online — take on the computer in your browser",
     template: "%s",
   },
   description:
-    "Play the board game Gygès in your browser — against other people or the computer. Free, no download, take your turns whenever you like.",
+    "Play the board game Gygès in your browser. Climb five levels of computer opponents, or play other people. Free, no download, take your turns whenever you like.",
   openGraph: {
-    title: "Play Gygès online from your browser",
+    title: "Play Gygès online — take on the computer in your browser",
     description:
-      "Against other people or the computer. Free, no download, take your turns whenever you like.",
+      "Climb five levels of computer opponents, or play other people. Free, no download.",
     url: "/",
     siteName: "playgyges.com",
     type: "website",

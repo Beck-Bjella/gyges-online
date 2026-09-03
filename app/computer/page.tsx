@@ -28,21 +28,22 @@ export default async function ComputerPage() {
       : [],
   );
 
-  // Hardest at the top, easiest at the bottom — and each end says so.
+  // Easiest at the top, hardest at the bottom: the list reads in the order
+  // you will actually play them.
   const rungs = bots
     .map((b) => ({
       ...b,
       rating: BOTS.find((spec) => spec.username === b.username)?.rating ?? 0,
     }))
-    .sort((a, b) => b.rating - a.rating);
+    .sort((a, b) => a.rating - b.rating);
 
-  const easiest = rungs[rungs.length - 1];
+  const easiest = rungs[0];
   /** The best badge earned, by difficulty. */
-  const best = [...rungs].find((r) => (records.get(r.username)?.wins ?? 0) > 0);
-  /** The easiest opponent not beaten yet. */
-  const next = [...rungs]
+  const best = [...rungs]
     .reverse()
-    .find((r) => (records.get(r.username)?.wins ?? 0) === 0);
+    .find((r) => (records.get(r.username)?.wins ?? 0) > 0);
+  /** The easiest opponent not beaten yet. */
+  const next = rungs.find((r) => (records.get(r.username)?.wins ?? 0) === 0);
 
   return (
     <>
@@ -94,8 +95,8 @@ export default async function ComputerPage() {
                     <Link href={`/player/${encodeURIComponent(rung.username)}`}>
                       <strong>{rung.username}</strong>
                     </Link>
-                    {i === 0 && <span className="tag">hardest</span>}
-                    {i === rungs.length - 1 && <span className="tag">easiest</span>}
+                    {i === 0 && <span className="tag">easiest</span>}
+                    {i === rungs.length - 1 && <span className="tag">hardest</span>}
                     {beaten && <span className="tag tag-turn">beaten</span>}
                     {user && !beaten && next?.username === rung.username && (
                       <span className="tag tag-waiting">next</span>
