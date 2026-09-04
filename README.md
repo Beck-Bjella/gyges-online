@@ -1,8 +1,15 @@
 # Gygès Online
 
+**Live at [gyges.app](https://gyges.app).**
+
 An online site for playing [Gygès](https://en.wikipedia.org/wiki/Gyges_(board_game))
-asynchronously against other players — correspondence-style, in the spirit of
-Board Game Arena.
+asynchronously — against other players, correspondence-style, or against five
+strengths of the site's own engine, which runs as WebAssembly in the player's
+browser.
+
+Deploying a change is two commands: `git push` here, then
+`bash deploy/deploy.sh` on the server. The runbook is
+[deploy/README.md](deploy/README.md).
 
 ## Running it locally
 

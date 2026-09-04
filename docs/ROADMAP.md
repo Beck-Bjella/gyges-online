@@ -147,27 +147,29 @@ Small, and none of it optional once strangers can reach the site.
 
 ---
 
-## 5. Deploy
+## 5. Deploy — **DONE** (launched 2026-09-04 at https://gyges.app)
 
-Independent of the engine. The site is a real site without it.
-
-- **One Linux box — Lightsail 2 GB — with the SQLite file on its disk, Caddy
-  in front for TLS, systemd keeping the process up, and the domain's A record
-  pointed at the static IP.** The full shape, and why this replaced Vercel plus
-  Neon Postgres, is in ARCHITECTURE.md under "Hosting".
-- **The Postgres port is off the roadmap.** It existed only because Vercel
-  cannot keep a file. The schema stays inside the portable subset regardless —
-  the known differences are listed at the top of `migrations/0001_initial.sql`
-  — so the door stays open at no cost.
-- **Migrations are already set up** (`migrations/`, `npm run db:migrate`), which
-  is the thing that makes a schema change routine rather than frightening. Keep
-  writing them: never edit an applied migration.
-- **Still to write, once, before the first deploy:** the systemd unit, the
-  Caddyfile, a deploy script (pull, `npm ci`, build, restart), a cron entry
-  running `npm run db:backup` and copying the result to S3, and an external
-  uptime check.
-- **Sign-in has no throttling.** Not infrastructure — a gap in the app, and the
-  one security item worth closing before the URL is public.
+- **The shape shipped as designed:** one Lightsail box (Ubuntu, the $5
+  512 MB tier — the swap file `setup.sh` creates is what makes its builds
+  possible), the SQLite file on its disk at `/var/lib/gyges/`, Caddy in front
+  for TLS, systemd keeping the process up. Domain `gyges.app` at NameHero,
+  DNS served by a Lightsail zone. The runbook is `deploy/README.md`;
+  publishing a change is `git push` then `bash deploy/deploy.sh` on the box.
+- **What launch night taught**, all fixed in git so the next box provisions
+  clean: browser-SSH sessions die when idle and take their script with them
+  (re-run; setup.sh resumes); the region's apt mirror had an outage (that box
+  now uses archive.ubuntu.com over https); the bot seeding used `require()`,
+  which the production ES-module server does not have (now a dynamic import);
+  and bot names with spaces failed username validation on a fresh database
+  (spaces are now allowed for bots only).
+- **The Postgres port stays off the roadmap.** The schema stays inside the
+  portable subset regardless — the known differences are listed at the top of
+  `migrations/0001_initial.sql` — so the door stays open at no cost.
+- **Migrations run themselves on deploy.** Keep writing them: never edit an
+  applied migration.
+- **Still to do on the ops side:** the S3 backup cron (`deploy/backup.sh` is
+  written; it needs a bucket and the crontab line) and an external uptime
+  ping. Sign-in throttling shipped before launch.
 - **Primary keys are already time-ordered.** `newId()` puts a millisecond
   timestamp in front of the random half, so inserts append to the end of the
   index rather than scattering through it — which was the page-split and

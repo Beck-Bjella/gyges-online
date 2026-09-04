@@ -1,8 +1,8 @@
-# Running it: your machine, your network, and a real server
+# Running it: your machine, your network, and the real server
 
-Three ways this same application can run, from most local to most public.
-Nothing about the code changes between them — only where it runs and what can
-reach it.
+Three ways this same application runs, from most local to most public — the
+third being https://gyges.app, where it is live. Nothing about the code
+changes between them — only where it runs and what can reach it.
 
 ---
 
@@ -146,21 +146,38 @@ public address with no passwords behind it — use it briefly and stop it after.
 
 ---
 
-## 3. A real server
+## 3. The real server
 
-The difference between "running on your PC" and "hosted" is smaller than it
-sounds. The same Node application runs; it just runs on a rented computer that
-is always on, with a domain name pointing at it.
+This is https://gyges.app: a $5 Lightsail instance (Ubuntu, 512 MB plus the
+2 GB swap file the setup script creates), provisioned once by
+`deploy/setup.sh` and updated ever after with one command. The full runbook —
+first-time setup, backups, restores, the things that bite — is
+`deploy/README.md`.
 
-### What changes
+### Publishing a change
 
-| | Your PC now | Hosted later |
+```sh
+# on this machine: commit and push as usual
+git push
+
+# on the server (Lightsail's browser SSH button):
+bash ~/gyges-online/deploy/deploy.sh
+```
+
+The deploy pulls, rebuilds, and restarts — in that order on purpose: the old
+version keeps serving until the new build has succeeded, so a broken build
+never takes the site down. Database migrations apply themselves when the app
+starts, and the database itself is never touched by a deploy.
+
+### What differs from your PC
+
+| | Your PC | gyges.app |
 |---|---|---|
-| Where the app runs | `npm run dev` in your terminal | `npm start` on a rented Linux box, kept up by systemd |
-| Who can reach it | you, or your wifi | anyone, via your domain |
-| Database | SQLite file in `.data/` | the same SQLite file, on that machine's disk |
+| Where the app runs | `npm run dev` in your terminal | `npm start` under systemd, restarted on crash or reboot |
+| Who can reach it | you, or your wifi | anyone |
+| Database | SQLite file in `.data/` | the same kind of file, at `/var/lib/gyges/gyges.db` |
+| HTTPS | none (dev is plain http) | Caddy, with a Let's Encrypt certificate it renews itself |
 | Uptime | while your terminal is open | continuous |
-| Address | `localhost:3000` | `yourdomain.com` |
 
 ### What does not change
 
@@ -179,15 +196,15 @@ ARCHITECTURE.md under "Hosting".
 
 ```
    Browser  ── plays the bots itself: the engine is wasm, in the page
-      │  yourdomain.com
+      │  gyges.app
       ▼
 ┌──────────────┐
-│  DNS         │  your registrar: "that name lives at 1.2.3.4"
-└──────────────┘
+│  DNS         │  a Lightsail zone: "gyges.app lives at the static IP"
+└──────────────┘   (the registrar holds the name and points here)
       │
       ▼
 ┌─────────────────────────────────────┐
-│  One Linux box (Lightsail 2 GB)     │
+│  One Linux box (Lightsail, $5)      │
 │                                     │
 │   Caddy  ──▶  Next.js  ──▶  gyges.db│  accounts, games, moves
 │   TLS         :3000        on disk  │
@@ -195,7 +212,7 @@ ARCHITECTURE.md under "Hosting".
       │
       ▼
 ┌──────────────┐
-│  S3          │  nightly copy of the file
+│  S3          │  nightly copy of the file (cron, once configured)
 └──────────────┘
 ```
 
@@ -257,12 +274,21 @@ Rebuilding it is a separate job in the engine repository, which carries the
 
 ---
 
-## Order of work
+## Debugging the live site
 
-1. **Now** — play over the LAN, find what feels wrong.
-2. **Real accounts** — done; passwords. Required before anyone outside
-   your home can reach it.
-3. **Deploy** — one Linux box, the SQLite file on its disk, the domain's A
-   record pointed at its static IP. No database port: the same file, moved.
-4. **Engine** — done, and not as a service: it is compiled to WebAssembly and
-   runs in the player's own browser.
+Everything below runs in the server's SSH session:
+
+```sh
+systemctl status gyges        # is it running
+journalctl -u gyges -f        # what it is saying (Ctrl+C to stop watching)
+journalctl -u caddy -n 50     # certificate trouble lives here
+npm run db:migrate -- --status  # which migrations the live database has
+```
+
+Two lessons from launch night worth keeping: the browser SSH session dies
+when idle, and a dying session kills whatever it was running — so keep the tab
+awake during deploys, and know that `setup.sh` and `deploy.sh` are both safe
+to simply run again. And when something network-ish fails silently, re-run the
+failing command loudly (without its quiet flags) before theorising: the mirror
+outage that stalled the first deploy was obvious the moment apt was allowed to
+speak.

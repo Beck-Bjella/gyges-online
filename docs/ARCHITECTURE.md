@@ -7,11 +7,15 @@ things get built and assumptions get tested.
 
 ## Status
 
-**Built and working locally** (see the README to run it): accounts with
-passwords, sessions, creating and joining games, an interactive SVG board with
-displacement moves, per-move history with review, resignation, forfeit on time,
-and a leaderboard. The server enforces participation, turn order, **and the
-rules of Gygès**. 135 unit tests and 63 end-to-end checks pass.
+**Live at https://gyges.app since 2026-09-04.** One Lightsail box, deployed by
+`deploy/setup.sh`, updated by `deploy/deploy.sh` — see `deploy/README.md`.
+
+**Built and working**: accounts with passwords, sessions, creating and joining
+games, an interactive SVG board with displacement moves, per-move history with
+review, resignation, draws by agreement, forfeit on time, a leaderboard, and
+five computer opponents with profile badges for beating them. The server
+enforces participation, turn order, **and the rules of Gygès**. 170 tests
+pass.
 
 **Reversed decision — SQLite is the production database, not a stand-in for
 one.** This document used to describe development on SQLite and production on
@@ -23,7 +27,11 @@ the door open.
 engine is compiled to WebAssembly and searches in the player's own browser. See
 "The engine runs in the browser" below.
 
-**Not built yet:** email notifications and ratings.
+**Not built yet:** email notifications, and any rating system — one was built
+(Elo against the bots as fixed anchors) and deliberately retired the same week
+for profile badges, which say "beat Hard Bot" in words instead of a number
+that needed explaining. The design survives in git history if a rating ever
+earns its way back.
 
 **Reversed decision — move legality is no longer waiting on the engine.** It is
 implemented in `lib/game/rules.ts`, in TypeScript, in-process. See "Where the
@@ -720,12 +728,13 @@ evening, once.
 
 ### The shape
 
-- **Instance.** AWS Lightsail, 2 GB. The 512 MB tier cannot finish a Next
-  build and 1 GB needs swap to manage it; the build is the only memory-hungry
-  moment in the system, and a deploy that dies halfway is what makes people
-  resent their own infrastructure. EC2 is equivalent and slightly dearer once
-  the separately-billed IPv4 address is counted — worth it for VPC or IAM
-  control, such as letting the backup job assume a role rather than hold a key.
+- **Instance.** AWS Lightsail. Launched on the $5, 512 MB tier — workable
+  because `setup.sh` creates a 2 GB swap file before anything else; the Next
+  build is the only memory-hungry moment in the system, and with swap it is
+  merely slow. If build times grate, snapshot and restore onto the 2 GB tier.
+  EC2 is equivalent and slightly dearer once the separately-billed IPv4
+  address is counted — worth it for VPC or IAM control, such as letting the
+  backup job assume a role rather than hold a key.
 - **Disk.** The database on the instance's own volume, and **never on EFS or
   any network filesystem** — SQLite's locking assumes a local disk, and over
   NFS it can corrupt rather than merely underperform. `GYGES_DB_PATH` chooses
@@ -756,7 +765,7 @@ evening, once.
 
 | Concern | Choice | Cost |
 |---------|--------|------|
-| App and database | Lightsail 2 GB | ~$12/mo |
+| App and database | Lightsail 512 MB (as launched) | $5/mo |
 | Backups | S3 | pennies |
 | Email | Resend free tier | $0 |
 | Domain | any registrar | ~$10–15/yr |
