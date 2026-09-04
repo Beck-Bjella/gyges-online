@@ -165,13 +165,22 @@ export interface GameWithPlayers extends Game {
 // ---------------------------------------------------------------------------
 
 /** Shared by createUser and renameUser. Returns the cleaned name. */
-function validateUsername(username: string): string {
+function validateUsername(username: string, allowSpaces = false): string {
   const trimmed = username.trim();
   if (trimmed.length < 2 || trimmed.length > 24) {
     throw new Error("Username must be between 2 and 24 characters.");
   }
-  if (!/^[A-Za-z0-9_-]+$/.test(trimmed)) {
-    throw new Error("Username may contain only letters, numbers, hyphens and underscores.");
+  // Spaces are reserved for the application's own accounts — "Rookie Bot" —
+  // so no person can register a name that reads like one of the computer
+  // opponents. Single spaces only even there, or "Rookie  Bot" could still
+  // impersonate "Rookie Bot" at a glance.
+  const pattern = allowSpaces ? /^[A-Za-z0-9_-]+( [A-Za-z0-9_-]+)*$/ : /^[A-Za-z0-9_-]+$/;
+  if (!pattern.test(trimmed)) {
+    throw new Error(
+      allowSpaces
+        ? "Bot names may contain only letters, numbers, hyphens, underscores and single spaces."
+        : "Username may contain only letters, numbers, hyphens and underscores.",
+    );
   }
   return trimmed;
 }
@@ -187,8 +196,13 @@ function validateUsername(username: string): string {
  * SELECT above it. Two simultaneous sign-ups for the same free name would both
  * pass the SELECT; the index is what actually stops the second one.
  */
-export function createUser(username: string, passwordHash?: string): User {
-  const trimmed = validateUsername(username);
+export function createUser(
+  username: string,
+  passwordHash?: string,
+  /** Only createBot passes true; a person's name never contains a space. */
+  allowSpaces = false,
+): User {
+  const trimmed = validateUsername(username, allowSpaces);
 
   const db = getDb();
   const existing = db
@@ -2036,7 +2050,10 @@ export function createBot(spec: BotSpec): User {
     throw new GameError("A bot must record which engine build it plays with.");
   }
 
-  const user = createUser(username);
+  // Spaces allowed: bot names are application configuration, not user input,
+  // and the live site's first boot proved the strict rule rejects "Rookie
+  // Bot" — every bot failed to seed, silently, behind the sync's catch.
+  const user = createUser(username, undefined, true);
   getDb()
     .prepare(
       `UPDATE users
