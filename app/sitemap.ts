@@ -9,8 +9,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
   return [
     { url: `${base}/`, priority: 1 },
     { url: `${base}/computer`, priority: 0.9 },
-    { url: `${base}/rules`, priority: 0.8 },
-    { url: `${base}/games`, priority: 0.7 },
-    { url: `${base}/leaderboard`, priority: 0.5 },
+    { url: `${base}/games`, priority: 0.8 },
+    { url: `${base}/leaderboard`, priority: 0.6 },
+    { url: `${base}/rules`, priority: 0.5 },
   ];
 }
