@@ -67,9 +67,13 @@ fi
 # why node_modules must never be copied here from a laptop.
 echo "==> build tools"
 if [[ "$PKG" == apt ]]; then
+  # Some cloud instances resolve the Ubuntu mirror to IPv6 addresses that do
+  # not answer (seen on Lightsail: connection failures and 503s, all on
+  # 2600:... addresses). Forcing IPv4 costs nothing and unsticks it.
+  echo 'Acquire::ForceIPv4 "true";' | sudo tee /etc/apt/apt.conf.d/99force-ipv4 >/dev/null
   sudo apt-get update -qq
   sudo apt-get install -y -qq build-essential python3 git curl tar \
-    debian-keyring debian-archive-keyring apt-transport-https ca-certificates
+    ca-certificates gnupg
 else
   sudo dnf -y -q group install "Development Tools" || sudo dnf -y -q groupinstall "Development Tools"
   sudo dnf -y -q install python3 git curl tar
