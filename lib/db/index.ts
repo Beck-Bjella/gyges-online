@@ -57,18 +57,27 @@ function syncBotsOnce(): void {
   if (botsSynced) return;
   botsSynced = true;
   try {
-    // require rather than a static import, to break the cycle with lib/bots.ts.
-    const { syncBots } = require("../bots.ts") as typeof import("../bots.ts");
-    const result = syncBots();
-    if (result.created.length) {
-      console.log(`  seeded bots: ${result.created.join(", ")}`);
-    }
-    if (result.retired.length) {
-      console.log(`  retired bots: ${result.retired.join(", ")}`);
-    }
-    for (const note of result.frozen) {
-      console.warn(`  bot not synced — ${note}`);
-    }
+    // A dynamic import rather than a static one, to break the cycle with
+    // lib/bots.ts. It USED to be require(), which the dev server tolerated —
+    // and the production server does not: it runs as ES modules, require does
+    // not exist there, and this catch dutifully swallowed the error, so the
+    // live site launched with no bots. Found on launch night, the hard way.
+    void import("../bots.ts")
+      .then(({ syncBots }) => {
+        const result = syncBots();
+        if (result.created.length) {
+          console.log(`  seeded bots: ${result.created.join(", ")}`);
+        }
+        if (result.retired.length) {
+          console.log(`  retired bots: ${result.retired.join(", ")}`);
+        }
+        for (const note of result.frozen) {
+          console.warn(`  bot not synced — ${note}`);
+        }
+      })
+      .catch((err) => {
+        console.error(`  bot sync failed: ${err instanceof Error ? err.message : err}`);
+      });
   } catch (err) {
     console.error("  bot sync failed:", err instanceof Error ? err.message : err);
   }
