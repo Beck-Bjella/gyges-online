@@ -858,23 +858,6 @@ tr.you td:first-child {
   margin-top: 5px;
 }
 
-.deflist {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 7px 14px;
-  margin: 0;
-  font-size: 13.5px;
-}
-.deflist dt {
-  color: var(--text-dim);
-}
-.deflist dd {
-  margin: 0;
-  font-family: var(--font-mono);
-  text-align: right;
-  color: var(--text-secondary);
-}
-
 /* --- grid --------------------------------------------------------------- */
 
 /*
@@ -1698,13 +1681,6 @@ td.num {
   margin: 8px 0 0;
   line-height: 1.6;
 }
-.host-controls {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
 /* --- placing pieces before play ----------------------------------------- */
 
 /*

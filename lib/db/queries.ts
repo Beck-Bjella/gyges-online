@@ -32,7 +32,7 @@ const SESSION_DAYS = 30;
 // by a CHECK constraint, and unambiguous.
 // ---------------------------------------------------------------------------
 
-export function encodeBoard(board: BoardState): string {
+function encodeBoard(board: BoardState): string {
   return board.join("");
 }
 
@@ -924,7 +924,7 @@ export interface ChatMessage {
 }
 
 /** The longest message anyone may send. Matches the CHECK in the schema. */
-export const CHAT_MAX_LENGTH = 500;
+const CHAT_MAX_LENGTH = 500;
 
 /**
  * Post to a game's private chat, or to the lobby when gameId is null.
